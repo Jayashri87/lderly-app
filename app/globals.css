@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050816;
+  --foreground: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: radial-gradient(circle at top, #172554, #050816 60%);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}

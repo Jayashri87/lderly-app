@@ -1,0 +1,187 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+        ".write": false
+      }
+    },
+    "caretakers": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+        ".write": "auth != null && auth.token.role === 'admin'"
+      }
+    },
+    "operations": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": "auth != null && auth.token.role === 'admin'",
+      "activeBookingId": {
+        ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "activeJourneyId": {
+        ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "bookingsByStatus": {
+        "$status": {
+          "$bookingId": {
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "bookingsByDate": {
+        "$date": {
+          "$bookingId": {
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "bookingsByZone": {
+        "$zone": {
+          "$bookingId": {
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "bookingsByCustomer": {
+        "$uid": {
+          "$bookingId": {
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "bookingsByCaretaker": {
+        "$uid": {
+          "$bookingId": {
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      }
+    },
+    "journeys": {
+      "byId": {
+        "$journeyId": {
+          ".read": "auth != null && (data.child('customerId').val() === auth.uid || data.child('caretakerId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": "auth != null && auth.token.role === 'admin'",
+          ".validate": "newData.hasChildren(['id', 'status', 'summary', 'serviceType', 'eta', 'customerId', 'customerName', 'caretakerName', 'priority', 'createdAt', 'updatedAt', 'timeline'])"
+        }
+      }
+    },
+    "bookings": {
+      "byId": {
+        "$bookingId": {
+          ".read": "auth != null && (data.child('customerId').val() === auth.uid || data.child('caretakerId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": "auth != null && auth.token.role === 'admin'",
+          ".validate": "newData.hasChildren(['id', 'serviceType', 'status', 'customerId', 'customerName', 'caretakerName', 'scheduledFor', 'notes', 'createdAt', 'updatedAt', 'timeline', 'lifecycle', 'matching', 'scheduleIndex', 'payment', 'familyUpdates', 'serviceReport'])"
+        }
+      }
+    },
+    "health": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+        ".validate": "newData.hasChildren(['userId', 'medicineStatus', 'nextMedicine', 'vitals', 'wellness', 'updatedAt', 'activity'])"
+      }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+        ".validate": "newData.hasChildren(['userId', 'elderName', 'age', 'primaryContact', 'emergencyContact', 'medicalNotes', 'allergies', 'subscriptionPlan', 'updatedAt'])"
+      }
+    },
+    "alerts": {
+      "$alertId": {
+        ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+        ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin')"
+      }
+    },
+    "notifications": {
+      "byId": {
+        "$notificationId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || data.child('role').val() === auth.token.role || data.child('role').val() === 'all' || auth.token.role === 'admin')",
+          ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".validate": "newData.hasChildren(['id', 'userId', 'role', 'title', 'body', 'priority', 'channel', 'deliveryStatus', 'read', 'createdAt'])"
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+        }
+      },
+      "byRole": {
+        "$role": {
+          ".read": "auth != null && (auth.token.role === $role || auth.token.role === 'admin')",
+          ".write": "auth != null && (auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+        }
+      }
+    },
+    "reports": {
+      "byId": {
+        "$reportId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".validate": "newData.hasChildren(['id', 'userId', 'caretakerName', 'serviceType', 'visitType', 'reportType', 'summary', 'vitalsSummary', 'medicineSummary', 'familySummary', 'caregiverNote', 'attachments', 'completedAt'])"
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+        }
+      }
+    },
+    "voiceNotes": {
+      "byId": {
+        "$voiceNoteId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || data.child('caretakerId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null"
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')"
+        }
+      }
+    },
+    "auditLogs": {
+      "$auditId": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
+      }
+    },
+    "deviceSessions": {
+      "byId": {
+        "$sessionId": {
+          ".read": "auth != null && (data.child('uid').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          "$sessionId": {
+            ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+            ".write": false
+          }
+        }
+      }
+    },
+    "caretakerKyc": {
+      "byCaretaker": {
+        "$caretakerId": {
+          "$documentType": {
+            ".read": "auth != null && (auth.uid === $caretakerId || auth.token.role === 'admin')",
+            ".write": false
+          }
+        }
+      }
+    }
+  }
+}
