@@ -11,7 +11,9 @@ import {
 import { hasVoiceNoteStorageConfig } from "../../../../server/voiceNoteProvider";
 
 const hasEnv = (name: string) => Boolean(process.env[name]);
-const rulesDeployed = existsSync(join(process.cwd(), ".firebase-rules-deployed.json"));
+const rulesDeployed =
+  process.env.FIREBASE_RULES_DEPLOYED === "true" ||
+  existsSync(join(process.cwd(), ".firebase-rules-deployed.json"));
 
 export async function GET() {
   return NextResponse.json({
