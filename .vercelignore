@@ -1,0 +1,15 @@
+.env*
+!.env.example
+.next
+node_modules
+*.log
+*.zip
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*-firebase-adminsdk-*.json
+.firebase-rules-deployed.json
+dev-server*.out.log
+dev-server*.err.log
+preview-*.out.log
+preview-*.err.log

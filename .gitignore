@@ -44,3 +44,5 @@ Thumbs.db
 
 # deployment markers
 .firebase-rules-deployed.json
+
+.vercel
