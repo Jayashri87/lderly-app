@@ -377,6 +377,10 @@ try {
     "shadcn-style primitives are prepared"
   );
   expect(
+    status.json?.productionReadiness?.sentrySdkPrepared === true,
+    "Sentry SDK is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.freeAiReassuranceApi === true,
     "free AI reassurance API is prepared"
   );

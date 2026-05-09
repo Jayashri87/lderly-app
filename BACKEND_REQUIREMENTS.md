@@ -323,6 +323,7 @@ Startup-friendly platform optimization is now available:
 - source-owned shadcn-style primitives for buttons, cards, badges, and skeleton states
 - TanStack Query provider for future cache, dedupe, optimistic UI, and background refresh
 - PostHog and Microsoft Clarity client adapters that remain dormant until keys are configured
+- Sentry Next.js SDK instrumentation is prepared for client, server, edge, and error boundary capture
 - Lottie runtime dependency is ready for premium, calm micro-interactions
 - `POST /api/ai/reassurance`
 - creates deterministic free AI-style reassurance messages for family wellbeing, service context, and next best action

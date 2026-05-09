@@ -99,6 +99,7 @@ export async function GET() {
       posthogPrepared: true,
       microsoftClarityPrepared: true,
       lottiePrepared: true,
+      sentrySdkPrepared: true,
       freeAiReassuranceApi: true,
       awsScaleArchitecturePrepared: true,
       emergencyEscalationApi: true,
