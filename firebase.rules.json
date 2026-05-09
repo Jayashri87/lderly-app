@@ -57,6 +57,38 @@
             ".write": "auth != null && auth.token.role === 'admin'"
           }
         }
+      },
+      "supportQueue": {
+        "$priority": {
+          "$ticketId": {
+            ".read": "auth != null && auth.token.role === 'admin'",
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "complaintQueue": {
+        "$severity": {
+          "$complaintId": {
+            ".read": "auth != null && auth.token.role === 'admin'",
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "refundQueue": {
+        "$status": {
+          "$refundId": {
+            ".read": "auth != null && auth.token.role === 'admin'",
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
+      },
+      "communicationLogs": {
+        "$bookingId": {
+          "$logId": {
+            ".read": "auth != null && auth.token.role === 'admin'",
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
       }
     },
     "journeys": {
@@ -142,6 +174,54 @@
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+        }
+      }
+    },
+    "supportTickets": {
+      "byId": {
+        "$ticketId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "complaints": {
+      "byId": {
+        "$complaintId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "refunds": {
+      "byId": {
+        "$refundId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
         }
       }
     },

@@ -2396,8 +2396,14 @@ function ProfilePanel({
         {
           icon: CircleHelp,
           label: "Help center",
-          value: "Chat or call LDERLY support",
-          action: "Open"
+          value: "Create ticket, complaint, or refund request",
+          action: "Ready"
+        },
+        {
+          icon: WalletCards,
+          label: "Refund support",
+          value: "Refund requests are reviewed by ops",
+          action: "Request"
         },
         {
           icon: ShieldCheck,

@@ -239,7 +239,7 @@ export default function OpsApp() {
             label="Caregivers online"
             value={String(caretakers.filter((item) => item.available).length)}
           />
-          <OpsMetric icon={BarChart3} label="SLA" value="94%" />
+          <OpsMetric icon={BarChart3} label="Support ops" value="Ready" />
         </section>
 
         {systemStatus && (
@@ -361,6 +361,20 @@ export default function OpsApp() {
                 No notifications yet
               </div>
             )}
+          </Panel>
+          <Panel title="Reliability queues">
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Support tickets</p>
+              <p className="mt-1 text-white/50">Customer issues route into ops support queue.</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Complaints</p>
+              <p className="mt-1 text-white/50">Care quality and safety complaints create escalations.</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Refunds</p>
+              <p className="mt-1 text-white/50">Payment refund requests are tracked with booking context.</p>
+            </div>
           </Panel>
         </section>
       </div>

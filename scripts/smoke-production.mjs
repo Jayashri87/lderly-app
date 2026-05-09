@@ -63,6 +63,7 @@ const database = getDatabase(app);
 
 const assertions = [];
 const createdPaths = [];
+const createdReliability = [];
 
 const pass = (label) => {
   assertions.push({ label, ok: true });
@@ -335,6 +336,51 @@ try {
     "checkout returns Razorpay-compatible payload"
   );
 
+  const supportResult = await request(
+    "/api/support/tickets",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        userId: booking.customerId,
+        category: "booking",
+        priority: "normal",
+        subject: "Smoke support ticket",
+        description: "Need help with smoke booking coordination."
+      })
+    },
+    customerCookie
+  );
+  expect(supportResult.response.ok, "customer can create support ticket", supportResult.text);
+  if (supportResult.json?.ticket?.id) {
+    createdReliability.push({
+      kind: "ticket",
+      id: supportResult.json.ticket.id,
+      userId: booking.customerId,
+      priority: "normal"
+    });
+  }
+
+  const refundResult = await request(
+    "/api/payments/refund",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        reason: "Smoke refund workflow validation"
+      })
+    },
+    customerCookie
+  );
+  expect(refundResult.response.ok, "customer can request refund review", refundResult.text);
+  if (refundResult.json?.refund?.id) {
+    createdReliability.push({
+      kind: "refund",
+      id: refundResult.json.refund.id,
+      bookingId: booking.id
+    });
+  }
+
   const pricingResult = await request(
     "/api/pricing/quote",
     {
@@ -431,6 +477,52 @@ try {
   expect(
     assignResult.json?.booking?.caretakerId === "demo-caretaker",
     "assignment selected smoke caretaker"
+  );
+
+  const complaintResult = await request(
+    "/api/support/complaints",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        userId: booking.customerId,
+        caretakerId: "demo-caretaker",
+        type: "delay",
+        severity: "medium",
+        summary: "Smoke complaint workflow validation"
+      })
+    },
+    customerCookie
+  );
+  expect(complaintResult.response.ok, "customer can create complaint", complaintResult.text);
+  if (complaintResult.json?.complaint?.id) {
+    createdReliability.push({
+      kind: "complaint",
+      id: complaintResult.json.complaint.id,
+      bookingId: booking.id,
+      userId: booking.customerId,
+      severity: "medium"
+    });
+  }
+
+  const lifecycleNotificationResult = await request(
+    "/api/notifications/lifecycle",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        userId: booking.customerId,
+        title: "Smoke lifecycle update",
+        body: "Care update reached the family.",
+        priority: "normal"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    lifecycleNotificationResult.response.ok,
+    "ops can broadcast lifecycle notification",
+    lifecycleNotificationResult.text
   );
 
   const availabilityResult = await request(
@@ -590,6 +682,39 @@ try {
 } catch (error) {
   fail("smoke test crashed", error instanceof Error ? error.message : String(error));
 } finally {
+  for (const item of createdReliability) {
+    if (item.kind === "ticket") {
+      await database
+        .ref()
+        .update({
+          [`supportTickets/byId/${item.id}`]: null,
+          [`supportTickets/byUser/${item.userId}/${item.id}`]: null,
+          [`operations/supportQueue/${item.priority}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "complaint") {
+      await database
+        .ref()
+        .update({
+          [`complaints/byId/${item.id}`]: null,
+          [`complaints/byBooking/${item.bookingId}/${item.id}`]: null,
+          [`complaints/byUser/${item.userId}/${item.id}`]: null,
+          [`operations/complaintQueue/${item.severity}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "refund") {
+      await database
+        .ref()
+        .update({
+          [`refunds/byId/${item.id}`]: null,
+          [`refunds/byBooking/${item.bookingId}/${item.id}`]: null,
+          [`operations/refundQueue/requested/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+  }
   for (const booking of createdPaths) {
     await cleanupBooking(booking).catch(() => undefined);
   }
