@@ -566,6 +566,26 @@ export default function OpsApp() {
               </p>
             </div>
           </Panel>
+          <Panel title="Finance operations">
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">GST invoices</p>
+              <p className="mt-1 text-white/50">
+                Invoice records now track taxable value, GST, line items, and PDF readiness.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Caregiver payouts</p>
+              <p className="mt-1 text-white/50">
+                Payout and incentive records are queued for ops reconciliation.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Recurring care</p>
+              <p className="mt-1 text-white/50">
+                Weekly and monthly subscriptions can be created from customer plans.
+              </p>
+            </div>
+          </Panel>
         </section>
       </div>
     </main>

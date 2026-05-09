@@ -109,6 +109,14 @@
       "partnerDispatchQueue": {
         ".read": "auth != null && auth.token.role === 'admin'",
         ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "payoutQueue": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "subscriptionQueue": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": "auth != null && auth.token.role === 'admin'"
       }
     },
     "journeys": {
@@ -276,6 +284,44 @@
     "monthlyReports": {
       "byId": {
         "$reportId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "invoices": {
+      "byId": {
+        "$invoiceId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "payouts": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": false
+    },
+    "subscriptions": {
+      "byId": {
+        "$subscriptionId": {
           ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
           ".write": false
         }

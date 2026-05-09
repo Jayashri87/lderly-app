@@ -272,6 +272,20 @@ Monthly / NRI report generation is now available:
 - stores visit counts, service breakdown, wellness signal, highlights, and PDF placeholder status
 - designed for future PDF rendering and WhatsApp/email delivery
 
+Finance operations scaffolding is now available:
+
+- `POST /api/finance/invoice`
+- generates GST-style invoice records with taxable amount, GST amount, line items, and PDF placeholder status
+- `POST /api/finance/payout`
+- creates caregiver payout and incentive records for ops reconciliation
+- writes payout queues for manual bank-transfer processing
+
+Recurring care subscriptions are now available:
+
+- `POST /api/subscriptions`
+- creates weekly/monthly subscription plan records
+- links subscriptions to profiles and ops subscription queues
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

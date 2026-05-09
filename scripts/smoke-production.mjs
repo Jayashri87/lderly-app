@@ -325,6 +325,18 @@ try {
     "monthly NRI report API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.invoiceGstApi === true,
+    "GST invoice API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.caregiverPayoutApi === true,
+    "caregiver payout API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.subscriptionPlanApi === true,
+    "subscription plan API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.emergencyEscalationApi === true,
     "emergency escalation API is prepared"
   );
@@ -655,6 +667,78 @@ try {
     assignResult.json?.booking?.caretakerId === "demo-caretaker",
     "assignment selected smoke caretaker"
   );
+
+  const invoiceResult = await request(
+    "/api/finance/invoice",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        billTo: "Smoke Customer Family",
+        gstin: "29ABCDE1234F1Z5"
+      })
+    },
+    customerCookie
+  );
+  expect(invoiceResult.response.ok, "customer can generate GST invoice", invoiceResult.text);
+  expect(
+    invoiceResult.json?.invoice?.gstAmount >= 0,
+    "invoice includes GST amount"
+  );
+  if (invoiceResult.json?.invoice?.id) {
+    createdReliability.push({
+      kind: "invoice",
+      id: invoiceResult.json.invoice.id,
+      bookingId: booking.id,
+      userId: booking.customerId
+    });
+  }
+
+  const payoutResult = await request(
+    "/api/finance/payout",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        caretakerId: "demo-caretaker",
+        incentiveAmount: 100
+      })
+    },
+    adminCookie
+  );
+  expect(payoutResult.response.ok, "admin can create caregiver payout", payoutResult.text);
+  if (payoutResult.json?.payout?.id) {
+    createdReliability.push({
+      kind: "payout",
+      id: payoutResult.json.payout.id,
+      caretakerId: "demo-caretaker",
+      bookingId: booking.id
+    });
+  }
+
+  const subscriptionResult = await request(
+    "/api/subscriptions",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: booking.customerId,
+        recipientName: "Smoke Mom",
+        packageId: "nriCare",
+        cadence: "monthly",
+        serviceTypes: ["Weekly wellness check", "Medicine reminder"],
+        amountLabel: "Rs 6,999 / month"
+      })
+    },
+    adminCookie
+  );
+  expect(subscriptionResult.response.ok, "admin can create recurring care subscription", subscriptionResult.text);
+  if (subscriptionResult.json?.subscription?.id) {
+    createdReliability.push({
+      kind: "subscription",
+      id: subscriptionResult.json.subscription.id,
+      userId: booking.customerId
+    });
+  }
 
   const complaintResult = await request(
     "/api/support/complaints",
@@ -1275,6 +1359,38 @@ try {
           [`partnerDispatches/byId/${item.id}`]: null,
           [`partnerDispatches/byPartner/${item.partnerId}/${item.id}`]: null,
           [`operations/partnerDispatchQueue/${item.partnerType}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "invoice") {
+      await database
+        .ref()
+        .update({
+          [`invoices/byId/${item.id}`]: null,
+          [`invoices/byBooking/${item.bookingId}`]: null,
+          [`invoices/byUser/${item.userId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "payout") {
+      await database
+        .ref()
+        .update({
+          [`payouts/byId/${item.id}`]: null,
+          [`payouts/byCaretaker/${item.caretakerId}/${item.id}`]: null,
+          [`payouts/byBooking/${item.bookingId}`]: null,
+          [`operations/payoutQueue/pending/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "subscription") {
+      await database
+        .ref()
+        .update({
+          [`subscriptions/byId/${item.id}`]: null,
+          [`subscriptions/byUser/${item.userId}/${item.id}`]: null,
+          [`profiles/${item.userId}/activeSubscriptions/${item.id}`]: null,
+          [`operations/subscriptionQueue/active/${item.id}`]: null
         })
         .catch(() => undefined);
     }
