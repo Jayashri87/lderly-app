@@ -234,7 +234,7 @@
       },
       "byBooking": {
         "$bookingId": {
-          ".read": "auth != null"
+          ".read": "auth != null && auth.token.role === 'admin'"
         }
       },
       "byUser": {

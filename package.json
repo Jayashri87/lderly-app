@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "verify:env": "node scripts/verify-production-env.mjs",
+    "audit:rules": "node scripts/audit-firebase-rules.mjs",
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
     "smoke:production": "node scripts/smoke-production.mjs"
   },
