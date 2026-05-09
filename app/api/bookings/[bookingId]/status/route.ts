@@ -10,10 +10,15 @@ import { TrustedBooking } from "../../../../../server/trustedBooking";
 
 const validStatuses: BookingStatus[] = [
   "requested",
+  "searching",
   "assigned",
   "accepted",
+  "en_route",
+  "arrived",
   "in_progress",
   "completed",
+  "payment_settled",
+  "report_generated",
   "cancelled"
 ];
 

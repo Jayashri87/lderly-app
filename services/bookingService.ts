@@ -7,10 +7,15 @@ import { NotificationService } from "./notificationService";
 export type BookingStatus =
   | "none"
   | "requested"
+  | "searching"
   | "assigned"
   | "accepted"
+  | "en_route"
+  | "arrived"
   | "in_progress"
   | "completed"
+  | "payment_settled"
+  | "report_generated"
   | "cancelled";
 
 export type CareBooking = {
@@ -32,10 +37,21 @@ export type CareBooking = {
   payment: BookingPayment;
   familyUpdates: FamilyUpdateSettings;
   serviceReport: ServiceReportPlan;
+  tracking?: BookingTracking;
+  sla?: BookingSla;
+  cancellation?: BookingCancellation;
+  rating?: BookingRating;
   timeline: Array<{
     label: string;
     at: number;
   }>;
+};
+
+export type CareLocation = {
+  lat: number;
+  lng: number;
+  accuracyMeters?: number;
+  capturedAt?: number;
 };
 
 export type BookingRequestDetails = {
@@ -101,6 +117,38 @@ export type BookingPayment = {
   invoiceId: string;
 };
 
+export type BookingTracking = {
+  etaMinutes: number;
+  distanceKm: number;
+  destinationLabel: string;
+  customerLocation: CareLocation;
+  caretakerLocation: CareLocation;
+  lastLocationAt: number;
+  routeStatus: "pending" | "tracking" | "arrived" | "completed";
+};
+
+export type BookingSla = {
+  assignmentDueAt: number;
+  arrivalDueAt: number;
+  status: "healthy" | "watch" | "breached";
+  breachReason: string;
+};
+
+export type BookingCancellation = {
+  cancelledBy: "customer" | "caretaker" | "admin" | "system";
+  reason: string;
+  refundEligible: boolean;
+  penaltyApplies: boolean;
+  cancelledAt: number;
+};
+
+export type BookingRating = {
+  score: number;
+  note: string;
+  ratedBy: string;
+  ratedAt: number;
+};
+
 export type FamilyUpdateSettings = {
   inApp: "queued" | "sent" | "failed";
   whatsapp: "pending" | "queued" | "sent" | "failed";
@@ -136,6 +184,13 @@ export type CaretakerMatchProfile = {
   verified: boolean;
   trained: boolean;
   yearsExperience: number;
+  status?: "available" | "on_visit" | "standby" | "offline";
+  serviceZones?: string[];
+  punctualityScore?: number;
+  repeatVisits?: number;
+  familiarFamilies?: string[];
+  currentLocation?: CareLocation;
+  lastSeenAt?: number;
 };
 
 const storageKey = "lderly-active-booking";
@@ -165,22 +220,42 @@ const demoCaretakerProfile: CaretakerMatchProfile = {
 
 const transitionMap: Record<BookingStatus, BookingStatus[]> = {
   none: ["requested"],
-  requested: ["assigned", "cancelled"],
+  requested: ["searching", "assigned", "cancelled"],
+  searching: ["assigned", "cancelled"],
   assigned: ["accepted", "cancelled"],
-  accepted: ["in_progress", "cancelled"],
+  accepted: ["en_route", "arrived", "in_progress", "cancelled"],
+  en_route: ["arrived", "in_progress", "cancelled"],
+  arrived: ["in_progress", "cancelled"],
   in_progress: ["completed", "cancelled"],
-  completed: [],
+  completed: ["payment_settled", "report_generated"],
+  payment_settled: ["report_generated"],
+  report_generated: [],
   cancelled: []
 };
 
 const stepLabels: Record<BookingStatus, string> = {
   none: "No booking",
   requested: "Request Created",
+  searching: "Finding Caregiver",
   assigned: "Caregiver Assigned",
   accepted: "Caregiver Accepted",
+  en_route: "Caregiver En Route",
+  arrived: "Caregiver Arrived",
   in_progress: "Session Started",
   completed: "Session Completed",
+  payment_settled: "Payment Settled",
+  report_generated: "Report Generated",
   cancelled: "Booking Cancelled"
+};
+
+const defaultCustomerLocation: CareLocation = {
+  lat: 12.9716,
+  lng: 77.5946
+};
+
+const defaultCaretakerLocation: CareLocation = {
+  lat: 12.985,
+  lng: 77.61
 };
 
 const createDefaultBooking = (): CareBooking => ({
@@ -225,19 +300,34 @@ const createDefaultBooking = (): CareBooking => ({
     status: "pending",
     invoiceId: ""
   },
-  familyUpdates: {
-    inApp: "queued",
-    whatsapp: "pending",
-    sms: "pending",
-    voiceNote: "not_requested",
-    recipients: []
-  },
-  serviceReport: {
-    reportType: "general_care",
-    requiredSections: ["Summary"],
-    uploadSlots: []
-  },
-  timeline: [{ label: "No active booking", at: now() }]
+    familyUpdates: {
+      inApp: "queued",
+      whatsapp: "pending",
+      sms: "pending",
+      voiceNote: "not_requested",
+      recipients: []
+    },
+    serviceReport: {
+      reportType: "general_care",
+      requiredSections: ["Summary"],
+      uploadSlots: []
+    },
+    tracking: {
+      etaMinutes: 0,
+      distanceKm: 0,
+      destinationLabel: "Care location",
+      customerLocation: defaultCustomerLocation,
+      caretakerLocation: defaultCaretakerLocation,
+      lastLocationAt: now(),
+      routeStatus: "pending"
+    },
+    sla: {
+      assignmentDueAt: now() + 10 * 60 * 1000,
+      arrivalDueAt: now() + 45 * 60 * 1000,
+      status: "healthy",
+      breachReason: ""
+    },
+    timeline: [{ label: "No active booking", at: now() }]
 });
 
 let localBooking = createDefaultBooking();
@@ -391,6 +481,67 @@ const lifecycleFor = (
   };
 };
 
+const trackingFor = (booking: CareBooking): BookingTracking => {
+  const tracking = booking.tracking;
+  const status = booking.status;
+  const etaByStatus: Partial<Record<BookingStatus, number>> = {
+    requested: 12,
+    searching: 10,
+    assigned: 8,
+    accepted: 7,
+    en_route: Math.max(2, (tracking?.etaMinutes ?? 8) - 2),
+    arrived: 0,
+    in_progress: 0,
+    completed: 0,
+    payment_settled: 0,
+    report_generated: 0,
+    cancelled: 0
+  };
+
+  return {
+    etaMinutes: etaByStatus[status] ?? tracking?.etaMinutes ?? 8,
+    distanceKm: tracking?.distanceKm ?? 3.2,
+    destinationLabel:
+      tracking?.destinationLabel || booking.requestDetails?.location.label || "Care location",
+    customerLocation: tracking?.customerLocation || defaultCustomerLocation,
+    caretakerLocation: tracking?.caretakerLocation || defaultCaretakerLocation,
+    lastLocationAt: tracking?.lastLocationAt || now(),
+    routeStatus:
+      status === "arrived" || status === "in_progress"
+        ? "arrived"
+        : status === "completed" || status === "payment_settled" || status === "report_generated"
+          ? "completed"
+          : status === "en_route"
+            ? "tracking"
+            : tracking?.routeStatus || "pending"
+  };
+};
+
+const slaFor = (booking: CareBooking): BookingSla => {
+  const timestamp = now();
+  const assignmentDueAt = booking.sla?.assignmentDueAt || booking.createdAt + 10 * 60 * 1000;
+  const arrivalDueAt = booking.sla?.arrivalDueAt || booking.scheduledFor + 20 * 60 * 1000;
+  const assignmentPending = ["requested", "searching"].includes(booking.status);
+  const arrivalPending = ["assigned", "accepted", "en_route"].includes(booking.status);
+  const breached =
+    (assignmentPending && timestamp > assignmentDueAt) ||
+    (arrivalPending && timestamp > arrivalDueAt);
+  const watch =
+    (assignmentPending && timestamp > assignmentDueAt - 3 * 60 * 1000) ||
+    (arrivalPending && timestamp > arrivalDueAt - 5 * 60 * 1000);
+
+  return {
+    assignmentDueAt,
+    arrivalDueAt,
+    status: breached ? "breached" : watch ? "watch" : booking.sla?.status || "healthy",
+    breachReason: breached
+      ? assignmentPending
+        ? "Assignment SLA breached"
+        : "Arrival SLA breached"
+      : ""
+  };
+};
+
 const enrichBooking = (
   booking: CareBooking,
   actor: SessionUser["role"] | "system" = "system"
@@ -441,7 +592,9 @@ const enrichBooking = (
       voiceNote: booking.familyUpdates?.voiceNote || "not_requested",
       recipients: booking.familyUpdates?.recipients || [booking.customerId].filter(Boolean)
     },
-    serviceReport: booking.serviceReport || reportPlanFor(booking.serviceType)
+    serviceReport: booking.serviceReport || reportPlanFor(booking.serviceType),
+    tracking: trackingFor(booking),
+    sla: slaFor(booking)
   };
 };
 
@@ -539,10 +692,15 @@ const patchBooking = (
 const statusLabel: Record<BookingStatus, string> = {
   none: "No active booking",
   requested: "Booking requested",
+  searching: "Finding the best caregiver",
   assigned: "Caretaker assigned",
   accepted: "Booking accepted",
+  en_route: "Caretaker is on the way",
+  arrived: "Caretaker arrived",
   in_progress: "Visit in progress",
   completed: "Booking completed",
+  payment_settled: "Payment settled",
+  report_generated: "Care report generated",
   cancelled: "Booking cancelled"
 };
 
@@ -719,6 +877,21 @@ export const BookingService = {
         recipients: [session.uid]
       },
       serviceReport: reportPlanFor(serviceType),
+      tracking: {
+        etaMinutes: 12,
+        distanceKm: 3.2,
+        destinationLabel: requestDetails?.location.label || "Care location",
+        customerLocation: defaultCustomerLocation,
+        caretakerLocation: defaultCaretakerLocation,
+        lastLocationAt: timestamp,
+        routeStatus: "pending"
+      },
+      sla: {
+        assignmentDueAt: timestamp + 10 * 60 * 1000,
+        arrivalDueAt: scheduledFor + 20 * 60 * 1000,
+        status: "healthy",
+        breachReason: ""
+      },
       timeline: [{ label: `${serviceType} requested`, at: timestamp }]
     };
 
@@ -843,6 +1016,61 @@ export const BookingService = {
       body: `Booking status changed to ${status}.`,
       priority: status === "cancelled" ? "urgent" : "normal"
     });
+  },
+
+  cancelBooking(
+    reason = "Customer requested cancellation",
+    actor: "customer" | "caretaker" | "admin" | "system" = "customer"
+  ) {
+    const booking = readLocalBooking();
+    postTrustedBookingAction(
+      `/api/bookings/${encodeURIComponent(booking.id)}/cancel`,
+      { reason }
+    ).then((result) => {
+      if (result?.booking) {
+        writeLocalBooking(enrichBooking(result.booking));
+      }
+    });
+
+    patchBooking(
+      {
+        status: "cancelled",
+        cancellation: {
+          cancelledBy: actor,
+          reason,
+          refundEligible: booking.payment.status !== "paid",
+          penaltyApplies: actor === "caretaker",
+          cancelledAt: now()
+        }
+      },
+      "Booking cancelled",
+      actor
+    );
+  },
+
+  rateBooking(score: number, note = "Care completed well") {
+    const booking = readLocalBooking();
+    postTrustedBookingAction(
+      `/api/bookings/${encodeURIComponent(booking.id)}/rating`,
+      { score, note }
+    ).then((result) => {
+      if (result?.booking) {
+        writeLocalBooking(enrichBooking(result.booking));
+      }
+    });
+
+    patchBooking(
+      {
+        rating: {
+          score,
+          note,
+          ratedBy: booking.customerId,
+          ratedAt: now()
+        }
+      },
+      `Family rated visit ${score}/5`,
+      "customer"
+    );
   },
 
   authorizePayment(method: BookingPayment["method"] = "upi") {

@@ -154,6 +154,47 @@ export default function OpsApp() {
 
   const activeJourney = journey && journey.status !== "idle";
   const activeBooking = booking && booking.status !== "none";
+  const bookingMapJourney: CareJourney | null =
+    booking && booking.status !== "none"
+      ? {
+          id: booking.id,
+          status:
+            booking.status === "en_route"
+              ? "en_route"
+              : booking.status === "arrived"
+                ? "arrived"
+                : booking.status === "completed" ||
+                    booking.status === "payment_settled" ||
+                    booking.status === "report_generated" ||
+                    booking.status === "cancelled"
+                  ? "completed"
+                  : booking.status === "assigned"
+                    ? "assigned"
+                    : booking.status === "accepted"
+                      ? "accepted"
+                      : "requested",
+          summary: booking.lifecycle.currentStep,
+          serviceType: booking.serviceType,
+          eta: booking.tracking?.etaMinutes || 0,
+          customerId: booking.customerId,
+          customerName: booking.customerName,
+          caretakerId: booking.caretakerId,
+          caretakerName: booking.caretakerName,
+          priority: booking.matching.priority,
+          destinationLabel: booking.tracking?.destinationLabel || "Care location",
+          customerLocation: booking.tracking?.customerLocation || {
+            lat: 12.9716,
+            lng: 77.5946
+          },
+          caretakerLocation: booking.tracking?.caretakerLocation || {
+            lat: 12.985,
+            lng: 77.61
+          },
+          createdAt: booking.createdAt,
+          updatedAt: booking.updatedAt,
+          timeline: booking.timeline
+        }
+      : journey;
 
   return (
     <main className="min-h-screen bg-[#071018] text-white">
@@ -182,7 +223,17 @@ export default function OpsApp() {
 
         <section className="mt-6 grid gap-3 md:grid-cols-4">
           <OpsMetric icon={BellRing} label="Active bookings" value={activeBooking ? "1" : "0"} />
-          <OpsMetric icon={AlertTriangle} label="Escalations" value={activeJourney ? "1" : "0"} />
+          <OpsMetric
+            icon={AlertTriangle}
+            label="SLA watch"
+            value={
+              booking?.sla?.status === "breached"
+                ? "Breach"
+                : booking?.sla?.status === "watch"
+                  ? "Watch"
+                  : "0"
+            }
+          />
           <OpsMetric
             icon={Users}
             label="Caregivers online"
@@ -270,7 +321,7 @@ export default function OpsApp() {
                   primary="Assign Anita"
                   secondary="Cancel"
                   onPrimary={BookingService.assignCaretaker}
-                  onSecondary={() => BookingService.updateStatus("cancelled")}
+                  onSecondary={() => BookingService.cancelBooking("Cancelled by operations", "admin")}
                 />
               )}
               {!activeJourney && !activeBooking && (
@@ -282,7 +333,7 @@ export default function OpsApp() {
           </div>
 
           <div>
-            <LiveMap journey={journey} />
+            <LiveMap journey={bookingMapJourney} />
           </div>
         </section>
 

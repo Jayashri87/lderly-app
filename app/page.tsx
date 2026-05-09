@@ -2098,16 +2098,55 @@ function JourneyExperience({
     journey?.status ??
     (bookingStatus === "none" || bookingStatus === "cancelled"
       ? "idle"
+      : bookingStatus === "searching"
+        ? "requested"
       : bookingStatus === "in_progress"
-        ? "accepted"
+        ? "arrived"
+        : bookingStatus === "payment_settled" || bookingStatus === "report_generated"
+          ? "completed"
         : bookingStatus);
+  const activeMapJourney: CareJourney | null =
+    journey ||
+    (booking && booking.status !== "none"
+      ? {
+          id: booking.id,
+          status:
+            status === "idle" || status === "escalated"
+              ? "requested"
+              : status === "completed"
+                ? "completed"
+                : status,
+          summary: booking.lifecycle.currentStep,
+          serviceType: booking.serviceType,
+          eta: booking.tracking?.etaMinutes || 0,
+          customerId: booking.customerId,
+          customerName: booking.customerName,
+          caretakerId: booking.caretakerId,
+          caretakerName: booking.caretakerName,
+          priority: booking.matching.priority,
+          destinationLabel: booking.tracking?.destinationLabel || "Care location",
+          customerLocation: booking.tracking?.customerLocation || {
+            lat: 12.9716,
+            lng: 77.5946
+          },
+          caretakerLocation: booking.tracking?.caretakerLocation || {
+            lat: 12.985,
+            lng: 77.61
+          },
+          createdAt: booking.createdAt,
+          updatedAt: booking.updatedAt,
+          timeline: booking.timeline
+        }
+      : null);
   const activeService = cleanServiceName(journey?.serviceType || booking?.serviceType);
   const hasActiveService =
     (journey && journey.status !== "idle") || (booking && booking.status !== "none");
   const careStatus = careStatusFor({ booking, journey });
   const serviceExperience = serviceExperienceFor(activeService);
   const activeIndex =
-    status === "completed"
+    bookingStatus === "in_progress"
+      ? 4
+      : status === "completed"
       ? 5
       : status === "arrived"
         ? 3
@@ -2141,7 +2180,7 @@ function JourneyExperience({
               {status === "idle" ? "No active care" : careStatus}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {activeService} - ETA {journey?.eta ?? 8} mins - {journey?.caretakerName || booking?.caretakerName || "Best caregiver nearby"}
+              {activeService} - ETA {activeMapJourney?.eta ?? 8} mins - {journey?.caretakerName || booking?.caretakerName || "Best caregiver nearby"}
             </p>
           </div>
           <ShieldCheck className="h-8 w-8 text-emerald-700" />
@@ -2172,7 +2211,7 @@ function JourneyExperience({
       </div>
 
       <div className="mt-5">
-        <LiveMap journey={journey} />
+        <LiveMap journey={activeMapJourney} />
       </div>
 
       <section className="mt-6 rounded-[1.5rem] bg-white/10 p-4">

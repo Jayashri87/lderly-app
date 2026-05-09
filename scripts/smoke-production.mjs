@@ -242,9 +242,16 @@ const cleanupBooking = async (booking) => {
     [`users/${booking.customerId}/activeBookingId`]: null,
     "operations/activeBookingId": null,
     [`operations/bookingsByStatus/requested/${booking.id}`]: null,
+    [`operations/bookingsByStatus/searching/${booking.id}`]: null,
     [`operations/bookingsByStatus/assigned/${booking.id}`]: null,
     [`operations/bookingsByStatus/accepted/${booking.id}`]: null,
+    [`operations/bookingsByStatus/en_route/${booking.id}`]: null,
+    [`operations/bookingsByStatus/arrived/${booking.id}`]: null,
     [`operations/bookingsByStatus/in_progress/${booking.id}`]: null,
+    [`operations/bookingsByStatus/completed/${booking.id}`]: null,
+    [`operations/bookingsByStatus/payment_settled/${booking.id}`]: null,
+    [`operations/bookingsByStatus/report_generated/${booking.id}`]: null,
+    [`operations/bookingsByStatus/cancelled/${booking.id}`]: null,
     [`operations/bookingsByDate/${booking.scheduleIndex.dateKey}/${booking.id}`]: null,
     [`operations/bookingsByZone/${booking.scheduleIndex.zone}/${booking.id}`]: null,
     [`operations/bookingsByZone/South/${booking.id}`]: null,
@@ -342,6 +349,20 @@ try {
     "assignment selected smoke caretaker"
   );
 
+  const availabilityResult = await request(
+    "/api/caretaker/availability",
+    {
+      method: "POST",
+      body: JSON.stringify({ available: true, status: "standby" })
+    },
+    caretakerCookie
+  );
+  expect(
+    availabilityResult.response.ok,
+    "caretaker can update availability",
+    availabilityResult.text
+  );
+
   const acceptResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/status`,
     {
@@ -351,6 +372,41 @@ try {
     caretakerCookie
   );
   expect(acceptResult.response.ok, "caretaker can accept assigned booking", acceptResult.text);
+
+  const enRouteResult = await request(
+    `/api/bookings/${encodeURIComponent(booking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "en_route" })
+    },
+    caretakerCookie
+  );
+  expect(enRouteResult.response.ok, "caretaker can mark en route", enRouteResult.text);
+
+  const locationResult = await request(
+    "/api/caretaker/location",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: booking.id,
+        lat: 12.974,
+        lng: 77.598,
+        accuracyMeters: 25
+      })
+    },
+    caretakerCookie
+  );
+  expect(locationResult.response.ok, "caretaker can update live location", locationResult.text);
+
+  const arrivedResult = await request(
+    `/api/bookings/${encodeURIComponent(booking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "arrived" })
+    },
+    caretakerCookie
+  );
+  expect(arrivedResult.response.ok, "caretaker can mark arrived", arrivedResult.text);
 
   const progressResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/status`,
@@ -371,6 +427,16 @@ try {
     caretakerCookie
   );
   expect(completeResult.response.ok, "caretaker can complete session", completeResult.text);
+
+  const ratingResult = await request(
+    `/api/bookings/${encodeURIComponent(booking.id)}/rating`,
+    {
+      method: "POST",
+      body: JSON.stringify({ score: 5, note: "Smoke visit completed well" })
+    },
+    customerCookie
+  );
+  expect(ratingResult.response.ok, "customer can rate completed care", ratingResult.text);
 
   const voiceResult = await request(
     "/api/voice-notes/upload-url",

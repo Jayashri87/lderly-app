@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   CheckCircle2,
   Clock,
   FileText,
@@ -13,6 +14,7 @@ import {
 import LiveMap from "../../components/LiveMap";
 import { AuthService, SessionUser } from "../../services/authService";
 import { BookingService, CareBooking } from "../../services/bookingService";
+import { CaretakerService } from "../../services/caretakerService";
 import { HealthService, HealthSnapshot } from "../../services/healthService";
 import { JourneyService, CareJourney } from "../../services/journeyService";
 import { ReportService } from "../../services/reportService";
@@ -74,6 +76,46 @@ export default function PartnerApp() {
   const activeBooking = booking;
   const isJourneyAssignment = Boolean(activeJourney && activeJourney.status !== "idle");
   const isBookingAssignment = Boolean(activeBooking && activeBooking.status !== "none");
+  const bookingMapJourney: CareJourney | null =
+    activeBooking && activeBooking.status !== "none"
+      ? {
+          id: activeBooking.id,
+          status:
+            activeBooking.status === "en_route"
+              ? "en_route"
+              : activeBooking.status === "arrived"
+                ? "arrived"
+                : activeBooking.status === "completed"
+                  ? "completed"
+                  : activeBooking.status === "cancelled"
+                    ? "completed"
+                    : activeBooking.status === "assigned"
+                      ? "assigned"
+                      : activeBooking.status === "accepted"
+                        ? "accepted"
+                        : "requested",
+          summary: activeBooking.lifecycle.currentStep,
+          serviceType: activeBooking.serviceType,
+          eta: activeBooking.tracking?.etaMinutes || 0,
+          customerId: activeBooking.customerId,
+          customerName: activeBooking.customerName,
+          caretakerId: activeBooking.caretakerId,
+          caretakerName: activeBooking.caretakerName,
+          priority: activeBooking.matching.priority,
+          destinationLabel: activeBooking.tracking?.destinationLabel || "Care location",
+          customerLocation: activeBooking.tracking?.customerLocation || {
+            lat: 12.9716,
+            lng: 77.5946
+          },
+          caretakerLocation: activeBooking.tracking?.caretakerLocation || {
+            lat: 12.985,
+            lng: 77.61
+          },
+          createdAt: activeBooking.createdAt,
+          updatedAt: activeBooking.updatedAt,
+          timeline: activeBooking.timeline
+        }
+      : activeJourney;
 
   const completeBooking = () => {
     BookingService.updateStatus("completed");
@@ -148,6 +190,12 @@ export default function PartnerApp() {
               Online
             </div>
             <button
+              onClick={() => CaretakerService.setAvailability(session.uid, "offline", false)}
+              className="rounded-full bg-white/10 px-3 py-2 text-sm font-semibold"
+            >
+              Go offline
+            </button>
+            <button
               onClick={async () => {
                 await AuthService.signOut();
                 setSession(null);
@@ -175,14 +223,22 @@ export default function PartnerApp() {
               "Assignments will appear here"}
           </p>
           <div className="mt-5 grid grid-cols-3 gap-2">
-            <Metric icon={Clock} label="ETA" value={`${activeJourney?.eta || 8}m`} />
+            <Metric
+              icon={Clock}
+              label="ETA"
+              value={`${bookingMapJourney?.eta || activeJourney?.eta || 8}m`}
+            />
             <Metric icon={ShieldCheck} label="Rating" value="4.9" />
-            <Metric icon={MapPinned} label="Area" value="Near" />
+            <Metric
+              icon={MapPinned}
+              label="SLA"
+              value={activeBooking?.sla?.status === "breached" ? "Breach" : "On time"}
+            />
           </div>
         </section>
 
         <div className="mt-5">
-          <LiveMap journey={activeJourney} />
+          <LiveMap journey={bookingMapJourney} />
         </div>
 
         <section className="mt-6 grid grid-cols-2 gap-3">
@@ -201,18 +257,41 @@ export default function PartnerApp() {
             onClick={() =>
               isJourneyAssignment
                 ? JourneyService.updateStatus("en_route")
-                : BookingService.updateStatus("in_progress")
+                : BookingService.updateStatus("en_route", "caretaker")
             }
           />
           <ActionButton
             label="Arrived"
             icon={MapPinned}
-            onClick={() => JourneyService.updateStatus("arrived")}
+            onClick={() =>
+              isJourneyAssignment
+                ? JourneyService.updateStatus("arrived")
+                : BookingService.updateStatus("arrived", "caretaker")
+            }
+          />
+          <ActionButton
+            label="Start Visit"
+            icon={ShieldCheck}
+            onClick={() =>
+              isJourneyAssignment
+                ? JourneyService.updateStatus("arrived")
+                : BookingService.updateStatus("in_progress", "caretaker")
+            }
           />
           <ActionButton
             label="Record Vitals"
             icon={ShieldCheck}
             onClick={HealthService.simulateVitalsCheck}
+          />
+          <ActionButton
+            label="Update GPS"
+            icon={Navigation}
+            onClick={() => CaretakerService.updateLocation(session.uid, activeBooking?.id)}
+          />
+          <ActionButton
+            label="Panic SOS"
+            icon={AlertTriangle}
+            onClick={() => JourneyService.updateStatus("escalated")}
           />
           <button
             onClick={isJourneyAssignment ? completeJourney : completeBooking}

@@ -189,5 +189,76 @@ export const CaretakerService = {
   seedDefaults() {
     writeLocalCaretakers(seedCaretakers);
     seedRemoteCaretakers(seedCaretakers);
+  },
+
+  setAvailability(
+    caretakerId: string,
+    nextStatus: CaretakerProfile["status"],
+    available = nextStatus !== "offline" && nextStatus !== "on_visit"
+  ) {
+    const nextCaretakers = readLocalCaretakers().map((caretaker) =>
+      caretaker.uid === caretakerId
+        ? {
+            ...caretaker,
+            available,
+            status: nextStatus,
+            lastSeenAt: now()
+          }
+        : caretaker
+    );
+
+    writeLocalCaretakers(nextCaretakers);
+    fetch("/api/caretaker/availability", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        caretakerId,
+        available,
+        status: nextStatus,
+        shiftEndsAt: nextStatus === "offline" ? Date.now() : Date.now() + 8 * 60 * 60 * 1000
+      })
+    }).catch(() => undefined);
+  },
+
+  updateLocation(caretakerId: string, bookingId?: string) {
+    const caretakers = readLocalCaretakers();
+    const caretaker = caretakers.find((item) => item.uid === caretakerId) || seedCaretakers[0];
+    const current = caretaker.currentLocation || {
+      lat: 12.985,
+      lng: 77.61
+    };
+    const nextLocation = {
+      lat: Number((current.lat - 0.0035).toFixed(6)),
+      lng: Number((current.lng - 0.0038).toFixed(6)),
+      accuracyMeters: 25,
+      capturedAt: now()
+    };
+
+    writeLocalCaretakers(
+      caretakers.map((item) =>
+        item.uid === caretakerId
+          ? {
+              ...item,
+              currentLocation: nextLocation,
+              lastSeenAt: now()
+            }
+          : item
+      )
+    );
+    fetch("/api/caretaker/location", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        caretakerId,
+        bookingId,
+        lat: nextLocation.lat,
+        lng: nextLocation.lng,
+        accuracyMeters: nextLocation.accuracyMeters
+      })
+    }).catch(() => undefined);
   }
 };
