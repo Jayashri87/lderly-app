@@ -1,8 +1,12 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
-import { hasMessagingProviderConfig } from "../../../../server/communicationProvider";
+import {
+  communicationReadiness,
+  hasMessagingProviderConfig
+} from "../../../../server/communicationProvider";
 import { hasFirebaseAdminConfig } from "../../../../server/firebaseAdmin";
+import { internalOpsReadiness } from "../../../../server/internalOpsProvider";
 import { hasGeocodingConfig } from "../../../../server/locationProvider";
 import {
   hasRazorpayConfig,
@@ -47,6 +51,9 @@ export async function GET() {
       complaintApi: true,
       refundRequestApi: true,
       lifecycleNotificationApi: true,
+      indiaFirstCommunication: communicationReadiness,
+      internalOpsAlertsApi: true,
+      internalOpsReadiness,
       analyticsEventApi: true,
       opsKpiApi: true,
       monitoringSnapshotApi: true,
@@ -90,6 +97,10 @@ export async function GET() {
         ...(hasAnyEnv(["SENTRY_DSN", "NEXT_PUBLIC_POSTHOG_KEY", "NEXT_PUBLIC_MIXPANEL_TOKEN"])
           ? []
           : ["Sentry/PostHog/Mixpanel production monitoring keys"]),
+        ...(hasMessagingProviderConfig
+          ? []
+          : ["India communication provider: WhatsApp Business, MSG91, or Exotel"]),
+        ...(internalOpsReadiness.slackConfigured ? [] : ["Slack ops webhook for internal alerts"]),
         ...(hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY")
           ? []
           : ["Firebase App Check reCAPTCHA Enterprise site key"])

@@ -2,6 +2,8 @@
 
 LDERLY is a modern eldercare operating system for India: realtime care coordination, emergency response, caregiver dispatch, family transparency, health monitoring, AI companionship, and marketplace infrastructure.
 
+The master product principle is now documented in `PRODUCT_VISION.md`: every customer surface should reduce family anxiety by answering "Is my parent okay right now?"
+
 ## Product Vision
 
 Build LDERLY as:

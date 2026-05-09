@@ -36,6 +36,21 @@ type SystemStatus = {
   };
   productionReadiness: {
     pending: string[];
+    indiaFirstCommunication?: {
+      whatsappBusinessConfigured: boolean;
+      whatsappManualReady: boolean;
+      msg91SmsConfigured: boolean;
+      exotelVoiceConfigured: boolean;
+      firebasePushPrepared: boolean;
+      twilioFallbackConfigured: boolean;
+    };
+    internalOpsReadiness?: {
+      slackConfigured: boolean;
+      emergencyAlertsChannel: string;
+      caregiverOpsChannel: string;
+      lateCheckinsChannel: string;
+      incidentReportsChannel: string;
+    };
   };
 };
 
@@ -422,6 +437,62 @@ export default function OpsApp() {
               <StatusPill label="Sentry" ready={Boolean(opsKpis?.monitoring.sentryConfigured)} />
               <StatusPill label="PostHog" ready={Boolean(opsKpis?.monitoring.posthogConfigured)} />
               <StatusPill label="Mixpanel" ready={Boolean(opsKpis?.monitoring.mixpanelConfigured)} />
+            </div>
+          </Panel>
+          <Panel title="India communication stack">
+            <div className="grid grid-cols-2 gap-3">
+              <StatusPill
+                label="WhatsApp API"
+                ready={Boolean(
+                  systemStatus?.productionReadiness.indiaFirstCommunication
+                    ?.whatsappBusinessConfigured
+                )}
+              />
+              <StatusPill
+                label="Manual WhatsApp"
+                ready={Boolean(
+                  systemStatus?.productionReadiness.indiaFirstCommunication
+                    ?.whatsappManualReady
+                )}
+              />
+              <StatusPill
+                label="MSG91 SMS"
+                ready={Boolean(
+                  systemStatus?.productionReadiness.indiaFirstCommunication
+                    ?.msg91SmsConfigured
+                )}
+              />
+              <StatusPill
+                label="Exotel voice"
+                ready={Boolean(
+                  systemStatus?.productionReadiness.indiaFirstCommunication
+                    ?.exotelVoiceConfigured
+                )}
+              />
+            </div>
+            <button
+              onClick={() =>
+                fetch("/api/ops/alerts", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    kind: "sla_breach",
+                    severity: "high",
+                    bookingId: booking?.id,
+                    title: "Ops alert test",
+                    message: "LDERLY ops alert route is ready for SLA and emergency escalation."
+                  })
+                })
+              }
+              className="w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#071018]"
+            >
+              Test ops alert route
+            </button>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/50">
+              Internal alerts are prepared for #emergency-alerts, #caregiver-ops,
+              #late-checkins, and #incident-reports.
             </div>
           </Panel>
         </section>

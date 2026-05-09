@@ -1144,6 +1144,14 @@ export default function CustomerApp() {
                     onRebook={rebookPreviousCare}
                   />
                   <CareConfidence recipient={recipient} health={health} />
+                  <FamilyReassuranceSystem
+                    recipient={recipient}
+                    health={health}
+                    booking={visibleBooking}
+                    journey={visibleJourney}
+                    reports={reports}
+                    experience={currentServiceExperience}
+                  />
                   <SmartRecommendation
                     experience={currentServiceExperience}
                     recipient={recipient}
@@ -1654,6 +1662,125 @@ function CareConfidence({
         ))}
       </div>
     </section>
+  );
+}
+
+function FamilyReassuranceSystem({
+  recipient,
+  health,
+  booking,
+  journey,
+  reports,
+  experience
+}: {
+  recipient: Recipient;
+  health: HealthSnapshot | null;
+  booking: CareBooking | null;
+  journey: CareJourney | null;
+  reports: VisitReport[];
+  experience: ReturnType<typeof serviceExperienceFor>;
+}) {
+  const activeService = cleanServiceName(journey?.serviceType || booking?.serviceType);
+  const hasLiveCare = Boolean(
+    (journey && journey.status !== "idle") || (booking && booking.status !== "none")
+  );
+  const latestReport = reports[0];
+  const wellbeing =
+    health?.wellness === "watch"
+      ? `${recipient.shortName} needs a little attention`
+      : `${recipient.shortName} looks okay right now`;
+  const familyLine = latestReport
+    ? latestReport.familySummary
+    : hasLiveCare
+      ? `${experience.feed[0]} Family updates are active.`
+      : "Book a service and this becomes the realtime family care board.";
+
+  return (
+    <section className="mt-5 space-y-3">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-xl"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-100">
+              Family reassurance
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight">
+              {wellbeing}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-white/55">{familyLine}</p>
+          </div>
+          <RealtimePulse />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <TrustSignal label="Caregiver" value={hasLiveCare ? "Live" : "Ready"} />
+          <TrustSignal label="Family" value="Updated" />
+          <TrustSignal label="Emergency" value="Active" />
+        </div>
+      </motion.div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <InsightCard
+          eyebrow="AI insight"
+          title={health?.medicineStatus === "missed" ? "Medicine follow-up" : "Routine looks steady"}
+          body={
+            health?.medicineStatus === "missed"
+              ? "Medicine support should be prioritized in the next visit."
+              : `${activeService || experience.profilePreference} is aligned with the current care plan.`
+          }
+          icon={Sparkles}
+        />
+        <InsightCard
+          eyebrow="NRI updates"
+          title="Family visibility on"
+          body="WhatsApp, voice notes, and visit summaries are ready for remote family coordination."
+          icon={MessageCircle}
+        />
+      </div>
+    </section>
+  );
+}
+
+function RealtimePulse() {
+  return (
+    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-300/15">
+      <span className="absolute h-8 w-8 animate-ping rounded-full bg-emerald-300/30" />
+      <span className="relative h-3 w-3 rounded-full bg-emerald-200" />
+    </div>
+  );
+}
+
+function TrustSignal({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-3">
+      <p className="text-xs text-white/45">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function InsightCard({
+  eyebrow,
+  title,
+  body,
+  icon: Icon
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <div className="rounded-[1.5rem] bg-white/10 p-4">
+      <Icon className="h-5 w-5 text-emerald-200" />
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-white/40">
+        {eyebrow}
+      </p>
+      <p className="mt-2 font-semibold">{title}</p>
+      <p className="mt-1 text-sm leading-5 text-white/45">{body}</p>
+    </div>
   );
 }
 

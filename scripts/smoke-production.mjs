@@ -282,6 +282,14 @@ try {
     status.json?.productionReadiness?.firebaseAppCheckPrepared === true,
     "Firebase App Check is scaffolded"
   );
+  expect(
+    status.json?.productionReadiness?.internalOpsAlertsApi === true,
+    "internal ops alerts API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.indiaFirstCommunication?.firebasePushPrepared === true,
+    "India-first communication readiness is exposed"
+  );
 
   const manifestResult = await request("/manifest.webmanifest");
   expect(manifestResult.response.ok, "web app manifest is reachable", manifestResult.text);
@@ -571,6 +579,30 @@ try {
   );
   expect(snapshotResult.response.ok, "admin can write monitoring snapshot", snapshotResult.text);
 
+  const opsAlertResult = await request(
+    "/api/ops/alerts",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "sla_breach",
+        severity: "high",
+        bookingId: booking.id,
+        title: "Smoke SLA alert",
+        message: "Smoke test validated internal ops escalation."
+      })
+    },
+    adminCookie
+  );
+  expect(opsAlertResult.response.ok, "admin can create internal ops alert", opsAlertResult.text);
+  if (opsAlertResult.json?.alert?.id) {
+    createdReliability.push({
+      kind: "opsAlert",
+      id: opsAlertResult.json.alert.id,
+      alertKind: "sla_breach",
+      severity: "high"
+    });
+  }
+
   const availabilityResult = await request(
     "/api/caretaker/availability",
     {
@@ -772,6 +804,16 @@ try {
           [`refunds/byId/${item.id}`]: null,
           [`refunds/byBooking/${item.bookingId}/${item.id}`]: null,
           [`operations/refundQueue/requested/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "opsAlert") {
+      await database
+        .ref()
+        .update({
+          [`operations/internalAlerts/byId/${item.id}`]: null,
+          [`operations/internalAlerts/byKind/${item.alertKind}/${item.id}`]: null,
+          [`operations/internalAlerts/bySeverity/${item.severity}/${item.id}`]: null
         })
         .catch(() => undefined);
     }
