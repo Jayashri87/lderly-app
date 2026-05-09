@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import LiveMap from "../components/LiveMap";
+import { Badge } from "../components/ui/badge";
+import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { AuthService, SessionUser } from "../services/authService";
 import {
   BookingRequestDetails,
@@ -40,6 +42,7 @@ import type { CareRecipientProfile } from "../services/profileService";
 import { ReportService, VisitReport } from "../services/reportService";
 import { CareJourney, JourneyService } from "../services/journeyService";
 import { NotificationService } from "../services/notificationService";
+import { trackProductEvent } from "../services/productAnalytics";
 
 type TabKey = "home" | "journey" | "profile";
 type BookingStep = "need" | "service" | "duration" | "time" | "location" | "review";
@@ -835,6 +838,10 @@ export default function CustomerApp() {
   }, [session]);
 
   const openBooking = () => {
+    trackProductEvent("booking_funnel_opened", {
+      recipient: recipient.shortName,
+      service: currentService
+    });
     setBookingStep("need");
     setBookingOpen(true);
   };
@@ -1788,7 +1795,43 @@ function FamilyReassuranceSystem({
           icon={MessageCircle}
         />
       </div>
+      <TrustVisibilityPanel recipient={recipient} hasLiveCare={hasLiveCare} />
     </section>
+  );
+}
+
+function TrustVisibilityPanel({
+  recipient,
+  hasLiveCare
+}: {
+  recipient: Recipient;
+  hasLiveCare: boolean;
+}) {
+  return (
+    <Card className="bg-white/10">
+      <CardHeader>
+        <div>
+          <CardTitle>Trust is visible</CardTitle>
+          <CardDescription>
+            Every visit keeps family, caregiver, and ops signals connected for {recipient.shortName}.
+          </CardDescription>
+        </div>
+        <Badge variant={hasLiveCare ? "trust" : "default"}>{hasLiveCare ? "Live" : "Ready"}</Badge>
+      </CardHeader>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        {[
+          "Verified caregiver",
+          "Police verification",
+          "Realtime timestamp",
+          "Visit proof ready"
+        ].map((item) => (
+          <div key={item} className="rounded-2xl bg-white/10 p-3 text-white/70">
+            <Check className="mb-1 h-4 w-4 text-emerald-200" />
+            {item}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

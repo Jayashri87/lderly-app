@@ -318,6 +318,17 @@ Ops lifecycle and emergency command-center depth is now available:
 - `GET /api/ops/emergency-command`
 - summarizes SOS queues, incidents, partner dispatches, critical bookings, internal alerts, escalation order, and next ops action
 
+Startup-friendly platform optimization is now available:
+
+- source-owned shadcn-style primitives for buttons, cards, badges, and skeleton states
+- TanStack Query provider for future cache, dedupe, optimistic UI, and background refresh
+- PostHog and Microsoft Clarity client adapters that remain dormant until keys are configured
+- Lottie runtime dependency is ready for premium, calm micro-interactions
+- `POST /api/ai/reassurance`
+- creates deterministic free AI-style reassurance messages for family wellbeing, service context, and next best action
+- `STARTUP_ARCHITECTURE.md`
+- documents the free-tier/current stack and AWS Activate future path
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

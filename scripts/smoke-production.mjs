@@ -369,6 +369,22 @@ try {
     "emergency command center API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.tanstackQueryProvider === true,
+    "TanStack Query provider is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.shadcnStylePrimitives === true,
+    "shadcn-style primitives are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.freeAiReassuranceApi === true,
+    "free AI reassurance API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.awsScaleArchitecturePrepared === true,
+    "AWS scale architecture is documented"
+  );
+  expect(
     status.json?.productionReadiness?.emergencyEscalationApi === true,
     "emergency escalation API is prepared"
   );
@@ -749,6 +765,37 @@ try {
     ["green", "amber", "red"].includes(emergencyCommandResult.json?.snapshot?.commandLevel),
     "emergency command center returns command level"
   );
+
+  const reassuranceResult = await request(
+    "/api/ai/reassurance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: booking.customerId,
+        bookingId: booking.id,
+        serviceType: booking.serviceType,
+        recipientName: "Smoke Mom"
+      })
+    },
+    customerCookie
+  );
+  expect(
+    reassuranceResult.response.ok,
+    "customer can generate free AI reassurance",
+    reassuranceResult.text
+  );
+  expect(
+    Boolean(reassuranceResult.json?.insight?.emotionalMessage),
+    "AI reassurance returns family message"
+  );
+  if (reassuranceResult.json?.insight?.id) {
+    createdReliability.push({
+      kind: "aiReassurance",
+      id: reassuranceResult.json.insight.id,
+      userId: booking.customerId,
+      bookingId: booking.id
+    });
+  }
 
   const invoiceResult = await request(
     "/api/finance/invoice",
@@ -1539,6 +1586,16 @@ try {
           [`aiSummaries/byUser/${item.userId}/${item.reportId}`]: null,
           [`reports/byId/${item.reportId}/aiSummary`]: null,
           [`reports/byUser/${item.userId}/${item.reportId}/aiSummary`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "aiReassurance") {
+      await database
+        .ref()
+        .update({
+          [`aiReassurance/byId/${item.id}`]: null,
+          [`aiReassurance/byUser/${item.userId}/${item.id}`]: null,
+          [`aiReassurance/byBooking/${item.bookingId}/${item.id}`]: null
         })
         .catch(() => undefined);
     }

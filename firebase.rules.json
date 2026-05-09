@@ -285,6 +285,26 @@
         }
       }
     },
+    "aiReassurance": {
+      "byId": {
+        "$insightId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      }
+    },
     "monthlyReports": {
       "byId": {
         "$reportId": {
