@@ -105,6 +105,18 @@ type CaregiverIntelligenceSnapshot = {
   }>;
 };
 
+type EmergencyCommandSnapshot = {
+  generatedAt: number;
+  commandLevel: "green" | "amber" | "red";
+  emergencyCount: number;
+  incidentCount: number;
+  partnerDispatchCount: number;
+  criticalBookings: number;
+  openAlerts: number;
+  escalationOrder: string[];
+  nextAction: string;
+};
+
 export default function OpsApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -119,6 +131,8 @@ export default function OpsApp() {
   const [opsKpis, setOpsKpis] = useState<OpsKpis | null>(null);
   const [caregiverIntel, setCaregiverIntel] =
     useState<CaregiverIntelligenceSnapshot | null>(null);
+  const [emergencyCommand, setEmergencyCommand] =
+    useState<EmergencyCommandSnapshot | null>(null);
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -158,6 +172,12 @@ export default function OpsApp() {
         setCaregiverIntel(payload?.snapshot || null)
       )
       .catch(() => setCaregiverIntel(null));
+    fetch("/api/ops/emergency-command")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { snapshot: EmergencyCommandSnapshot } | null) =>
+        setEmergencyCommand(payload?.snapshot || null)
+      )
+      .catch(() => setEmergencyCommand(null));
   }, [session]);
 
   const enterOps = async () => {
@@ -345,6 +365,11 @@ export default function OpsApp() {
             icon={Sparkles}
             label="Reliability"
             value={`${caregiverIntel?.averageReliability ?? 0}%`}
+          />
+          <OpsMetric
+            icon={AlertTriangle}
+            label="Command"
+            value={emergencyCommand?.commandLevel?.toUpperCase() || "GREEN"}
           />
         </section>
 
@@ -592,6 +617,35 @@ export default function OpsApp() {
             </div>
           </Panel>
           <Panel title="Emergency and partners">
+            {emergencyCommand && (
+              <div
+                className={`rounded-2xl p-4 text-sm ${
+                  emergencyCommand.commandLevel === "red"
+                    ? "bg-red-500/20"
+                    : emergencyCommand.commandLevel === "amber"
+                      ? "bg-amber-300/15"
+                      : "bg-emerald-300/15"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Emergency command center</p>
+                    <p className="mt-1 text-white/60">{emergencyCommand.nextAction}</p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#071018]">
+                    {emergencyCommand.commandLevel}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <StatusPill label="SOS" ready={emergencyCommand.emergencyCount === 0} />
+                  <StatusPill label="Incidents" ready={emergencyCommand.incidentCount === 0} />
+                  <StatusPill label="Partners" ready={emergencyCommand.partnerDispatchCount >= 0} />
+                </div>
+                <p className="mt-3 text-xs text-white/45">
+                  Escalation: {emergencyCommand.escalationOrder.join(" -> ")}
+                </p>
+              </div>
+            )}
             <button
               onClick={() =>
                 fetch("/api/partners", {

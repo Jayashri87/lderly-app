@@ -357,6 +357,18 @@ try {
     "caregiver reliability scoring API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.complaintLifecycleApi === true,
+    "complaint lifecycle API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.refundLifecycleApi === true,
+    "refund lifecycle API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.emergencyCommandCenterApi === true,
+    "emergency command center API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.emergencyEscalationApi === true,
     "emergency escalation API is prepared"
   );
@@ -490,6 +502,26 @@ try {
       id: refundResult.json.refund.id,
       bookingId: booking.id
     });
+  }
+
+  if (refundResult.json?.refund?.id) {
+    const refundStatusResult = await request(
+      `/api/payments/refund/${encodeURIComponent(refundResult.json.refund.id)}/status`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          status: "processed",
+          providerRefundId: "smoke-refund-provider-id",
+          note: "Smoke refund processed by ops"
+        })
+      },
+      adminCookie
+    );
+    expect(
+      refundStatusResult.response.ok,
+      "admin can update refund lifecycle",
+      refundStatusResult.text
+    );
   }
 
   const pricingResult = await request(
@@ -703,6 +735,21 @@ try {
     "caregiver intelligence returns reliability score"
   );
 
+  const emergencyCommandResult = await request(
+    "/api/ops/emergency-command",
+    {},
+    adminCookie
+  );
+  expect(
+    emergencyCommandResult.response.ok,
+    "admin can read emergency command center",
+    emergencyCommandResult.text
+  );
+  expect(
+    ["green", "amber", "red"].includes(emergencyCommandResult.json?.snapshot?.commandLevel),
+    "emergency command center returns command level"
+  );
+
   const invoiceResult = await request(
     "/api/finance/invoice",
     {
@@ -912,6 +959,25 @@ try {
       userId: booking.customerId,
       severity: "medium"
     });
+  }
+
+  if (complaintResult.json?.complaint?.id) {
+    const complaintStatusResult = await request(
+      `/api/support/complaints/${encodeURIComponent(complaintResult.json.complaint.id)}/status`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          status: "resolved",
+          note: "Smoke complaint resolved by ops"
+        })
+      },
+      adminCookie
+    );
+    expect(
+      complaintStatusResult.response.ok,
+      "admin can update complaint lifecycle",
+      complaintStatusResult.text
+    );
   }
 
   const lifecycleNotificationResult = await request(
@@ -1387,7 +1453,8 @@ try {
           [`complaints/byId/${item.id}`]: null,
           [`complaints/byBooking/${item.bookingId}/${item.id}`]: null,
           [`complaints/byUser/${item.userId}/${item.id}`]: null,
-          [`operations/complaintQueue/${item.severity}/${item.id}`]: null
+          [`operations/complaintQueue/${item.severity}/${item.id}`]: null,
+          [`complaintActions/${item.id}`]: null
         })
         .catch(() => undefined);
     }
@@ -1397,7 +1464,11 @@ try {
         .update({
           [`refunds/byId/${item.id}`]: null,
           [`refunds/byBooking/${item.bookingId}/${item.id}`]: null,
-          [`operations/refundQueue/requested/${item.id}`]: null
+          [`operations/refundQueue/requested/${item.id}`]: null,
+          [`operations/refundQueue/processing/${item.id}`]: null,
+          [`operations/refundQueue/processed/${item.id}`]: null,
+          [`operations/refundQueue/failed/${item.id}`]: null,
+          [`refundActions/${item.id}`]: null
         })
         .catch(() => undefined);
     }

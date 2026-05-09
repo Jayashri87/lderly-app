@@ -191,6 +191,59 @@ export const OpsReliability = {
     return { ok: true as const, complaint };
   },
 
+  async updateComplaintStatus({
+    complaintId,
+    status,
+    note
+  }: {
+    complaintId: string;
+    status: Complaint["status"];
+    note?: string;
+  }) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const snapshot = await database.ref(`complaints/byId/${complaintId}`).get();
+    const complaint = snapshot.val() as Complaint | null;
+
+    if (!complaint) {
+      return { ok: false as const, status: 404, error: "Complaint not found" };
+    }
+
+    const updatedComplaint = {
+      ...complaint,
+      status,
+      updatedAt: Date.now()
+    };
+
+    await database.ref().update({
+      [`complaints/byId/${complaintId}`]: updatedComplaint,
+      [`complaints/byBooking/${complaint.bookingId}/${complaintId}`]: true,
+      [`complaints/byUser/${complaint.userId}/${complaintId}`]: true,
+      [`complaintActions/${complaintId}/${Date.now()}`]: {
+        status,
+        note: note || "",
+        createdAt: Date.now()
+      },
+      ...(status === "resolved"
+        ? { [`operations/complaintQueue/${complaint.severity}/${complaintId}`]: null }
+        : {})
+    });
+
+    await writeNotification({
+      userId: complaint.userId,
+      role: "customer",
+      title: status === "resolved" ? "Complaint resolved" : "Complaint update",
+      body: note || "Your complaint has been updated by LDERLY operations.",
+      priority: complaint.severity === "critical" ? "critical" : "normal"
+    });
+
+    return { ok: true as const, complaint: updatedComplaint };
+  },
+
   async requestRefund({
     bookingId,
     reason,
@@ -249,6 +302,63 @@ export const OpsReliability = {
       priority: "normal"
     });
     return { ok: true as const, refund };
+  },
+
+  async updateRefundStatus({
+    refundId,
+    status,
+    providerRefundId = "",
+    note = ""
+  }: {
+    refundId: string;
+    status: RefundRequest["status"];
+    providerRefundId?: string;
+    note?: string;
+  }) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const snapshot = await database.ref(`refunds/byId/${refundId}`).get();
+    const refund = snapshot.val() as RefundRequest | null;
+
+    if (!refund) {
+      return { ok: false as const, status: 404, error: "Refund request not found" };
+    }
+
+    const updatedRefund = {
+      ...refund,
+      status,
+      providerRefundId: providerRefundId || refund.providerRefundId,
+      updatedAt: Date.now()
+    };
+
+    await database.ref().update({
+      [`refunds/byId/${refundId}`]: updatedRefund,
+      [`refunds/byBooking/${refund.bookingId}/${refundId}`]: true,
+      [`refundActions/${refundId}/${Date.now()}`]: {
+        status,
+        providerRefundId: providerRefundId || "",
+        note,
+        createdAt: Date.now()
+      },
+      [`operations/refundQueue/requested/${refundId}`]: null,
+      ...(status === "processing" ? { [`operations/refundQueue/processing/${refundId}`]: true } : {}),
+      ...(status === "processed" ? { [`operations/refundQueue/processed/${refundId}`]: true } : {}),
+      ...(status === "failed" ? { [`operations/refundQueue/failed/${refundId}`]: true } : {})
+    });
+
+    await writeNotification({
+      userId: refund.userId,
+      role: "customer",
+      title: status === "processed" ? "Refund processed" : "Refund update",
+      body: note || "Your refund request has been updated by LDERLY operations.",
+      priority: "normal"
+    });
+
+    return { ok: true as const, refund: updatedRefund };
   },
 
   async broadcastLifecycleUpdate({

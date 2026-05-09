@@ -499,6 +499,14 @@
         }
       }
     },
+    "complaintActions": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": false
+    },
+    "refundActions": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": false
+    },
     "voiceNotes": {
       "byId": {
         "$voiceNoteId": {

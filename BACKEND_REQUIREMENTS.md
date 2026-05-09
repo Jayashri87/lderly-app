@@ -307,6 +307,17 @@ Caregiver intelligence is now available:
 - returns recommended caregiver, watch counts, online count, and trust signals for ops dispatch
 - designed as the first step toward automated caregiver matching and SLA-aware reassignment
 
+Ops lifecycle and emergency command-center depth is now available:
+
+- `POST /api/support/complaints/{complaintId}/status`
+- lets admin users move complaints through open, ops review, action taken, and resolved states
+- writes complaint action history and notifies the customer
+- `POST /api/payments/refund/{refundId}/status`
+- lets admin users move refund requests through requested, processing, processed, or failed states
+- writes refund action history and customer updates
+- `GET /api/ops/emergency-command`
+- summarizes SOS queues, incidents, partner dispatches, critical bookings, internal alerts, escalation order, and next ops action
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

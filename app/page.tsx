@@ -1164,6 +1164,12 @@ export default function CustomerApp() {
                     reports={reports}
                     experience={currentServiceExperience}
                   />
+                  <SessionSummaryPreview
+                    recipient={recipient}
+                    experience={currentServiceExperience}
+                    reports={reports}
+                  />
+                  <AccessibilityCareControls recipient={recipient} />
                   <SmartRecommendation
                     experience={currentServiceExperience}
                     recipient={recipient}
@@ -1781,6 +1787,64 @@ function FamilyReassuranceSystem({
           body="WhatsApp, voice notes, and visit summaries are ready for remote family coordination."
           icon={MessageCircle}
         />
+      </div>
+    </section>
+  );
+}
+
+function SessionSummaryPreview({
+  recipient,
+  experience,
+  reports
+}: {
+  recipient: Recipient;
+  experience: ReturnType<typeof serviceExperienceFor>;
+  reports: VisitReport[];
+}) {
+  const latestReport = reports[0];
+  const summaryItems = latestReport
+    ? [
+        latestReport.vitalsSummary,
+        latestReport.medicineSummary,
+        latestReport.familySummary,
+        latestReport.caregiverNote
+      ]
+    : experience.summary.map((item) => `${recipient.shortName}: ${item}`);
+
+  return (
+    <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">Today&apos;s care summary</p>
+          <h3 className="mt-1 text-2xl font-semibold">Family handover ready</h3>
+        </div>
+        <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
+          Voice note
+        </span>
+      </div>
+      <div className="mt-4 space-y-2">
+        {summaryItems.slice(0, 4).map((item) => (
+          <div key={item} className="flex items-start gap-3 rounded-2xl bg-white/10 p-3 text-sm">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
+            <span className="text-white/70">{item}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AccessibilityCareControls({ recipient }: { recipient: Recipient }) {
+  return (
+    <section className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+      <p className="text-sm font-semibold text-emerald-100">Elder-friendly mode</p>
+      <p className="mt-2 text-sm leading-6 text-white/55">
+        Larger touch targets, calmer alerts, voice summaries, and family-first updates are ready for {recipient.shortName}.
+      </p>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-white/60">
+        <div className="rounded-2xl bg-white/10 p-3">Large text</div>
+        <div className="rounded-2xl bg-white/10 p-3">Voice notes</div>
+        <div className="rounded-2xl bg-white/10 p-3">Family alerts</div>
       </div>
     </section>
   );
