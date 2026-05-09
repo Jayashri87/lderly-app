@@ -223,6 +223,7 @@ const seedCaretaker = async () => {
     uid: "demo-caretaker",
     name: "Smoke Caretaker",
     available: true,
+    status: "available",
     city: "Bengaluru",
     zone: "South",
     skills: ["doctor_visit", "lab_support", "medicine_help"],
@@ -232,7 +233,12 @@ const seedCaretaker = async () => {
     maxAssignments: 5,
     verified: true,
     trained: true,
-    yearsExperience: 5
+    yearsExperience: 5,
+    serviceZones: ["South", "Central", "Medical"],
+    punctualityScore: 99,
+    repeatVisits: 1,
+    familiarFamilies: ["demo-customer"],
+    activeBookingId: null
   });
   pass("smoke caretaker seeded");
 };
@@ -289,6 +295,18 @@ try {
   expect(
     status.json?.productionReadiness?.indiaFirstCommunication?.firebasePushPrepared === true,
     "India-first communication readiness is exposed"
+  );
+  expect(
+    status.json?.productionReadiness?.pushTokenRegistrationApi === true,
+    "push token registration API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.caretakerAttendanceApi === true,
+    "caretaker attendance API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.familyReportAccessApi === true,
+    "family report access API is prepared"
   );
 
   const manifestResult = await request("/manifest.webmanifest");
@@ -501,6 +519,34 @@ try {
     customerCookie
   );
   expect(familyResult.response.ok, "customer can add family access member", familyResult.text);
+  const familyMemberId = familyResult.json?.familyMember?.id;
+
+  const pushTokenResult = await request(
+    "/api/notifications/push-token",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        token: `smoke-web-token-${Date.now()}`,
+        platform: "web",
+        deviceId: "smoke-web-device"
+      })
+    },
+    customerCookie
+  );
+  expect(
+    pushTokenResult.response.ok,
+    "customer can register push notification token",
+    pushTokenResult.text
+  );
+  if (pushTokenResult.json?.token?.id) {
+    createdReliability.push({
+      kind: "pushToken",
+      id: pushTokenResult.json.token.id,
+      userId: "demo-customer",
+      role: "customer",
+      token: pushTokenResult.json.token.token
+    });
+  }
 
   const assignResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/assign`,
@@ -617,6 +663,34 @@ try {
     availabilityResult.text
   );
 
+  const attendanceCheckInResult = await request(
+    "/api/caretaker/attendance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: "check_in",
+        lat: 12.974,
+        lng: 77.598,
+        note: "Smoke shift check-in"
+      })
+    },
+    caretakerCookie
+  );
+  expect(
+    attendanceCheckInResult.response.ok,
+    "caretaker can check in for shift",
+    attendanceCheckInResult.text
+  );
+  const smokeShiftId = attendanceCheckInResult.json?.shift?.id;
+  if (smokeShiftId) {
+    createdReliability.push({
+      kind: "attendance",
+      id: smokeShiftId,
+      caretakerId: "demo-caretaker",
+      dateKey: new Date().toISOString().slice(0, 10)
+    });
+  }
+
   const acceptResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/status`,
     {
@@ -692,6 +766,73 @@ try {
   );
   expect(ratingResult.response.ok, "customer can rate completed care", ratingResult.text);
 
+  const reportId = `smoke-report-${Date.now()}`;
+  await database.ref().update({
+    [`reports/byId/${reportId}`]: {
+      id: reportId,
+      userId: booking.customerId,
+      bookingId: booking.id,
+      caretakerName: "Smoke Caretaker",
+      serviceType: booking.serviceType,
+      visitType: "booking",
+      reportType: "doctor_visit",
+      summary: "Smoke doctor visit report",
+      vitalsSummary: "Vitals stable",
+      medicineSummary: "Medicine not required",
+      familySummary: "Family report access smoke validation",
+      caregiverNote: "Report grant validated",
+      attachments: [],
+      completedAt: Date.now()
+    },
+    [`reports/byUser/${booking.customerId}/${reportId}`]: {
+      id: reportId,
+      userId: booking.customerId,
+      bookingId: booking.id,
+      caretakerName: "Smoke Caretaker",
+      serviceType: booking.serviceType,
+      visitType: "booking",
+      reportType: "doctor_visit",
+      summary: "Smoke doctor visit report",
+      vitalsSummary: "Vitals stable",
+      medicineSummary: "Medicine not required",
+      familySummary: "Family report access smoke validation",
+      caregiverNote: "Report grant validated",
+      attachments: [],
+      completedAt: Date.now()
+    }
+  });
+  createdReliability.push({
+    kind: "report",
+    id: reportId,
+    userId: booking.customerId
+  });
+
+  const familyAccessResult = await request(
+    "/api/reports/family-access",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        familyMemberId,
+        reportId,
+        permissions: ["monitor", "alerts"]
+      })
+    },
+    customerCookie
+  );
+  expect(
+    familyAccessResult.response.ok,
+    "customer can grant family report access",
+    familyAccessResult.text
+  );
+  if (familyAccessResult.json?.grant?.familyMemberId) {
+    createdReliability.push({
+      kind: "reportAccess",
+      id: reportId,
+      userId: booking.customerId,
+      familyMemberId
+    });
+  }
+
   const voiceResult = await request(
     "/api/voice-notes/upload-url",
     {
@@ -755,6 +896,24 @@ try {
   );
   expect(logoutAllResult.response.ok, "caretaker can logout all devices", logoutAllResult.text);
 
+  const attendanceCheckOutResult = await request(
+    "/api/caretaker/attendance",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        caretakerId: "demo-caretaker",
+        action: "check_out",
+        note: "Smoke shift check-out"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    attendanceCheckOutResult.response.ok,
+    "admin can record caretaker shift checkout",
+    attendanceCheckOutResult.text
+  );
+
   const revokedVoiceResult = await request(
     "/api/voice-notes/upload-url",
     {
@@ -814,6 +973,46 @@ try {
           [`operations/internalAlerts/byId/${item.id}`]: null,
           [`operations/internalAlerts/byKind/${item.alertKind}/${item.id}`]: null,
           [`operations/internalAlerts/bySeverity/${item.severity}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "pushToken") {
+      await database
+        .ref()
+        .update({
+          [`pushTokens/byUser/${item.userId}/${item.id}`]: null,
+          [`pushTokens/byRole/${item.role}/${item.userId}-${item.id}`]: null,
+          [`pushTokens/byToken/${String(item.token).replace(/[.#$/[\]]/g, "_")}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "attendance") {
+      await database
+        .ref()
+        .update({
+          [`caretakerAttendance/activeShifts/${item.caretakerId}`]: null,
+          [`caretakerAttendance/byCaretaker/${item.caretakerId}/${item.id}`]: null,
+          [`caretakerAttendance/byDate/${item.dateKey}/${item.caretakerId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "report") {
+      await database
+        .ref()
+        .update({
+          [`reports/byId/${item.id}`]: null,
+          [`reports/byUser/${item.userId}/${item.id}`]: null,
+          [`reports/familyVisible/${item.userId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "reportAccess") {
+      await database
+        .ref()
+        .update({
+          [`reportAccess/byFamilyMember/${item.familyMemberId}/${item.id}`]: null,
+          [`reportAccess/byCustomer/${item.userId}/${item.familyMemberId}/${item.id}`]: null,
+          [`reports/familyVisible/${item.userId}/${item.id}/${item.familyMemberId}`]: null
         })
         .catch(() => undefined);
     }

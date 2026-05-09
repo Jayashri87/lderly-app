@@ -97,6 +97,10 @@
             ".write": "auth != null && auth.token.role === 'admin'"
           }
         }
+      },
+      "internalAlerts": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": "auth != null && auth.token.role === 'admin'"
       }
     },
     "journeys": {
@@ -183,6 +187,72 @@
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')"
         }
+      },
+      "familyVisible": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "familyAccess": {
+      "byCustomer": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byPhone": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
+      }
+    },
+    "reportAccess": {
+      "byFamilyMember": {
+        "$familyMemberId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      },
+      "byCustomer": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "pushTokens": {
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byRole": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
+      },
+      "byToken": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
+      }
+    },
+    "caretakerAttendance": {
+      "activeShifts": {
+        "$caretakerId": {
+          ".read": "auth != null && (auth.uid === $caretakerId || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byCaretaker": {
+        "$caretakerId": {
+          ".read": "auth != null && (auth.uid === $caretakerId || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byDate": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
       }
     },
     "supportTickets": {

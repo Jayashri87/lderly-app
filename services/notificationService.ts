@@ -171,5 +171,19 @@ export const NotificationService = {
         read: true
       }))
     );
+  },
+
+  registerPushToken(session: SessionUser, token: string, platform: "android" | "ios" | "web") {
+    fetch("/api/notifications/push-token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        token,
+        platform,
+        deviceId: `${session.role}-${session.uid}-web`
+      })
+    }).catch(() => undefined);
   }
 };

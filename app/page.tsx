@@ -39,6 +39,7 @@ import { CareProfile, ProfileService } from "../services/profileService";
 import type { CareRecipientProfile } from "../services/profileService";
 import { ReportService, VisitReport } from "../services/reportService";
 import { CareJourney, JourneyService } from "../services/journeyService";
+import { NotificationService } from "../services/notificationService";
 
 type TabKey = "home" | "journey" | "profile";
 type BookingStep = "need" | "service" | "duration" | "time" | "location" | "review";
@@ -824,6 +825,11 @@ export default function CustomerApp() {
       ProfileService.subscribe(customerSession, setProfile),
       ReportService.subscribe(customerSession, setReports)
     ];
+    NotificationService.registerPushToken(
+      customerSession,
+      `web-demo-token-${customerSession.uid}`,
+      "web"
+    );
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [session]);

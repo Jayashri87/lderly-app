@@ -495,6 +495,26 @@ export default function OpsApp() {
               #late-checkins, and #incident-reports.
             </div>
           </Panel>
+          <Panel title="Workforce and family access">
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Attendance tracking</p>
+              <p className="mt-1 text-white/50">
+                Partner check-in, break, and check-out events now write to shift history.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Push tokens</p>
+              <p className="mt-1 text-white/50">
+                Customer, caretaker, and admin devices can register Firebase push tokens.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Family report grants</p>
+              <p className="mt-1 text-white/50">
+                Visit reports can be granted to family members without exposing all customer data.
+              </p>
+            </div>
+          </Panel>
         </section>
       </div>
     </main>

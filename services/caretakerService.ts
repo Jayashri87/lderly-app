@@ -222,6 +222,22 @@ export const CaretakerService = {
     }).catch(() => undefined);
   },
 
+  recordAttendance(
+    action: "break_end" | "break_start" | "check_in" | "check_out",
+    note?: string
+  ) {
+    fetch("/api/caretaker/attendance", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action,
+        note
+      })
+    }).catch(() => undefined);
+  },
+
   updateLocation(caretakerId: string, bookingId?: string) {
     const caretakers = readLocalCaretakers();
     const caretaker = caretakers.find((item) => item.uid === caretakerId) || seedCaretakers[0];

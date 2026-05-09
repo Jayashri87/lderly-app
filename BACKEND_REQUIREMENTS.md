@@ -205,6 +205,33 @@ Voice-note upload scaffolding is now available:
 - records metadata under `voiceNotes/byId`, `voiceNotes/byBooking`, and `voiceNotes/byUser`
 - falls back to a mock upload URL if storage is not configured
 
+India-first operations scaffolding is now available:
+
+- `POST /api/ops/alerts`
+- routes SLA, emergency, incident, late check-in, and AI-risk alerts into internal ops queues
+- supports Slack webhook delivery when configured, with Firebase queue fallback
+- exposes WhatsApp Business, manual WhatsApp, MSG91, Exotel, Firebase push, and Twilio fallback readiness
+
+Caretaker attendance scaffolding is now available:
+
+- `POST /api/caretaker/attendance`
+- records check-in, break start, break end, and check-out
+- writes active shifts and shift history under `caretakerAttendance`
+- keeps caretaker availability/status aligned with shift state
+
+Push notification token registration is now available:
+
+- `POST /api/notifications/push-token`
+- stores web, Android, and iOS push tokens under `pushTokens`
+- indexes tokens by user, role, and token for future Firebase Cloud Messaging delivery
+
+Family-scoped report access is now available:
+
+- `POST /api/reports/family-access`
+- creates report grants for family members
+- indexes grants under `reportAccess` and `reports/familyVisible`
+- keeps existing report records unchanged
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

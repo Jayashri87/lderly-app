@@ -149,7 +149,75 @@ export const CareProfileStore = {
       updatedAt: Date.now()
     };
 
-    await database.ref(`profiles/${userId}/familyMembers/${id}`).set(familyMember);
+    await database.ref().update({
+      [`profiles/${userId}/familyMembers/${id}`]: familyMember,
+      [`familyAccess/byCustomer/${userId}/${id}`]: {
+        id,
+        userId,
+        name: familyMember.name,
+        relationship: familyMember.relationship,
+        phone: familyMember.phone,
+        permissions: familyMember.permissions,
+        nriMode: familyMember.nriMode,
+        status: "invited",
+        updatedAt: familyMember.updatedAt
+      },
+      [`familyAccess/byPhone/${familyMember.phone.replace(/[.#$/[\]]/g, "_")}/${userId}`]:
+        id
+    });
     return { ok: true as const, familyMember };
+  },
+
+  async grantFamilyReportAccess({
+    userId,
+    familyMemberId,
+    reportId,
+    permissions
+  }: {
+    userId: string;
+    familyMemberId: string;
+    reportId: string;
+    permissions: Array<"alerts" | "approve" | "monitor" | "pay">;
+  }) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const [familySnapshot, reportSnapshot] = await Promise.all([
+      database.ref(`profiles/${userId}/familyMembers/${familyMemberId}`).get(),
+      database.ref(`reports/byId/${reportId}`).get()
+    ]);
+    const familyMember = familySnapshot.val() as FamilyMemberAccess | null;
+    const report = reportSnapshot.val() as { userId?: string } | null;
+
+    if (!familyMember) {
+      return { ok: false as const, status: 404, error: "Family member not found" };
+    }
+
+    if (!report || report.userId !== userId) {
+      return { ok: false as const, status: 404, error: "Report not found for customer" };
+    }
+
+    const grant = {
+      userId,
+      familyMemberId,
+      reportId,
+      permissions,
+      status: "active",
+      grantedAt: Date.now()
+    };
+
+    await database.ref().update({
+      [`reportAccess/byFamilyMember/${familyMemberId}/${reportId}`]: grant,
+      [`reportAccess/byCustomer/${userId}/${familyMemberId}/${reportId}`]: true,
+      [`reports/familyVisible/${userId}/${reportId}/${familyMemberId}`]: true
+    });
+
+    return {
+      ok: true as const,
+      grant
+    };
   }
 };

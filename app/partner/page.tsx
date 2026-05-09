@@ -246,6 +246,22 @@ export default function PartnerApp() {
 
         <section className="mt-6 grid grid-cols-2 gap-3">
           <ActionButton
+            label="Check In"
+            icon={Clock}
+            onClick={() => {
+              CaretakerService.recordAttendance("check_in", "Partner app check-in");
+              CaretakerService.setAvailability(session.uid, "available", true);
+            }}
+          />
+          <ActionButton
+            label="Break"
+            icon={Clock}
+            onClick={() => {
+              CaretakerService.recordAttendance("break_start", "Short break");
+              CaretakerService.setAvailability(session.uid, "standby", false);
+            }}
+          />
+          <ActionButton
             label="Accept"
             icon={CheckCircle2}
             onClick={() =>
@@ -295,6 +311,14 @@ export default function PartnerApp() {
             label="Panic SOS"
             icon={AlertTriangle}
             onClick={() => JourneyService.updateStatus("escalated")}
+          />
+          <ActionButton
+            label="Check Out"
+            icon={Clock}
+            onClick={() => {
+              CaretakerService.recordAttendance("check_out", "Partner app check-out");
+              CaretakerService.setAvailability(session.uid, "offline", false);
+            }}
           />
           <button
             onClick={isJourneyAssignment ? completeJourney : completeBooking}
