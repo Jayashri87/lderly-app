@@ -68,6 +68,17 @@ type OpsKpis = {
     posthogConfigured: boolean;
     mixpanelConfigured: boolean;
   };
+  shiftAnalytics?: {
+    activeShifts: number;
+    completedToday: number;
+    averageShiftMinutes: number;
+    checkinsToday: number;
+  };
+  slaAnalytics?: {
+    healthyRate: number;
+    breachedRate: number;
+    atRiskBookings: number;
+  };
 };
 
 export default function OpsApp() {
@@ -287,6 +298,16 @@ export default function OpsApp() {
             icon={BarChart3}
             label="Support ops"
             value={`${opsKpis?.supportOpen ?? 0}/${opsKpis?.complaintsOpen ?? 0}`}
+          />
+          <OpsMetric
+            icon={CalendarClock}
+            label="Shift check-ins"
+            value={String(opsKpis?.shiftAnalytics?.checkinsToday ?? 0)}
+          />
+          <OpsMetric
+            icon={ShieldCheck}
+            label="SLA healthy"
+            value={`${opsKpis?.slaAnalytics?.healthyRate ?? 100}%`}
           />
         </section>
 

@@ -301,12 +301,24 @@ try {
     "push token registration API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.pushDispatchApi === true,
+    "push dispatch API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.caretakerAttendanceApi === true,
     "caretaker attendance API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.shiftAnalyticsApi === true,
+    "shift analytics are prepared"
+  );
+  expect(
     status.json?.productionReadiness?.familyReportAccessApi === true,
     "family report access API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.aiReportSummaryApi === true,
+    "AI report summary API is prepared"
   );
 
   const manifestResult = await request("/manifest.webmanifest");
@@ -548,6 +560,31 @@ try {
     });
   }
 
+  const pushDispatchResult = await request(
+    "/api/notifications/push-dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: booking.customerId,
+        title: "Smoke care update",
+        body: "Push delivery route validated.",
+        data: {
+          bookingId: booking.id,
+          link: "/"
+        }
+      })
+    },
+    adminCookie
+  );
+  expect(pushDispatchResult.response.ok, "admin can dispatch push update", pushDispatchResult.text);
+  if (pushDispatchResult.json?.dispatch?.id) {
+    createdReliability.push({
+      kind: "pushDispatch",
+      id: pushDispatchResult.json.dispatch.id,
+      userId: booking.customerId
+    });
+  }
+
   const assignResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/assign`,
     {
@@ -613,6 +650,14 @@ try {
   expect(
     typeof kpiResult.json?.kpis?.activeBookings === "number",
     "ops KPIs include active bookings"
+  );
+  expect(
+    typeof kpiResult.json?.kpis?.shiftAnalytics?.activeShifts === "number",
+    "ops KPIs include shift analytics"
+  );
+  expect(
+    typeof kpiResult.json?.kpis?.slaAnalytics?.healthyRate === "number",
+    "ops KPIs include SLA analytics"
   );
 
   const snapshotResult = await request(
@@ -833,6 +878,29 @@ try {
     });
   }
 
+  const aiSummaryResult = await request(
+    "/api/reports/ai-summary",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        reportId
+      })
+    },
+    adminCookie
+  );
+  expect(aiSummaryResult.response.ok, "admin can generate AI report summary", aiSummaryResult.text);
+  expect(
+    Boolean(aiSummaryResult.json?.summary?.nextBestAction),
+    "AI report summary includes next best action"
+  );
+  if (aiSummaryResult.json?.summary?.id) {
+    createdReliability.push({
+      kind: "aiSummary",
+      reportId,
+      userId: booking.customerId
+    });
+  }
+
   const voiceResult = await request(
     "/api/voice-notes/upload-url",
     {
@@ -986,6 +1054,15 @@ try {
         })
         .catch(() => undefined);
     }
+    if (item.kind === "pushDispatch") {
+      await database
+        .ref()
+        .update({
+          [`pushDispatches/byId/${item.id}`]: null,
+          [`pushDispatches/byUser/${item.userId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
     if (item.kind === "attendance") {
       await database
         .ref()
@@ -1013,6 +1090,17 @@ try {
           [`reportAccess/byFamilyMember/${item.familyMemberId}/${item.id}`]: null,
           [`reportAccess/byCustomer/${item.userId}/${item.familyMemberId}/${item.id}`]: null,
           [`reports/familyVisible/${item.userId}/${item.id}/${item.familyMemberId}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "aiSummary") {
+      await database
+        .ref()
+        .update({
+          [`aiSummaries/byReport/${item.reportId}`]: null,
+          [`aiSummaries/byUser/${item.userId}/${item.reportId}`]: null,
+          [`reports/byId/${item.reportId}/aiSummary`]: null,
+          [`reports/byUser/${item.userId}/${item.reportId}/aiSummary`]: null
         })
         .catch(() => undefined);
     }

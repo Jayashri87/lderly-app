@@ -237,6 +237,34 @@
         ".write": false
       }
     },
+    "pushDispatches": {
+      "byId": {
+        "$dispatchId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "aiSummaries": {
+      "byReport": {
+        "$reportId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
     "caretakerAttendance": {
       "activeShifts": {
         "$caretakerId": {

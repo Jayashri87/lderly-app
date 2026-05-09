@@ -30,6 +30,17 @@ export type OpsKpis = {
     activeAssignments: number;
     status: string;
   }>;
+  shiftAnalytics: {
+    activeShifts: number;
+    completedToday: number;
+    averageShiftMinutes: number;
+    checkinsToday: number;
+  };
+  slaAnalytics: {
+    healthyRate: number;
+    breachedRate: number;
+    atRiskBookings: number;
+  };
   monitoring: {
     sentryConfigured: boolean;
     posthogConfigured: boolean;
@@ -68,6 +79,17 @@ type RefundMetricRecord = {
 
 type NotificationMetricRecord = {
   deliveryStatus?: string;
+};
+
+type AttendanceMetricRecord = {
+  status?: string;
+  durationMinutes?: number;
+  events?: Record<
+    string,
+    {
+      action?: string;
+    }
+  >;
 };
 
 const countRecord = (value: unknown) =>
@@ -152,14 +174,20 @@ export const Observability = {
       supportSnapshot,
       complaintsSnapshot,
       refundsSnapshot,
-      notificationsSnapshot
+      notificationsSnapshot,
+      activeShiftsSnapshot,
+      attendanceTodaySnapshot
     ] = await Promise.all([
       database.ref("bookings/byId").get(),
       database.ref("caretakers").get(),
       database.ref("supportTickets/byId").get(),
       database.ref("complaints/byId").get(),
       database.ref("refunds/byId").get(),
-      database.ref("notifications/byId").get()
+      database.ref("notifications/byId").get(),
+      database.ref("caretakerAttendance/activeShifts").get(),
+      database
+        .ref(`caretakerAttendance/byDate/${new Date().toISOString().slice(0, 10)}`)
+        .get()
     ]);
     const bookings = recordValues<BookingMetricRecord>(bookingsSnapshot.val());
     const caretakers = recordEntries<CaretakerMetricRecord>(caretakersSnapshot.val());
@@ -167,23 +195,49 @@ export const Observability = {
     const complaints = recordValues<ComplaintMetricRecord>(complaintsSnapshot.val());
     const refunds = recordValues<RefundMetricRecord>(refundsSnapshot.val());
     const notifications = recordValues<NotificationMetricRecord>(notificationsSnapshot.val());
+    const activeShifts = recordValues<AttendanceMetricRecord>(activeShiftsSnapshot.val());
+    const attendanceToday = recordEntries<Record<string, boolean>>(
+      attendanceTodaySnapshot.val()
+    );
+    const shiftIdsToday = attendanceToday.flatMap(([, shifts]) => Object.keys(shifts || {}));
+    const shiftRecordsToday = await Promise.all(
+      attendanceToday.flatMap(([caretakerId, shifts]) =>
+        Object.keys(shifts || {}).map(async (shiftId) => {
+          const shiftSnapshot = await database
+            .ref(`caretakerAttendance/byCaretaker/${caretakerId}/${shiftId}`)
+            .get();
+          return shiftSnapshot.val() as AttendanceMetricRecord | null;
+        })
+      )
+    );
+    const completedShifts = shiftRecordsToday.filter(
+      (shift): shift is AttendanceMetricRecord => Boolean(shift?.durationMinutes)
+    );
+    const checkinsToday = shiftRecordsToday.reduce((total, shift) => {
+      const events = Object.values(shift?.events || {});
+      return total + events.filter((event) => event.action === "check_in").length;
+    }, 0);
     const bookingsByStatus = bookings.reduce<Record<string, number>>((result, booking) => {
       const status = booking.status || "unknown";
       result[status] = (result[status] || 0) + 1;
       return result;
     }, {});
+    const healthyBookings = bookings.filter((booking) => booking.sla?.status === "healthy").length;
+    const breachedBookings = bookings.filter((booking) => booking.sla?.status === "breached")
+      .length;
+    const activeBookingCount = bookings.filter(
+      (booking) =>
+        booking.status &&
+        !["completed", "payment_settled", "report_generated", "cancelled"].includes(
+          booking.status
+        )
+    ).length;
 
     return {
       ok: true,
       kpis: {
         generatedAt: Date.now(),
-        activeBookings: bookings.filter(
-          (booking) =>
-            booking.status &&
-            !["completed", "payment_settled", "report_generated", "cancelled"].includes(
-              booking.status
-            )
-        ).length,
+        activeBookings: activeBookingCount,
         bookingsByStatus,
         onlineCaretakers: caretakers.filter(([, caretaker]) => caretaker.available)
           .length,
@@ -209,6 +263,28 @@ export const Observability = {
           activeAssignments: caretaker.activeAssignments || 0,
           status: caretaker.status || (caretaker.available ? "available" : "offline")
         })),
+        shiftAnalytics: {
+          activeShifts: activeShifts.length,
+          completedToday: completedShifts.length,
+          averageShiftMinutes: completedShifts.length
+            ? Math.round(
+                completedShifts.reduce(
+                  (total, shift) => total + (shift.durationMinutes || 0),
+                  0
+                ) / completedShifts.length
+              )
+            : 0,
+          checkinsToday: checkinsToday || shiftIdsToday.length
+        },
+        slaAnalytics: {
+          healthyRate: bookings.length ? Math.round((healthyBookings / bookings.length) * 100) : 100,
+          breachedRate: bookings.length
+            ? Math.round((breachedBookings / bookings.length) * 100)
+            : 0,
+          atRiskBookings: bookings.filter((booking) =>
+            ["watch", "breached"].includes(booking.sla?.status || "")
+          ).length
+        },
         monitoring: {
           sentryConfigured: Boolean(process.env.SENTRY_DSN),
           posthogConfigured: Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY),

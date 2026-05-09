@@ -224,6 +224,9 @@ Push notification token registration is now available:
 - `POST /api/notifications/push-token`
 - stores web, Android, and iOS push tokens under `pushTokens`
 - indexes tokens by user, role, and token for future Firebase Cloud Messaging delivery
+- `POST /api/notifications/push-dispatch`
+- sends Firebase Cloud Messaging pushes when Admin messaging is available
+- queues delivery records under `pushDispatches` when tokens or messaging are not ready
 
 Family-scoped report access is now available:
 
@@ -231,6 +234,21 @@ Family-scoped report access is now available:
 - creates report grants for family members
 - indexes grants under `reportAccess` and `reports/familyVisible`
 - keeps existing report records unchanged
+
+AI-ready report summaries are now available:
+
+- `POST /api/reports/ai-summary`
+- creates deterministic AI-placeholder family summaries from visit reports
+- stores risk level, family headline, next best action, and caregiver quality signal
+- writes under `aiSummaries` and mirrors the summary onto report records
+
+Ops analytics now include:
+
+- active shifts
+- shift check-ins today
+- completed shifts today
+- average shift duration
+- SLA healthy rate, breach rate, and at-risk booking count
 
 ## Remaining Production Hardening
 

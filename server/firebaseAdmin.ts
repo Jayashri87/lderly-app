@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getDatabase } from "firebase-admin/database";
+import { getMessaging } from "firebase-admin/messaging";
 import { getStorage } from "firebase-admin/storage";
 
 const adminProjectId =
@@ -60,4 +61,14 @@ export const getAdminStorageBucket = () => {
   }
 
   return getStorage(app).bucket();
+};
+
+export const getAdminMessaging = () => {
+  const app = getAdminApp();
+
+  if (!app) {
+    return null;
+  }
+
+  return getMessaging(app);
 };
