@@ -2328,6 +2328,20 @@ function ProfilePanel({
           action: "Edit"
         },
         {
+          icon: HeartPulse,
+          label: "Medical readiness",
+          value: `${details.allergies || profile?.allergies || "Allergies not set"} - ${details.mobility || "mobility pending"}`,
+          action: "Review"
+        },
+        {
+          icon: Pill,
+          label: "Medication list",
+          value:
+            profile?.careRecipients?.[recipient.name]?.medicationList?.join(", ") ||
+            "Add medicines and dosage timings",
+          action: "Add"
+        },
+        {
           icon: Languages,
           label: "Preferred language",
           value: details.language || "Not set",
@@ -2349,6 +2363,12 @@ function ProfilePanel({
           label: "Payment methods",
           value: "UPI and cards",
           action: "Manage"
+        },
+        {
+          icon: Users,
+          label: "Family access",
+          value: `${Object.keys(profile?.familyMembers || {}).length || 1} family member can monitor care`,
+          action: "Invite"
         },
         {
           icon: MessageCircle,
@@ -2439,6 +2459,32 @@ function ProfilePanel({
         <ProfileStat label="Care score" value="92%" />
         <ProfileStat label="Trusted visits" value="12" />
       </div>
+
+      <section className="mt-6">
+        <h3 className="mb-3 text-lg font-semibold">Care packages</h3>
+        <div className="space-y-3">
+          {Object.values(profile?.carePackages || {}).slice(0, 3).map((carePackage) => (
+            <div key={carePackage.id} className="rounded-3xl bg-white/10 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{carePackage.name}</p>
+                  <p className="mt-1 text-sm text-white/50">{carePackage.recommendedFor}</p>
+                </div>
+                <span className="rounded-full bg-emerald-300 px-3 py-1 text-xs font-semibold text-[#06130f]">
+                  {carePackage.priceLabel}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {carePackage.included.map((item) => (
+                  <span key={item} className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-6 space-y-6">
         {profileSections.map((section) => (

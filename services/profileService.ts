@@ -12,7 +12,38 @@ export type CareRecipientProfile = {
   allergies: string;
   mobility: string;
   language: string;
+  medicationList?: string[];
+  medicalConditions?: string[];
+  dementiaSupport?: boolean;
+  fallRisk?: "low" | "medium" | "high";
+  emergencyContacts?: EmergencyContact[];
   updatedAt: number;
+};
+
+export type EmergencyContact = {
+  name: string;
+  relationship: string;
+  phone: string;
+  priority: number;
+};
+
+export type FamilyMemberAccess = {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  permissions: Array<"monitor" | "approve" | "pay" | "alerts">;
+  nriMode: boolean;
+  updatedAt: number;
+};
+
+export type CarePackage = {
+  id: string;
+  name: string;
+  priceLabel: string;
+  cadence: "single" | "weekly" | "monthly";
+  included: string[];
+  recommendedFor: string;
 };
 
 export type CareProfile = {
@@ -25,6 +56,15 @@ export type CareProfile = {
   allergies: string;
   subscriptionPlan: "Basic" | "Premium" | "Care Plus";
   careRecipients?: Record<string, CareRecipientProfile>;
+  familyMembers?: Record<string, FamilyMemberAccess>;
+  preferredCaregiverId?: string;
+  carePackages?: Record<string, CarePackage>;
+  notificationPreferences?: {
+    whatsapp: boolean;
+    sms: boolean;
+    voiceSummary: boolean;
+    nriDigest: boolean;
+  };
   updatedAt: number;
 };
 
@@ -41,6 +81,32 @@ const createDefaultProfile = (session?: SessionUser | null): CareProfile => ({
   allergies: "No known allergies",
   subscriptionPlan: "Premium",
   careRecipients: {},
+  familyMembers: {},
+  preferredCaregiverId: "demo-caretaker",
+  carePackages: {
+    parentWellness: {
+      id: "parentWellness",
+      name: "Parent Wellness Plan",
+      priceLabel: "Rs 4,999 / month",
+      cadence: "monthly",
+      included: ["4 check-ins", "medicine reminders", "family updates"],
+      recommendedFor: "Families who want weekly reassurance"
+    },
+    hospitalSupport: {
+      id: "hospitalSupport",
+      name: "Hospital Support Pack",
+      priceLabel: "From Rs 1,499",
+      cadence: "single",
+      included: ["attender support", "doctor notes", "discharge help"],
+      recommendedFor: "Appointments, admission, or discharge days"
+    }
+  },
+  notificationPreferences: {
+    whatsapp: true,
+    sms: false,
+    voiceSummary: true,
+    nriDigest: true
+  },
   updatedAt: now()
 });
 
@@ -197,6 +263,43 @@ export const ProfileService = {
         recipient
       )
     );
+  },
+
+  saveFamilyMember(
+    session: SessionUser,
+    member: Omit<FamilyMemberAccess, "id" | "updatedAt">
+  ) {
+    const profile = readLocalProfile(session);
+    const id = `family-${now()}`;
+
+    saveProfile({
+      ...profile,
+      userId: session.uid,
+      familyMembers: {
+        ...(profile.familyMembers || {}),
+        [id]: {
+          id,
+          ...member,
+          updatedAt: now()
+        }
+      }
+    });
+  },
+
+  selectPackage(session: SessionUser, packageId: string) {
+    const profile = readLocalProfile(session);
+    const plan =
+      packageId === "parentWellness"
+        ? "Premium"
+        : packageId === "hospitalSupport"
+          ? "Care Plus"
+          : profile.subscriptionPlan;
+
+    saveProfile({
+      ...profile,
+      userId: session.uid,
+      subscriptionPlan: plan
+    });
   },
 
   removeCareRecipient(session: SessionUser, relationship: string) {

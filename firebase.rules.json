@@ -88,7 +88,19 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
         ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
-        ".validate": "newData.hasChildren(['userId', 'elderName', 'age', 'primaryContact', 'emergencyContact', 'medicalNotes', 'allergies', 'subscriptionPlan', 'updatedAt'])"
+        ".validate": "newData.hasChildren(['userId', 'elderName', 'age', 'primaryContact', 'emergencyContact', 'medicalNotes', 'allergies', 'subscriptionPlan', 'updatedAt'])",
+        "familyMembers": {
+          "$memberId": {
+            ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+            ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')"
+          }
+        },
+        "carePackages": {
+          "$packageId": {
+            ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
       }
     },
     "alerts": {

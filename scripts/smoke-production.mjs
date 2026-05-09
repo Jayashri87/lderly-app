@@ -335,6 +335,90 @@ try {
     "checkout returns Razorpay-compatible payload"
   );
 
+  const pricingResult = await request(
+    "/api/pricing/quote",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        serviceType: booking.serviceType,
+        durationLabel: booking.requestDetails.duration.label,
+        priority: booking.matching.priority,
+        distanceKm: 4.2,
+        recurring: false
+      })
+    },
+    customerCookie
+  );
+  expect(pricingResult.response.ok, "customer can get dynamic pricing quote", pricingResult.text);
+  expect(
+    pricingResult.json?.quote?.estimatedTotal > 0,
+    "pricing quote returns payable estimate"
+  );
+
+  const profileResult = await request(
+    "/api/profiles/care",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        profile: {
+          elderName: "Smoke Mom",
+          age: 72,
+          primaryContact: "+91 90000 00000",
+          emergencyContact: "Family - +91 90000 00000",
+          medicalNotes: "Smoke profile hypertension note",
+          allergies: "No known allergies",
+          subscriptionPlan: "Premium",
+          careRecipients: {
+            Mother: {
+              relationship: "Mother",
+              fullName: "Smoke Mom",
+              age: 72,
+              phone: "+91 90000 00000",
+              address: "Jayanagar Bengaluru",
+              healthNotes: "Monitor BP",
+              allergies: "No known allergies",
+              mobility: "Walks with support",
+              language: "Kannada",
+              medicationList: ["BP tablet 9 PM"],
+              medicalConditions: ["Hypertension"],
+              dementiaSupport: false,
+              fallRisk: "medium",
+              emergencyContacts: [
+                {
+                  name: "Smoke Family",
+                  relationship: "Son",
+                  phone: "+91 90000 00000",
+                  priority: 1
+                }
+              ],
+              updatedAt: Date.now()
+            }
+          }
+        }
+      })
+    },
+    customerCookie
+  );
+  expect(profileResult.response.ok, "customer can save medical care profile", profileResult.text);
+
+  const familyResult = await request(
+    "/api/profiles/family",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        member: {
+          name: "Smoke Sibling",
+          relationship: "Daughter",
+          phone: "+91 91111 11111",
+          permissions: ["monitor", "alerts"],
+          nriMode: true
+        }
+      })
+    },
+    customerCookie
+  );
+  expect(familyResult.response.ok, "customer can add family access member", familyResult.text);
+
   const assignResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/assign`,
     {

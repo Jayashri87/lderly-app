@@ -1,0 +1,46 @@
+import { NextRequest, NextResponse } from "next/server";
+import {
+  jsonError,
+  parseJsonBody,
+  requireApiSession,
+  withMutationAudit
+} from "../../../../server/apiSecurity";
+import { CareProfileStore } from "../../../../server/carePricing";
+import type { CareProfile } from "../../../../services/profileService";
+
+export async function POST(request: NextRequest) {
+  const auth = await requireApiSession(request, ["customer", "admin"], { rateLimit: 40 });
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const body = await parseJsonBody<{ userId?: string; profile?: Partial<CareProfile> }>(request);
+  const userId =
+    auth.session.role === "admin"
+      ? body?.userId || auth.session.uid || auth.session.username
+      : auth.session.uid || auth.session.username;
+
+  if (!body?.profile || !userId) {
+    return jsonError("Care profile payload is required", 400);
+  }
+
+  const result = await withMutationAudit(
+    request,
+    {
+      action: "profile.care.save",
+      resource: userId,
+      status: "success",
+      details: {
+        actor: auth.session.role
+      }
+    },
+    () => CareProfileStore.saveProfile(userId, body.profile!)
+  );
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  return NextResponse.json({ profile: result.profile });
+}
