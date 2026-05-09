@@ -2,8 +2,30 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LDERLY Care Intelligence",
-  description: "Modern emergency assistance and care journey dashboard."
+  metadataBase: new URL("https://lderly-app.vercel.app"),
+  title: {
+    default: "LDERLY Care",
+    template: "%s | LDERLY"
+  },
+  description: "Book, track, and coordinate trusted elder care for family.",
+  applicationName: "LDERLY",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "LDERLY",
+    statusBarStyle: "black-translucent"
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg"
+  },
+  openGraph: {
+    title: "LDERLY Care",
+    description: "Care arrives on demand for parents and families.",
+    url: "https://lderly-app.vercel.app",
+    siteName: "LDERLY",
+    type: "website"
+  }
 };
 
 export const viewport: Viewport = {

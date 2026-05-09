@@ -1,4 +1,5 @@
 import { FirebaseApp, getApps, initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { Auth, getAuth } from "firebase/auth";
 import { Database, getDatabase } from "firebase/database";
 
@@ -29,3 +30,19 @@ export const app: FirebaseApp | null = hasFirebaseConfig
 export const db: Database | null = app ? getDatabase(app) : null;
 
 export const auth: Auth | null = app ? getAuth(app) : null;
+
+const appCheckSiteKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY;
+const appCheckDebugToken = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN;
+
+if (typeof window !== "undefined" && app && appCheckSiteKey) {
+  if (appCheckDebugToken) {
+    Object.assign(window, {
+      FIREBASE_APPCHECK_DEBUG_TOKEN: appCheckDebugToken
+    });
+  }
+
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}

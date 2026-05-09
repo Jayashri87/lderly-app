@@ -81,3 +81,47 @@ export const createKycUpload = async ({
 
   return upload;
 };
+
+export const reviewKycDocument = async ({
+  caretakerId,
+  documentType,
+  status,
+  reviewerId,
+  note
+}: {
+  caretakerId: string;
+  documentType: KycDocumentType;
+  status: "approved" | "rejected" | "needs_resubmission";
+  reviewerId: string;
+  note: string;
+}) => {
+  const database = getAdminDatabase();
+
+  if (!database) {
+    return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+  }
+
+  const documentRef = database.ref(`caretakerKyc/byCaretaker/${caretakerId}/${documentType}`);
+  const snapshot = await documentRef.get();
+
+  if (!snapshot.exists()) {
+    return { ok: false as const, status: 404, error: "KYC document not found" };
+  }
+
+  const review = {
+    status,
+    reviewerId,
+    note,
+    reviewedAt: Date.now()
+  };
+
+  await documentRef.update(review);
+  await database.ref(`caretakers/${caretakerId}/kycStatus/${documentType}`).set(status);
+  await database.ref(`operations/kycReviewQueue/${status}/${caretakerId}-${documentType}`).set({
+    caretakerId,
+    documentType,
+    ...review
+  });
+
+  return { ok: true as const, review };
+};

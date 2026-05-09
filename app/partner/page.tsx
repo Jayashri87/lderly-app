@@ -186,6 +186,9 @@ export default function PartnerApp() {
             <h1 className="mt-1 text-3xl font-semibold">Today</h1>
           </div>
           <div className="flex items-center gap-2">
+            <div className="rounded-full bg-white/10 px-3 py-2 text-sm font-semibold">
+              KYC ready
+            </div>
             <div className="rounded-full bg-emerald-300 px-3 py-2 text-sm font-semibold text-[#080b10]">
               Online
             </div>

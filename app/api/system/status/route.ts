@@ -39,6 +39,7 @@ export async function GET() {
       logoutAllDevicesRoute: true,
       auditLogging: true,
       caretakerKycUploadRoute: true,
+      caretakerKycReviewRoute: true,
       careProfileApi: true,
       familyAccessApi: true,
       pricingQuoteApi: true,
@@ -49,6 +50,10 @@ export async function GET() {
       analyticsEventApi: true,
       opsKpiApi: true,
       monitoringSnapshotApi: true,
+      firebaseAppCheckPrepared: true,
+      firebaseAppCheckConfigured: hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY"),
+      pwaManifest: true,
+      legalPages: true,
       observabilityConfigured: hasAnyEnv([
         "SENTRY_DSN",
         "NEXT_PUBLIC_POSTHOG_KEY",
@@ -84,7 +89,10 @@ export async function GET() {
           : ["Google Maps production Map ID"]),
         ...(hasAnyEnv(["SENTRY_DSN", "NEXT_PUBLIC_POSTHOG_KEY", "NEXT_PUBLIC_MIXPANEL_TOKEN"])
           ? []
-          : ["Sentry/PostHog/Mixpanel production monitoring keys"])
+          : ["Sentry/PostHog/Mixpanel production monitoring keys"]),
+        ...(hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY")
+          ? []
+          : ["Firebase App Check reCAPTCHA Enterprise site key"])
       ]
     }
   });

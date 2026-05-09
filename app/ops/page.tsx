@@ -410,6 +410,12 @@ export default function OpsApp() {
                 {opsKpis?.refundsRequested ?? 0} refund requests are awaiting ops review.
               </p>
             </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">KYC reviews</p>
+              <p className="mt-1 text-white/50">
+                Aadhaar, PAN, and face checks route through the ops review API.
+              </p>
+            </div>
           </Panel>
           <Panel title="Monitoring">
             <div className="grid grid-cols-3 gap-3">

@@ -276,6 +276,18 @@ try {
     status.json?.productionReadiness?.razorpayConfigured === true,
     "Razorpay order keys configured"
   );
+  expect(status.json?.productionReadiness?.pwaManifest === true, "PWA manifest is prepared");
+  expect(status.json?.productionReadiness?.legalPages === true, "legal pages are prepared");
+  expect(
+    status.json?.productionReadiness?.firebaseAppCheckPrepared === true,
+    "Firebase App Check is scaffolded"
+  );
+
+  const manifestResult = await request("/manifest.webmanifest");
+  expect(manifestResult.response.ok, "web app manifest is reachable", manifestResult.text);
+
+  const privacyResult = await request("/legal/privacy");
+  expect(privacyResult.response.ok, "privacy page is reachable", privacyResult.text);
 
   const unauthorizedBooking = await request("/api/bookings", {
     method: "POST",
@@ -674,6 +686,21 @@ try {
     caretakerCookie
   );
   expect(kycResult.response.ok, "caretaker can create Aadhaar KYC upload URL", kycResult.text);
+
+  const kycReviewResult = await request(
+    "/api/caretaker/kyc/review",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        caretakerId: "demo-caretaker",
+        documentType: "aadhaar",
+        status: "approved",
+        note: "Smoke KYC approval"
+      })
+    },
+    adminCookie
+  );
+  expect(kycReviewResult.response.ok, "admin can review caretaker KYC", kycReviewResult.text);
 
   const geoResult = await request(
     "/api/locations/geocode",

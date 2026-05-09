@@ -89,6 +89,14 @@
             ".write": "auth != null && auth.token.role === 'admin'"
           }
         }
+      },
+      "kycReviewQueue": {
+        "$status": {
+          "$reviewId": {
+            ".read": "auth != null && auth.token.role === 'admin'",
+            ".write": "auth != null && auth.token.role === 'admin'"
+          }
+        }
       }
     },
     "journeys": {
