@@ -240,6 +240,26 @@ export default function PartnerApp() {
           </div>
         </section>
 
+        <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-emerald-200/10 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-emerald-100">Visit readiness</p>
+              <h2 className="mt-1 text-2xl font-semibold">Next best action is clear</h2>
+              <p className="mt-1 text-sm text-white/50">
+                Large actions below keep the visit workflow fast, calm, and audit-ready.
+              </p>
+            </div>
+            <span className="rounded-full bg-emerald-300 px-3 py-1 text-xs font-semibold text-[#080b10]">
+              96% reliable
+            </span>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-white/60">
+            <div className="rounded-2xl bg-white/10 p-3">KYC verified</div>
+            <div className="rounded-2xl bg-white/10 p-3">Training active</div>
+            <div className="rounded-2xl bg-white/10 p-3">SLA tracked</div>
+          </div>
+        </section>
+
         <div className="mt-5">
           <LiveMap journey={bookingMapJourney} />
         </div>

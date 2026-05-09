@@ -1124,6 +1124,12 @@ export default function CustomerApp() {
           </div>
         )}
 
+        <RealtimeCareStrip
+          activeCare={Boolean(activeCare)}
+          service={currentService}
+          recipient={recipient}
+        />
+
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
             <Screen key="home">
@@ -1573,6 +1579,37 @@ function CompactStatus({
           medicine progress, mood, and care score.
         </div>
       )}
+    </section>
+  );
+}
+
+function RealtimeCareStrip({
+  activeCare,
+  service,
+  recipient
+}: {
+  activeCare: boolean;
+  service: string;
+  recipient: Recipient;
+}) {
+  const status = activeCare
+    ? `${service || "Care"} live for ${recipient.shortName}`
+    : `Ready to arrange care for ${recipient.shortName}`;
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3 backdrop-blur-xl">
+      <div className="flex items-center gap-3">
+        <RealtimePulse />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100">
+            Realtime care system
+          </p>
+          <p className="mt-1 truncate text-sm text-white/70">{status}</p>
+        </div>
+        <span className="rounded-full bg-emerald-300 px-3 py-1 text-xs font-semibold text-[#06130f]">
+          {activeCare ? "Live" : "Ready"}
+        </span>
+      </div>
     </section>
   );
 }
@@ -2343,6 +2380,13 @@ function JourneyExperience({
         </div>
       </div>
 
+      <LiveEtaCard
+        eta={activeMapJourney?.eta ?? 8}
+        currentStep={currentStep}
+        nextStep={nextStep}
+        activeIndex={activeIndex}
+      />
+
       <div className="mt-5">
         <LiveMap journey={activeMapJourney} />
       </div>
@@ -2403,6 +2447,50 @@ function JourneyExperience({
       </button>
         </>
       )}
+    </section>
+  );
+}
+
+function LiveEtaCard({
+  eta,
+  currentStep,
+  nextStep,
+  activeIndex
+}: {
+  eta: number;
+  currentStep: string;
+  nextStep: string;
+  activeIndex: number;
+}) {
+  return (
+    <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-emerald-200/10 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">Live ETA</p>
+          <h3 className="mt-1 text-3xl font-semibold">{eta || 8} mins</h3>
+        </div>
+        <div className="relative h-14 w-14 rounded-full bg-emerald-300/15">
+          <span className="absolute inset-2 animate-ping rounded-full bg-emerald-300/20" />
+          <span className="absolute inset-5 rounded-full bg-emerald-200" />
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div className="rounded-2xl bg-white/10 p-3">
+          <p className="text-xs text-white/45">Now</p>
+          <p className="mt-1 font-semibold">{currentStep}</p>
+        </div>
+        <div className="rounded-2xl bg-white/10 p-3">
+          <p className="text-xs text-white/45">Next</p>
+          <p className="mt-1 font-semibold">{nextStep}</p>
+        </div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.max(16, ((activeIndex + 1) / journeySteps.length) * 100)}%` }}
+          className="h-full rounded-full bg-emerald-300"
+        />
+      </div>
     </section>
   );
 }

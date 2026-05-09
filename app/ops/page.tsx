@@ -8,6 +8,7 @@ import {
   BellRing,
   CalendarClock,
   ShieldCheck,
+  Sparkles,
   Users
 } from "lucide-react";
 import LiveMap from "../../components/LiveMap";
@@ -81,6 +82,29 @@ type OpsKpis = {
   };
 };
 
+type CaregiverIntelligenceSnapshot = {
+  generatedAt: number;
+  averageReliability: number;
+  online: number;
+  watch: number;
+  recommendedCaretakerId: string;
+  recommendation: string;
+  caretakers: Array<{
+    uid: string;
+    name: string;
+    status: string;
+    zone: string;
+    reliabilityScore: number;
+    risk: "trusted" | "watch" | "manual_review" | "offline";
+    punctualityScore: number;
+    rating: number;
+    repeatVisits: number;
+    activeAssignments: number;
+    maxAssignments: number;
+    signals: string[];
+  }>;
+};
+
 export default function OpsApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -93,6 +117,8 @@ export default function OpsApp() {
   const [adminError, setAdminError] = useState("");
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [opsKpis, setOpsKpis] = useState<OpsKpis | null>(null);
+  const [caregiverIntel, setCaregiverIntel] =
+    useState<CaregiverIntelligenceSnapshot | null>(null);
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -126,6 +152,12 @@ export default function OpsApp() {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload: { kpis: OpsKpis } | null) => setOpsKpis(payload?.kpis || null))
       .catch(() => setOpsKpis(null));
+    fetch("/api/ops/caregiver-intelligence")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { snapshot: CaregiverIntelligenceSnapshot } | null) =>
+        setCaregiverIntel(payload?.snapshot || null)
+      )
+      .catch(() => setCaregiverIntel(null));
   }, [session]);
 
   const enterOps = async () => {
@@ -309,6 +341,11 @@ export default function OpsApp() {
             label="SLA healthy"
             value={`${opsKpis?.slaAnalytics?.healthyRate ?? 100}%`}
           />
+          <OpsMetric
+            icon={Sparkles}
+            label="Reliability"
+            value={`${caregiverIntel?.averageReliability ?? 0}%`}
+          />
         </section>
 
         {systemStatus && (
@@ -414,6 +451,24 @@ export default function OpsApp() {
             >
               Seed caretaker profiles
             </button>
+            {caregiverIntel && (
+              <div className="rounded-2xl bg-emerald-300/15 p-4 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-emerald-100">Dispatch intelligence</p>
+                    <p className="mt-1 text-white/60">{caregiverIntel.recommendation}</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-300 px-3 py-1 text-xs font-semibold text-[#071018]">
+                    {caregiverIntel.averageReliability}%
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <StatusPill label="Online" ready={caregiverIntel.online > 0} />
+                  <StatusPill label="Watch" ready={caregiverIntel.watch === 0} />
+                  <StatusPill label="Auto-match" ready={Boolean(caregiverIntel.recommendedCaretakerId)} />
+                </div>
+              </div>
+            )}
             {caretakers.map((caretaker) => (
               <CaretakerRow key={caretaker.uid} caretaker={caretaker} />
             ))}

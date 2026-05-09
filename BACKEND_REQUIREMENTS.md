@@ -300,6 +300,13 @@ Care quality and safety operations are now available:
 - lets admin users award caregiver training badges and verification credentials
 - mirrors active badges onto caretaker profiles for future trust UI and assignment logic
 
+Caregiver intelligence is now available:
+
+- `GET /api/ops/caregiver-intelligence`
+- calculates caregiver reliability scores from rating, punctuality, repeat visits, verification, training, assignment load, and availability
+- returns recommended caregiver, watch counts, online count, and trust signals for ops dispatch
+- designed as the first step toward automated caregiver matching and SLA-aware reassignment
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

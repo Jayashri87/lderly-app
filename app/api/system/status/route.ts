@@ -90,6 +90,7 @@ export async function GET() {
       medicationAdherenceApi: true,
       incidentReportApi: true,
       caretakerTrainingBadgeApi: true,
+      caregiverReliabilityScoringApi: true,
       emergencyEscalationApi: true,
       partnerMarketplaceApi: true,
       partnerDispatchApi: true,

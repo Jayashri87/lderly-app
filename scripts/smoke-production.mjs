@@ -353,6 +353,10 @@ try {
     "caretaker training badge API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.caregiverReliabilityScoringApi === true,
+    "caregiver reliability scoring API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.emergencyEscalationApi === true,
     "emergency escalation API is prepared"
   );
@@ -682,6 +686,21 @@ try {
   expect(
     assignResult.json?.booking?.caretakerId === "demo-caretaker",
     "assignment selected smoke caretaker"
+  );
+
+  const caregiverIntelResult = await request(
+    "/api/ops/caregiver-intelligence",
+    {},
+    adminCookie
+  );
+  expect(
+    caregiverIntelResult.response.ok,
+    "admin can read caregiver reliability intelligence",
+    caregiverIntelResult.text
+  );
+  expect(
+    caregiverIntelResult.json?.snapshot?.averageReliability >= 0,
+    "caregiver intelligence returns reliability score"
   );
 
   const invoiceResult = await request(
