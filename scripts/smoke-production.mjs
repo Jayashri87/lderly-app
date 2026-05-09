@@ -319,6 +319,23 @@ try {
     "booking gets server-side dispatch zone"
   );
 
+  const analyticsResult = await request(
+    "/api/analytics/events",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: "smoke_booking_created",
+        bookingId: booking.id,
+        properties: {
+          serviceType: booking.serviceType,
+          source: "smoke"
+        }
+      })
+    },
+    customerCookie
+  );
+  expect(analyticsResult.response.ok, "customer can capture analytics event", analyticsResult.text);
+
   const customerRead = await database.ref(`bookings/byId/${booking.id}`).get();
   expect(customerRead.exists(), "booking persisted in Firebase");
 
@@ -524,6 +541,23 @@ try {
     "ops can broadcast lifecycle notification",
     lifecycleNotificationResult.text
   );
+
+  const kpiResult = await request("/api/ops/kpis", {}, adminCookie);
+  expect(kpiResult.response.ok, "admin can read ops KPIs", kpiResult.text);
+  expect(
+    typeof kpiResult.json?.kpis?.activeBookings === "number",
+    "ops KPIs include active bookings"
+  );
+
+  const snapshotResult = await request(
+    "/api/monitoring/snapshot",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(snapshotResult.response.ok, "admin can write monitoring snapshot", snapshotResult.text);
 
   const availabilityResult = await request(
     "/api/caretaker/availability",

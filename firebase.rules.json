@@ -249,6 +249,10 @@
         ".write": false
       }
     },
+    "analytics": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": false
+    },
     "deviceSessions": {
       "byId": {
         "$sessionId": {

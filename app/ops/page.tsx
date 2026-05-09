@@ -39,6 +39,22 @@ type SystemStatus = {
   };
 };
 
+type OpsKpis = {
+  activeBookings: number;
+  onlineCaretakers: number;
+  slaWatch: number;
+  slaBreached: number;
+  supportOpen: number;
+  complaintsOpen: number;
+  refundsRequested: number;
+  notificationsQueued: number;
+  monitoring: {
+    sentryConfigured: boolean;
+    posthogConfigured: boolean;
+    mixpanelConfigured: boolean;
+  };
+};
+
 export default function OpsApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -50,6 +66,7 @@ export default function OpsApp() {
   const [adminPassword, setAdminPassword] = useState("");
   const [adminError, setAdminError] = useState("");
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [opsKpis, setOpsKpis] = useState<OpsKpis | null>(null);
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -79,6 +96,10 @@ export default function OpsApp() {
       .then((response) => (response.ok ? response.json() : null))
       .then((status: SystemStatus | null) => setSystemStatus(status))
       .catch(() => setSystemStatus(null));
+    fetch("/api/ops/kpis")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { kpis: OpsKpis } | null) => setOpsKpis(payload?.kpis || null))
+      .catch(() => setOpsKpis(null));
   }, [session]);
 
   const enterOps = async () => {
@@ -222,12 +243,20 @@ export default function OpsApp() {
         </header>
 
         <section className="mt-6 grid gap-3 md:grid-cols-4">
-          <OpsMetric icon={BellRing} label="Active bookings" value={activeBooking ? "1" : "0"} />
+          <OpsMetric
+            icon={BellRing}
+            label="Active bookings"
+            value={String(opsKpis?.activeBookings ?? (activeBooking ? 1 : 0))}
+          />
           <OpsMetric
             icon={AlertTriangle}
             label="SLA watch"
             value={
-              booking?.sla?.status === "breached"
+              opsKpis?.slaBreached
+                ? "Breach"
+                : opsKpis?.slaWatch
+                  ? "Watch"
+                  : booking?.sla?.status === "breached"
                 ? "Breach"
                 : booking?.sla?.status === "watch"
                   ? "Watch"
@@ -237,9 +266,13 @@ export default function OpsApp() {
           <OpsMetric
             icon={Users}
             label="Caregivers online"
-            value={String(caretakers.filter((item) => item.available).length)}
+            value={String(opsKpis?.onlineCaretakers ?? caretakers.filter((item) => item.available).length)}
           />
-          <OpsMetric icon={BarChart3} label="Support ops" value="Ready" />
+          <OpsMetric
+            icon={BarChart3}
+            label="Support ops"
+            value={`${opsKpis?.supportOpen ?? 0}/${opsKpis?.complaintsOpen ?? 0}`}
+          />
         </section>
 
         {systemStatus && (
@@ -373,7 +406,16 @@ export default function OpsApp() {
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Refunds</p>
-              <p className="mt-1 text-white/50">Payment refund requests are tracked with booking context.</p>
+              <p className="mt-1 text-white/50">
+                {opsKpis?.refundsRequested ?? 0} refund requests are awaiting ops review.
+              </p>
+            </div>
+          </Panel>
+          <Panel title="Monitoring">
+            <div className="grid grid-cols-3 gap-3">
+              <StatusPill label="Sentry" ready={Boolean(opsKpis?.monitoring.sentryConfigured)} />
+              <StatusPill label="PostHog" ready={Boolean(opsKpis?.monitoring.posthogConfigured)} />
+              <StatusPill label="Mixpanel" ready={Boolean(opsKpis?.monitoring.mixpanelConfigured)} />
             </div>
           </Panel>
         </section>

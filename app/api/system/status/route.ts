@@ -11,6 +11,7 @@ import {
 import { hasVoiceNoteStorageConfig } from "../../../../server/voiceNoteProvider";
 
 const hasEnv = (name: string) => Boolean(process.env[name]);
+const hasAnyEnv = (names: string[]) => names.some((name) => hasEnv(name));
 const rulesDeployed =
   process.env.FIREBASE_RULES_DEPLOYED === "true" ||
   existsSync(join(process.cwd(), ".firebase-rules-deployed.json"));
@@ -45,6 +46,14 @@ export async function GET() {
       complaintApi: true,
       refundRequestApi: true,
       lifecycleNotificationApi: true,
+      analyticsEventApi: true,
+      opsKpiApi: true,
+      monitoringSnapshotApi: true,
+      observabilityConfigured: hasAnyEnv([
+        "SENTRY_DSN",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_MIXPANEL_TOKEN"
+      ]),
       securityHeadersProxy: true,
       errorBoundaries: true,
       stricterRulesPrepared: true,
@@ -72,7 +81,10 @@ export async function GET() {
         ...(hasVoiceNoteStorageConfig ? [] : ["Voice-note storage provider"]),
         ...(hasEnv("NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID")
           ? []
-          : ["Google Maps production Map ID"])
+          : ["Google Maps production Map ID"]),
+        ...(hasAnyEnv(["SENTRY_DSN", "NEXT_PUBLIC_POSTHOG_KEY", "NEXT_PUBLIC_MIXPANEL_TOKEN"])
+          ? []
+          : ["Sentry/PostHog/Mixpanel production monitoring keys"])
       ]
     }
   });
