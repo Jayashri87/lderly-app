@@ -250,6 +250,28 @@ Ops analytics now include:
 - average shift duration
 - SLA healthy rate, breach rate, and at-risk booking count
 
+Emergency escalation orchestration is now available:
+
+- `POST /api/emergency/escalate`
+- creates and advances escalation flows across customer, family, ops, ambulance, and hospital stages
+- writes `emergencyEscalations` plus ops emergency queues
+- dispatches internal ops alerts and customer push updates
+
+Partner marketplace scaffolding is now available:
+
+- `POST /api/partners`
+- seeds hospital, ambulance, diagnostic lab, pharmacy, and physiotherapy partner records
+- `POST /api/partners/dispatch`
+- selects available partners by type, zone, SLA, and rating
+- writes partner dispatch records and ops partner queues
+
+Monthly / NRI report generation is now available:
+
+- `POST /api/reports/monthly`
+- summarizes completed visit reports by month
+- stores visit counts, service breakdown, wellness signal, highlights, and PDF placeholder status
+- designed for future PDF rendering and WhatsApp/email delivery
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

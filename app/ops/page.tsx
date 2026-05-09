@@ -536,6 +536,36 @@ export default function OpsApp() {
               </p>
             </div>
           </Panel>
+          <Panel title="Emergency and partners">
+            <button
+              onClick={() =>
+                fetch("/api/partners", {
+                  method: "POST"
+                })
+              }
+              className="w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#071018]"
+            >
+              Seed care partners
+            </button>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Emergency escalation</p>
+              <p className="mt-1 text-white/50">
+                Customer, family, ops, ambulance, and hospital stages are now tracked.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Partner dispatch</p>
+              <p className="mt-1 text-white/50">
+                Ambulance, labs, pharmacies, hospitals, and physio partners can be dispatched by SLA.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">NRI reports</p>
+              <p className="mt-1 text-white/50">
+                Monthly family summaries are ready for PDF and WhatsApp delivery.
+              </p>
+            </div>
+          </Panel>
         </section>
       </div>
     </main>

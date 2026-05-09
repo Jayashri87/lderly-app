@@ -320,6 +320,18 @@ try {
     status.json?.productionReadiness?.aiReportSummaryApi === true,
     "AI report summary API is prepared"
   );
+  expect(
+    status.json?.productionReadiness?.monthlyNriReportApi === true,
+    "monthly NRI report API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.emergencyEscalationApi === true,
+    "emergency escalation API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.partnerMarketplaceApi === true,
+    "partner marketplace API is prepared"
+  );
 
   const manifestResult = await request("/manifest.webmanifest");
   expect(manifestResult.response.ok, "web app manifest is reachable", manifestResult.text);
@@ -585,6 +597,51 @@ try {
     });
   }
 
+  const partnerSeedResult = await request(
+    "/api/partners",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(partnerSeedResult.response.ok, "admin can seed partner marketplace", partnerSeedResult.text);
+  for (const partner of partnerSeedResult.json?.partners || []) {
+    createdReliability.push({
+      kind: "partner",
+      id: partner.id,
+      type: partner.type,
+      zone: partner.zone
+    });
+  }
+
+  const partnerDispatchResult = await request(
+    "/api/partners/dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        partnerType: "ambulance",
+        bookingId: booking.id,
+        zone: "Central",
+        reason: "Smoke emergency partner dispatch"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    partnerDispatchResult.response.ok,
+    "admin can dispatch marketplace partner",
+    partnerDispatchResult.text
+  );
+  if (partnerDispatchResult.json?.dispatch?.id) {
+    createdReliability.push({
+      kind: "partnerDispatch",
+      id: partnerDispatchResult.json.dispatch.id,
+      partnerId: partnerDispatchResult.json.dispatch.partnerId,
+      partnerType: "ambulance"
+    });
+  }
+
   const assignResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/assign`,
     {
@@ -693,6 +750,55 @@ try {
       severity: "high"
     });
   }
+
+  const emergencyResult = await request(
+    "/api/emergency/escalate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create",
+        userId: booking.customerId,
+        bookingId: booking.id,
+        reason: "Smoke emergency escalation",
+        locationLabel: "Smoke care address",
+        severity: "critical"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    emergencyResult.response.ok,
+    "admin can create emergency escalation",
+    emergencyResult.text
+  );
+  const emergencyId = emergencyResult.json?.escalation?.id;
+  if (emergencyId) {
+    createdReliability.push({
+      kind: "emergency",
+      id: emergencyId,
+      userId: booking.customerId,
+      severity: "critical"
+    });
+  }
+
+  const emergencyAdvanceResult = await request(
+    "/api/emergency/escalate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: "advance",
+        escalationId: emergencyId,
+        stage: "customer",
+        note: "Customer contacted during smoke test"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    emergencyAdvanceResult.response.ok,
+    "admin can advance emergency escalation",
+    emergencyAdvanceResult.text
+  );
 
   const availabilityResult = await request(
     "/api/caretaker/availability",
@@ -901,6 +1007,35 @@ try {
     });
   }
 
+  const monthlyReportResult = await request(
+    "/api/reports/monthly",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: booking.customerId,
+        month: new Date().toISOString().slice(0, 7)
+      })
+    },
+    adminCookie
+  );
+  expect(
+    monthlyReportResult.response.ok,
+    "admin can generate monthly NRI report",
+    monthlyReportResult.text
+  );
+  expect(
+    typeof monthlyReportResult.json?.monthlyReport?.totalVisits === "number",
+    "monthly report includes visit count"
+  );
+  if (monthlyReportResult.json?.monthlyReport?.id) {
+    createdReliability.push({
+      kind: "monthlyReport",
+      id: monthlyReportResult.json.monthlyReport.id,
+      userId: booking.customerId,
+      month: monthlyReportResult.json.monthlyReport.month
+    });
+  }
+
   const voiceResult = await request(
     "/api/voice-notes/upload-url",
     {
@@ -1101,6 +1236,45 @@ try {
           [`aiSummaries/byUser/${item.userId}/${item.reportId}`]: null,
           [`reports/byId/${item.reportId}/aiSummary`]: null,
           [`reports/byUser/${item.userId}/${item.reportId}/aiSummary`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "monthlyReport") {
+      await database
+        .ref()
+        .update({
+          [`monthlyReports/byId/${item.id}`]: null,
+          [`monthlyReports/byUser/${item.userId}/${item.month}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "emergency") {
+      await database
+        .ref()
+        .update({
+          [`emergencyEscalations/byId/${item.id}`]: null,
+          [`emergencyEscalations/byUser/${item.userId}/${item.id}`]: null,
+          [`operations/emergencyQueue/${item.severity}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "partner") {
+      await database
+        .ref()
+        .update({
+          [`partners/byId/${item.id}`]: null,
+          [`partners/byType/${item.type}/${item.id}`]: null,
+          [`partners/byZone/${item.zone}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "partnerDispatch") {
+      await database
+        .ref()
+        .update({
+          [`partnerDispatches/byId/${item.id}`]: null,
+          [`partnerDispatches/byPartner/${item.partnerId}/${item.id}`]: null,
+          [`operations/partnerDispatchQueue/${item.partnerType}/${item.id}`]: null
         })
         .catch(() => undefined);
     }

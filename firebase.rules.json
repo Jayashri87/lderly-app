@@ -101,6 +101,14 @@
       "internalAlerts": {
         ".read": "auth != null && auth.token.role === 'admin'",
         ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "emergencyQueue": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "partnerDispatchQueue": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": "auth != null && auth.token.role === 'admin'"
       }
     },
     "journeys": {
@@ -263,6 +271,50 @@
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": false
         }
+      }
+    },
+    "monthlyReports": {
+      "byId": {
+        "$reportId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "emergencyEscalations": {
+      "byId": {
+        "$escalationId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      }
+    },
+    "partners": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": false
+    },
+    "partnerDispatches": {
+      "byId": {
+        "$dispatchId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      },
+      "byPartner": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
       }
     },
     "caretakerAttendance": {
