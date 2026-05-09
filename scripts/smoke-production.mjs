@@ -337,6 +337,22 @@ try {
     "subscription plan API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.medicationScheduleApi === true,
+    "medication schedule API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.medicationAdherenceApi === true,
+    "medication adherence API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.incidentReportApi === true,
+    "incident report API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.caretakerTrainingBadgeApi === true,
+    "caretaker training badge API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.emergencyEscalationApi === true,
     "emergency escalation API is prepared"
   );
@@ -737,6 +753,119 @@ try {
       kind: "subscription",
       id: subscriptionResult.json.subscription.id,
       userId: booking.customerId
+    });
+  }
+
+  const medicationScheduleResult = await request(
+    "/api/care-quality/medication",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: "schedule",
+        recipientName: "Smoke Mom",
+        medicines: [
+          {
+            name: "BP tablet",
+            dosage: "1 tablet",
+            time: "9 PM",
+            instructions: "After dinner"
+          }
+        ]
+      })
+    },
+    customerCookie
+  );
+  expect(
+    medicationScheduleResult.response.ok,
+    "customer can create medication schedule",
+    medicationScheduleResult.text
+  );
+  if (medicationScheduleResult.json?.schedule?.id) {
+    createdReliability.push({
+      kind: "medicationSchedule",
+      id: medicationScheduleResult.json.schedule.id,
+      userId: booking.customerId
+    });
+  }
+
+  const medicationAdherenceResult = await request(
+    "/api/care-quality/medication",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: "adherence",
+        userId: booking.customerId,
+        scheduleId: medicationScheduleResult.json?.schedule?.id,
+        medicineName: "BP tablet",
+        status: "completed",
+        note: "Smoke adherence workflow validation",
+        bookingId: booking.id
+      })
+    },
+    caretakerCookie
+  );
+  expect(
+    medicationAdherenceResult.response.ok,
+    "caretaker can record medication adherence",
+    medicationAdherenceResult.text
+  );
+  if (medicationAdherenceResult.json?.adherence?.id) {
+    createdReliability.push({
+      kind: "medicationAdherence",
+      id: medicationAdherenceResult.json.adherence.id,
+      userId: booking.customerId,
+      bookingId: booking.id
+    });
+  }
+
+  const incidentResult = await request(
+    "/api/care-quality/incident",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: booking.customerId,
+        caretakerId: "demo-caretaker",
+        bookingId: booking.id,
+        severity: "medium",
+        category: "safety",
+        summary: "Smoke incident workflow validation"
+      })
+    },
+    caretakerCookie
+  );
+  expect(incidentResult.response.ok, "caretaker can report care incident", incidentResult.text);
+  if (incidentResult.json?.incident?.id) {
+    createdReliability.push({
+      kind: "incident",
+      id: incidentResult.json.incident.id,
+      userId: booking.customerId,
+      bookingId: booking.id,
+      severity: "medium"
+    });
+  }
+
+  const trainingBadgeResult = await request(
+    "/api/caretaker/training",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        caretakerId: "demo-caretaker",
+        badgeId: "elder-safety-smoke",
+        title: "Elder Safety Training"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    trainingBadgeResult.response.ok,
+    "admin can award caretaker training badge",
+    trainingBadgeResult.text
+  );
+  if (trainingBadgeResult.json?.badge?.badgeId) {
+    createdReliability.push({
+      kind: "trainingBadge",
+      caretakerId: "demo-caretaker",
+      badgeId: trainingBadgeResult.json.badge.badgeId
     });
   }
 
@@ -1391,6 +1520,46 @@ try {
           [`subscriptions/byUser/${item.userId}/${item.id}`]: null,
           [`profiles/${item.userId}/activeSubscriptions/${item.id}`]: null,
           [`operations/subscriptionQueue/active/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "medicationSchedule") {
+      await database
+        .ref()
+        .update({
+          [`medicationSchedules/byId/${item.id}`]: null,
+          [`medicationSchedules/byUser/${item.userId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "medicationAdherence") {
+      await database
+        .ref()
+        .update({
+          [`medicationAdherence/byId/${item.id}`]: null,
+          [`medicationAdherence/byUser/${item.userId}/${item.id}`]: null,
+          [`medicationAdherence/byBooking/${item.bookingId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "incident") {
+      await database
+        .ref()
+        .update({
+          [`incidents/byId/${item.id}`]: null,
+          [`incidents/byUser/${item.userId}/${item.id}`]: null,
+          [`incidents/byBooking/${item.bookingId}/${item.id}`]: null,
+          [`operations/incidentQueue/${item.severity}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "trainingBadge") {
+      await database
+        .ref()
+        .update({
+          [`trainingBadges/byCaretaker/${item.caretakerId}/${item.badgeId}`]: null,
+          [`trainingBadges/byBadge/${item.badgeId}/${item.caretakerId}`]: null,
+          [`caretakers/${item.caretakerId}/trainingBadges/${item.badgeId}`]: null
         })
         .catch(() => undefined);
     }

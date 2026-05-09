@@ -286,6 +286,20 @@ Recurring care subscriptions are now available:
 - creates weekly/monthly subscription plan records
 - links subscriptions to profiles and ops subscription queues
 
+Care quality and safety operations are now available:
+
+- `POST /api/care-quality/medication`
+- creates medication schedules for saved care recipients
+- records medication adherence as completed, due, missed, or skipped
+- keeps the realtime health status aligned with medicine adherence
+- escalates missed medicine events through ops alerts and push dispatch
+- `POST /api/care-quality/incident`
+- lets caretaker/admin users report safety, medical, service, fall-risk, or other incidents
+- writes incident records plus admin incident queues for operational follow-up
+- `POST /api/caretaker/training`
+- lets admin users award caregiver training badges and verification credentials
+- mirrors active badges onto caretaker profiles for future trust UI and assignment logic
+
 ## Remaining Production Hardening
 
 1. Complete Firebase Admin production setup

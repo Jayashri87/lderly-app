@@ -117,6 +117,10 @@
       "subscriptionQueue": {
         ".read": "auth != null && auth.token.role === 'admin'",
         ".write": "auth != null && auth.token.role === 'admin'"
+      },
+      "incidentQueue": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": "auth != null && auth.token.role === 'admin'"
       }
     },
     "journeys": {
@@ -331,6 +335,72 @@
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": false
         }
+      }
+    },
+    "medicationSchedules": {
+      "byId": {
+        "$scheduleId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".write": false
+        }
+      }
+    },
+    "medicationAdherence": {
+      "byId": {
+        "$adherenceId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      }
+    },
+    "incidents": {
+      "byId": {
+        "$incidentId": {
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byUser": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBooking": {
+        "$bookingId": {
+          ".read": "auth != null && auth.token.role === 'admin'",
+          ".write": false
+        }
+      }
+    },
+    "trainingBadges": {
+      "byCaretaker": {
+        "$caretakerId": {
+          ".read": "auth != null && (auth.uid === $caretakerId || auth.token.role === 'admin')",
+          ".write": false
+        }
+      },
+      "byBadge": {
+        ".read": "auth != null && auth.token.role === 'admin'",
+        ".write": false
       }
     },
     "emergencyEscalations": {
