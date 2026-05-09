@@ -381,6 +381,14 @@ try {
     "Sentry SDK is prepared"
   );
   expect(
+    status.json?.productionReadiness?.analyticsFunnelKpis === true,
+    "analytics funnel KPIs are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.realtimeSlaExperience === true,
+    "realtime SLA experience is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.freeAiReassuranceApi === true,
     "free AI reassurance API is prepared"
   );

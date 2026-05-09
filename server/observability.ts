@@ -41,6 +41,22 @@ export type OpsKpis = {
     breachedRate: number;
     atRiskBookings: number;
   };
+  funnelAnalytics: {
+    totalEvents: number;
+    bookingStarts: number;
+    bookingConfirms: number;
+    paymentStarts: number;
+    paymentConfirms: number;
+    emergencyStarts: number;
+    caretakerActions: number;
+    opsActions: number;
+    conversionRate: number;
+    paymentCompletionRate: number;
+    topEvents: Array<{
+      name: string;
+      count: number;
+    }>;
+  };
   monitoring: {
     sentryConfigured: boolean;
     posthogConfigured: boolean;
@@ -176,7 +192,9 @@ export const Observability = {
       refundsSnapshot,
       notificationsSnapshot,
       activeShiftsSnapshot,
-      attendanceTodaySnapshot
+      attendanceTodaySnapshot,
+      analyticsByNameSnapshot,
+      analyticsByDateSnapshot
     ] = await Promise.all([
       database.ref("bookings/byId").get(),
       database.ref("caretakers").get(),
@@ -187,7 +205,9 @@ export const Observability = {
       database.ref("caretakerAttendance/activeShifts").get(),
       database
         .ref(`caretakerAttendance/byDate/${new Date().toISOString().slice(0, 10)}`)
-        .get()
+        .get(),
+      database.ref("analytics/events/byName").get(),
+      database.ref("analytics/events/byDate").get()
     ]);
     const bookings = recordValues<BookingMetricRecord>(bookingsSnapshot.val());
     const caretakers = recordEntries<CaretakerMetricRecord>(caretakersSnapshot.val());
@@ -225,6 +245,23 @@ export const Observability = {
     const healthyBookings = bookings.filter((booking) => booking.sla?.status === "healthy").length;
     const breachedBookings = bookings.filter((booking) => booking.sla?.status === "breached")
       .length;
+    const eventCounts = Object.entries(
+      (analyticsByNameSnapshot.val() || {}) as Record<string, unknown>
+    )
+      .map(([name, value]) => ({
+        name,
+        count: countRecord(value)
+      }))
+      .sort((a, b) => b.count - a.count);
+    const eventCountFor = (name: string) =>
+      eventCounts.find((event) => event.name === name)?.count || 0;
+    const eventCountMatching = (matcher: (name: string) => boolean) =>
+      eventCounts.reduce((total, event) => (matcher(event.name) ? total + event.count : total), 0);
+    const bookingStarts = eventCountFor("booking_funnel_opened");
+    const bookingConfirms = eventCountFor("booking_confirmed");
+    const paymentStarts = eventCountFor("payment_checkout_started");
+    const paymentConfirms = eventCountFor("payment_confirmed");
+    const totalAnalyticsEvents = countNested(analyticsByDateSnapshot.val());
     const activeBookingCount = bookings.filter(
       (booking) =>
         booking.status &&
@@ -284,6 +321,27 @@ export const Observability = {
           atRiskBookings: bookings.filter((booking) =>
             ["watch", "breached"].includes(booking.sla?.status || "")
           ).length
+        },
+        funnelAnalytics: {
+          totalEvents: totalAnalyticsEvents,
+          bookingStarts,
+          bookingConfirms,
+          paymentStarts,
+          paymentConfirms,
+          emergencyStarts: eventCountFor("immediate_assistance_requested"),
+          caretakerActions: eventCountMatching((name) => name.startsWith("caretaker_")),
+          opsActions: eventCountMatching((name) => name.startsWith("ops_")),
+          conversionRate: bookingStarts
+            ? Math.round((bookingConfirms / bookingStarts) * 100)
+            : bookingConfirms
+              ? 100
+              : 0,
+          paymentCompletionRate: paymentStarts
+            ? Math.round((paymentConfirms / paymentStarts) * 100)
+            : paymentConfirms
+              ? 100
+              : 0,
+          topEvents: eventCounts.slice(0, 6)
         },
         monitoring: {
           sentryConfigured: Boolean(process.env.SENTRY_DSN),

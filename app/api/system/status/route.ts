@@ -20,6 +20,8 @@ const rulesDeployed =
   process.env.FIREBASE_RULES_DEPLOYED === "true" ||
   existsSync(join(process.cwd(), ".firebase-rules-deployed.json"));
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   return NextResponse.json({
     firebaseAdmin: {
@@ -55,7 +57,9 @@ export async function GET() {
       internalOpsAlertsApi: true,
       internalOpsReadiness,
       analyticsEventApi: true,
+      analyticsFunnelKpis: true,
       opsKpiApi: true,
+      realtimeSlaExperience: true,
       monitoringSnapshotApi: true,
       firebaseAppCheckPrepared: true,
       firebaseAppCheckConfigured: hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY"),

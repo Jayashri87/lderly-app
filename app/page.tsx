@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -783,6 +783,8 @@ export default function CustomerApp() {
       window.localStorage.getItem(subscriptionKey) === "true"
   );
   const [paymentMessage, setPaymentMessage] = useState("");
+  const lastStatusEventRef = useRef("");
+  const lastStepEventRef = useRef("");
 
   const recipient =
     recipients.find((item) => item.name === recipientName) ?? recipients[0];
@@ -837,11 +839,106 @@ export default function CustomerApp() {
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [session]);
 
+  useEffect(() => {
+    if (!session || !recipientName) {
+      return;
+    }
+
+    trackProductEvent("customer_screen_viewed", {
+      screen: activeTab,
+      recipient: recipient.shortName,
+      activeCare: Boolean(activeCare),
+      service: currentService
+    });
+  }, [activeCare, activeTab, currentService, recipient.shortName, recipientName, session]);
+
+  useEffect(() => {
+    if (!session || !bookingOpen) {
+      return;
+    }
+
+    const eventKey = `${bookingStep}:${selectedNeed.title}:${selectedService}`;
+
+    if (lastStepEventRef.current === eventKey) {
+      return;
+    }
+
+    lastStepEventRef.current = eventKey;
+    trackProductEvent("booking_funnel_step_viewed", {
+      step: bookingStep,
+      recipient: recipient.shortName,
+      need: selectedNeed.title,
+      service: selectedService,
+      duration: selectedDuration.label,
+      time: selectedTime.label
+    });
+  }, [
+    bookingOpen,
+    bookingStep,
+    recipient.shortName,
+    selectedDuration.label,
+    selectedNeed.title,
+    selectedService,
+    selectedTime.label,
+    session
+  ]);
+
+  useEffect(() => {
+    if (!session || !activeCare) {
+      return;
+    }
+
+    const status = visibleBooking?.status || visibleJourney?.status || "idle";
+    const bookingId = visibleBooking?.id || visibleJourney?.id || "";
+    const eventKey = `${bookingId}:${status}:${currentService}`;
+
+    if (lastStatusEventRef.current === eventKey) {
+      return;
+    }
+
+    lastStatusEventRef.current = eventKey;
+    trackProductEvent("care_live_status_changed", {
+      bookingId,
+      status,
+      service: currentService,
+      recipient: recipient.shortName,
+      eta:
+        visibleBooking?.tracking?.etaMinutes ??
+        visibleJourney?.eta ??
+        null,
+      sla: visibleBooking?.sla?.status || "not_started"
+    });
+  }, [
+    activeCare,
+    currentService,
+    recipient.shortName,
+    session,
+    visibleBooking?.id,
+    visibleBooking?.sla?.status,
+    visibleBooking?.status,
+    visibleBooking?.tracking?.etaMinutes,
+    visibleJourney?.eta,
+    visibleJourney?.id,
+    visibleJourney?.status
+  ]);
+
+  const selectTab = (tab: TabKey, source: string) => {
+    trackProductEvent("customer_navigation_selected", {
+      from: activeTab,
+      to: tab,
+      source,
+      service: currentService,
+      activeCare: Boolean(activeCare)
+    });
+    setActiveTab(tab);
+  };
+
   const openBooking = () => {
     trackProductEvent("booking_funnel_opened", {
       recipient: recipient.shortName,
       service: currentService
     });
+    lastStepEventRef.current = "";
     setBookingStep("need");
     setBookingOpen(true);
   };
@@ -854,6 +951,11 @@ export default function CustomerApp() {
     const matchedNeed =
       careNeeds.find((need) => need.services.includes(previousService)) ?? careNeeds[0];
 
+    trackProductEvent("rebook_previous_care_started", {
+      recipient: recipient.shortName,
+      service: previousService,
+      source: reports[0] ? "report" : booking ? "booking" : "default"
+    });
     setSelectedNeed(matchedNeed);
     setSelectedService(previousService);
     setBookingStep("duration");
@@ -870,13 +972,24 @@ export default function CustomerApp() {
       { ...session, role: "customer" },
       `Immediate Assistance for ${recipient.name}`
     );
+    trackProductEvent("immediate_assistance_requested", {
+      recipient: recipient.shortName,
+      service: `Immediate Assistance for ${recipient.name}`,
+      activeCare: Boolean(activeCare)
+    });
     window.localStorage.setItem(subscriptionKey, "true");
     setCareSubscriptionStarted(true);
-    setActiveTab("journey");
+    selectTab("journey", "immediate_assistance");
   };
 
   const openRazorpayCheckout = async (nextBooking: CareBooking) => {
     setPaymentMessage("Preparing secure payment");
+    trackProductEvent("payment_checkout_started", {
+      bookingId: nextBooking.id,
+      service: nextBooking.serviceType,
+      amount: nextBooking.payment.estimatedTotal,
+      mode: "razorpay"
+    });
 
     let checkoutResponse: Response | null = null;
 
@@ -908,6 +1021,11 @@ export default function CustomerApp() {
     if (checkout.mode === "mock") {
       setPaymentMessage("Payment authorized for local testing");
       BookingService.authorizePayment("upi");
+      trackProductEvent("payment_authorized", {
+        bookingId: nextBooking.id,
+        service: nextBooking.serviceType,
+        mode: "mock"
+      });
       return true;
     }
 
@@ -950,8 +1068,17 @@ export default function CustomerApp() {
           if (confirmResponse.ok) {
             BookingService.markPaymentPaid(response.razorpay_payment_id);
             setPaymentMessage("Payment confirmed");
+            trackProductEvent("payment_confirmed", {
+              bookingId: nextBooking.id,
+              service: nextBooking.serviceType,
+              mode: "razorpay"
+            });
           } else {
             setPaymentMessage("Payment could not be verified");
+            trackProductEvent("payment_verification_failed", {
+              bookingId: nextBooking.id,
+              service: nextBooking.serviceType
+            });
           }
 
           resolve();
@@ -959,6 +1086,10 @@ export default function CustomerApp() {
         modal: {
           ondismiss: () => {
             setPaymentMessage("Payment can be completed from Care");
+            trackProductEvent("payment_modal_dismissed", {
+              bookingId: nextBooking.id,
+              service: nextBooking.serviceType
+            });
             resolve();
           }
         }
@@ -1026,6 +1157,15 @@ export default function CustomerApp() {
       selectedService,
       bookingDetails
     );
+    trackProductEvent("booking_confirmed", {
+      bookingId: nextBooking.id,
+      recipient: recipient.shortName,
+      need: selectedNeed.title,
+      service: selectedService,
+      duration: selectedDuration.label,
+      time: selectedTime.label,
+      location: selectedLocation.label
+    });
     await openRazorpayCheckout(nextBooking);
     window.localStorage.setItem(subscriptionKey, "true");
     setCareSubscriptionStarted(true);
@@ -1034,7 +1174,7 @@ export default function CustomerApp() {
 
     window.setTimeout(() => {
       setCareOnWay(false);
-      setActiveTab("journey");
+      selectTab("journey", "post_booking_auto_open");
     }, 1600);
   };
 
@@ -1070,8 +1210,12 @@ export default function CustomerApp() {
     return (
       <RecipientGate
         onSelect={(nextRecipient) => {
+          trackProductEvent("care_recipient_selected", {
+            recipient: nextRecipient,
+            source: "post_login_gate"
+          });
           setRecipientName(nextRecipient);
-          setActiveTab("home");
+          selectTab("home", "recipient_selected");
         }}
       />
     );
@@ -1098,7 +1242,13 @@ export default function CustomerApp() {
             recipient.name,
             toCareRecipientProfile(details)
           );
-          setActiveTab("home");
+          trackProductEvent("care_recipient_details_saved", {
+            recipient: recipient.shortName,
+            hasAddress: Boolean(details.address),
+            hasHealthNotes: Boolean(details.healthNotes),
+            hasEmergencyPhone: Boolean(details.phone)
+          });
+          selectTab("home", "recipient_details_saved");
         }}
       />
     );
@@ -1159,7 +1309,7 @@ export default function CustomerApp() {
                   <QuickActions
                     activeCare={Boolean(activeCare)}
                     experience={currentServiceExperience}
-                    onTrack={() => setActiveTab("journey")}
+                    onTrack={() => selectTab("journey", "quick_action_track")}
                     onRebook={rebookPreviousCare}
                   />
                   <CareConfidence recipient={recipient} health={health} />
@@ -1206,7 +1356,12 @@ export default function CustomerApp() {
                 recipient={recipient}
                 details={activeRecipientDetails}
                 serviceExperience={currentServiceExperience}
-                onSelectRecipient={() => setRecipientName("")}
+                onSelectRecipient={() => {
+                  trackProductEvent("care_recipient_switch_started", {
+                    currentRecipient: recipient.shortName
+                  });
+                  setRecipientName("");
+                }}
                 onEditDetails={() => {
                   const nextDetails = { ...recipientDetails };
                   delete nextDetails[recipient.name];
@@ -1219,6 +1374,9 @@ export default function CustomerApp() {
                     { ...session, role: "customer" },
                     recipient.name
                   );
+                  trackProductEvent("care_recipient_details_edit_started", {
+                    recipient: recipient.shortName
+                  });
                 }}
                 onSignOut={async () => {
                   await AuthService.signOut();
@@ -1239,7 +1397,7 @@ export default function CustomerApp() {
             return (
               <button
                 key={item.key}
-                onClick={() => setActiveTab(item.key)}
+                onClick={() => selectTab(item.key, "bottom_nav")}
                 className={`rounded-2xl px-3 py-3 text-xs transition ${
                   active ? "bg-white text-[#06130f]" : "text-white/55"
                 }`}
@@ -1261,25 +1419,57 @@ export default function CustomerApp() {
           selectedDuration={selectedDuration}
           selectedTime={selectedTime}
           selectedLocation={selectedLocation}
-          onClose={() => setBookingOpen(false)}
+          onClose={() => {
+            trackProductEvent("booking_funnel_closed", {
+              step: bookingStep,
+              recipient: recipient.shortName,
+              service: selectedService
+            });
+            setBookingOpen(false);
+          }}
           onNeed={(need) => {
+            trackProductEvent("booking_need_selected", {
+              recipient: recipient.shortName,
+              need: need.title
+            });
             setSelectedNeed(need);
             setSelectedService(need.services[0]);
             setBookingStep("service");
           }}
           onService={(service) => {
+            trackProductEvent("booking_service_selected", {
+              recipient: recipient.shortName,
+              need: selectedNeed.title,
+              service
+            });
             setSelectedService(service);
             setBookingStep("duration");
           }}
           onDuration={(duration) => {
+            trackProductEvent("booking_duration_selected", {
+              recipient: recipient.shortName,
+              service: selectedService,
+              duration: duration.label,
+              price: duration.price
+            });
             setSelectedDuration(duration);
             setBookingStep("time");
           }}
           onTime={(time) => {
+            trackProductEvent("booking_time_selected", {
+              recipient: recipient.shortName,
+              service: selectedService,
+              time: time.label
+            });
             setSelectedTime(time);
             setBookingStep("location");
           }}
           onLocation={(location) => {
+            trackProductEvent("booking_location_selected", {
+              recipient: recipient.shortName,
+              service: selectedService,
+              location: location.label
+            });
             setSelectedLocation(location);
             setBookingStep("review");
           }}
