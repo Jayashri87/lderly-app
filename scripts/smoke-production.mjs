@@ -393,6 +393,30 @@ try {
     "free AI reassurance API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.aiDailyCareSummaryUi === true,
+    "AI daily care summary UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.caregiverTrustProfileUi === true,
+    "caregiver trust profile UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.familyPermissionsUi === true,
+    "family permissions UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.visitProofUi === true,
+    "visit proof UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.sameCaregiverRebookingUi === true,
+    "same caregiver rebooking UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.monthlyNriPreviewUi === true,
+    "monthly NRI preview UI is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.awsScaleArchitecturePrepared === true,
     "AWS scale architecture is documented"
   );

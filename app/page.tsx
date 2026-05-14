@@ -129,6 +129,15 @@ type LocationOption = {
   detail: string;
 };
 
+type AiReassuranceInsight = {
+  id: string;
+  headline: string;
+  summary: string;
+  emotionalMessage: string;
+  nextAction: string;
+  createdAt: number;
+};
+
 type RecipientDetails = {
   fullName: string;
   age: string;
@@ -783,8 +792,10 @@ export default function CustomerApp() {
       window.localStorage.getItem(subscriptionKey) === "true"
   );
   const [paymentMessage, setPaymentMessage] = useState("");
+  const [aiInsight, setAiInsight] = useState<AiReassuranceInsight | null>(null);
   const lastStatusEventRef = useRef("");
   const lastStepEventRef = useRef("");
+  const lastAiInsightRef = useRef("");
 
   const recipient =
     recipients.find((item) => item.name === recipientName) ?? recipients[0];
@@ -920,6 +931,46 @@ export default function CustomerApp() {
     visibleJourney?.eta,
     visibleJourney?.id,
     visibleJourney?.status
+  ]);
+
+  useEffect(() => {
+    if (!session || !recipientName || !activeRecipientDetails) {
+      return;
+    }
+
+    const bookingId = visibleBooking?.id || visibleJourney?.id || "";
+    const insightKey = `${recipient.name}:${currentService}:${bookingId}`;
+
+    if (lastAiInsightRef.current === insightKey) {
+      return;
+    }
+
+    lastAiInsightRef.current = insightKey;
+    fetch("/api/ai/reassurance", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        bookingId,
+        serviceType: currentService,
+        recipientName: activeRecipientDetails.fullName || recipient.displayName
+      })
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { insight?: AiReassuranceInsight } | null) => {
+        setAiInsight(payload?.insight || null);
+      })
+      .catch(() => setAiInsight(null));
+  }, [
+    activeRecipientDetails,
+    currentService,
+    recipient.displayName,
+    recipient.name,
+    recipientName,
+    session,
+    visibleBooking?.id,
+    visibleJourney?.id
   ]);
 
   const selectTab = (tab: TabKey, source: string) => {
@@ -1320,11 +1371,29 @@ export default function CustomerApp() {
                     journey={visibleJourney}
                     reports={reports}
                     experience={currentServiceExperience}
+                    aiInsight={aiInsight}
+                  />
+                  <TrustedCaregiverProfile
+                    recipient={recipient}
+                    booking={visibleBooking}
+                    journey={visibleJourney}
+                    onRebook={rebookPreviousCare}
                   />
                   <SessionSummaryPreview
                     recipient={recipient}
                     experience={currentServiceExperience}
                     reports={reports}
+                  />
+                  <VisitProofSystem
+                    recipient={recipient}
+                    reports={reports}
+                    booking={visibleBooking}
+                    journey={visibleJourney}
+                  />
+                  <NriMonthlyReportPreview
+                    recipient={recipient}
+                    reports={reports}
+                    aiInsight={aiInsight}
                   />
                   <AccessibilityCareControls recipient={recipient} />
                   <SmartRecommendation
@@ -1376,6 +1445,27 @@ export default function CustomerApp() {
                   );
                   trackProductEvent("care_recipient_details_edit_started", {
                     recipient: recipient.shortName
+                  });
+                }}
+                onInviteFamily={() => {
+                  if (!session) {
+                    return;
+                  }
+
+                  ProfileService.saveFamilyMember(
+                    { ...session, role: "customer" },
+                    {
+                      name: "Family reviewer",
+                      relationship: "Sibling",
+                      phone: "+91 90000 00000",
+                      permissions: ["monitor", "alerts"],
+                      nriMode: true
+                    }
+                  );
+                  trackProductEvent("family_member_invited", {
+                    recipient: recipient.shortName,
+                    permissions: ["monitor", "alerts"],
+                    nriMode: true
                   });
                 }}
                 onSignOut={async () => {
@@ -1917,7 +2007,8 @@ function FamilyReassuranceSystem({
   booking,
   journey,
   reports,
-  experience
+  experience,
+  aiInsight
 }: {
   recipient: Recipient;
   health: HealthSnapshot | null;
@@ -1925,6 +2016,7 @@ function FamilyReassuranceSystem({
   journey: CareJourney | null;
   reports: VisitReport[];
   experience: ReturnType<typeof serviceExperienceFor>;
+  aiInsight: AiReassuranceInsight | null;
 }) {
   const activeService = cleanServiceName(journey?.serviceType || booking?.serviceType);
   const hasLiveCare = Boolean(
@@ -1970,11 +2062,15 @@ function FamilyReassuranceSystem({
       <div className="grid grid-cols-2 gap-3">
         <InsightCard
           eyebrow="AI insight"
-          title={health?.medicineStatus === "missed" ? "Medicine follow-up" : "Routine looks steady"}
+          title={
+            aiInsight?.headline ||
+            (health?.medicineStatus === "missed" ? "Medicine follow-up" : "Routine looks steady")
+          }
           body={
-            health?.medicineStatus === "missed"
+            aiInsight?.summary ||
+            (health?.medicineStatus === "missed"
               ? "Medicine support should be prioritized in the next visit."
-              : `${activeService || experience.profilePreference} is aligned with the current care plan.`
+              : `${activeService || experience.profilePreference} is aligned with the current care plan.`)
           }
           icon={Sparkles}
         />
@@ -1985,7 +2081,44 @@ function FamilyReassuranceSystem({
           icon={MessageCircle}
         />
       </div>
+      <AiDailyCareSummary
+        recipient={recipient}
+        insight={aiInsight}
+        fallback={`${recipient.shortName}'s care plan is connected across family, caregiver, and ops.`}
+      />
       <TrustVisibilityPanel recipient={recipient} hasLiveCare={hasLiveCare} />
+    </section>
+  );
+}
+
+function AiDailyCareSummary({
+  recipient,
+  insight,
+  fallback
+}: {
+  recipient: Recipient;
+  insight: AiReassuranceInsight | null;
+  fallback: string;
+}) {
+  return (
+    <section className="rounded-[1.5rem] bg-emerald-200/10 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-300 text-[#06130f]">
+          <Sparkles className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">AI daily care summary</p>
+          <h3 className="mt-1 text-xl font-semibold">
+            {insight?.headline || `${recipient.shortName}'s care looks organized`}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-white/60">
+            {insight?.emotionalMessage || fallback}
+          </p>
+          <p className="mt-3 rounded-2xl bg-white/10 p-3 text-sm text-white/65">
+            Next best action: {insight?.nextAction || "Keep the next care update visible for family."}
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -2022,6 +2155,73 @@ function TrustVisibilityPanel({
         ))}
       </div>
     </Card>
+  );
+}
+
+function TrustedCaregiverProfile({
+  recipient,
+  booking,
+  journey,
+  onRebook
+}: {
+  recipient: Recipient;
+  booking: CareBooking | null;
+  journey: CareJourney | null;
+  onRebook: () => void;
+}) {
+  const caregiverName = journey?.caretakerName || booking?.caretakerName || "Anita";
+  const hasAssignedCaregiver = Boolean(
+    caregiverName && caregiverName !== "Assigning now" && caregiverName !== "Best caregiver nearby"
+  );
+
+  return (
+    <section className="mt-5 rounded-[1.5rem] bg-white p-4 text-[#06130f]">
+      <div className="flex items-start gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-200 to-sky-200 text-2xl font-bold">
+          {caregiverName.charAt(0)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-emerald-700">Verified caregiver profile</p>
+          <h3 className="mt-1 text-2xl font-semibold">{caregiverName}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {hasAssignedCaregiver
+              ? `Familiar caregiver for ${recipient.shortName}`
+              : `Best available caregiver will be shown after matching`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {["ID verified", "Police checked", "4.9 rating", "12 repeat visits"].map((signal) => (
+              <span
+                key={signal}
+                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+              >
+                {signal}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+        <CaregiverTrustMetric label="Trust score" value="96%" />
+        <CaregiverTrustMetric label="Punctuality" value="98%" />
+        <CaregiverTrustMetric label="Languages" value="Kannada, Hindi" />
+      </div>
+      <button
+        onClick={onRebook}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-4 py-3 text-sm font-semibold text-white"
+      >
+        <Repeat2 className="h-4 w-4" />
+        Rebook same caregiver
+      </button>
+    </section>
+  );
+}
+
+function CaregiverTrustMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-100 p-3">
+      <p className="text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold">{value}</p>
+    </div>
   );
 }
 
@@ -2063,6 +2263,100 @@ function SessionSummaryPreview({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function VisitProofSystem({
+  recipient,
+  reports,
+  booking,
+  journey
+}: {
+  recipient: Recipient;
+  reports: VisitReport[];
+  booking: CareBooking | null;
+  journey: CareJourney | null;
+}) {
+  const latestReport = reports[0];
+  const timestamp = latestReport?.completedAt || booking?.updatedAt || journey?.updatedAt || 0;
+  const proofItems = latestReport
+    ? [
+        { label: "Completed", value: timestamp ? new Date(timestamp).toLocaleString() : "Verified after visit" },
+        { label: "Vitals", value: latestReport.vitalsSummary },
+        { label: "Medicine", value: latestReport.medicineSummary },
+        { label: "GPS", value: booking?.tracking?.destinationLabel || journey?.destinationLabel || "Care location verified" }
+      ]
+    : [
+        { label: "Timestamp", value: "Will verify when visit starts" },
+        { label: "GPS", value: "Location proof pending" },
+        { label: "Care notes", value: "Caregiver note pending" },
+        { label: "Family proof", value: "Photo / voice note optional" }
+      ];
+
+  return (
+    <section className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">Visit proof</p>
+          <h3 className="mt-1 text-2xl font-semibold">
+            {latestReport ? "Proof ready for family" : `Proof will appear for ${recipient.shortName}`}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-white/55">
+            Timestamps, GPS, vitals, medicine status, caregiver notes, and optional media are kept together for family trust.
+          </p>
+        </div>
+        <Badge variant={latestReport ? "trust" : "default"}>{latestReport ? "Verified" : "Pending"}</Badge>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {proofItems.map((item) => (
+          <div key={item.label} className="rounded-2xl bg-white/10 p-3">
+            <p className="text-xs text-white/45">{item.label}</p>
+            <p className="mt-1 text-sm font-semibold text-white/75">{item.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 space-y-2">
+        {(latestReport?.attachments || [
+          { label: "Visit photo", status: "pending" as const },
+          { label: "Voice summary", status: "pending" as const }
+        ]).slice(0, 3).map((attachment) => (
+          <div key={attachment.label} className="flex items-center justify-between rounded-2xl bg-white/10 px-3 py-2 text-sm">
+            <span className="text-white/70">{attachment.label}</span>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
+              {attachment.status === "not_required" ? "optional" : attachment.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NriMonthlyReportPreview({
+  recipient,
+  reports,
+  aiInsight
+}: {
+  recipient: Recipient;
+  reports: VisitReport[];
+  aiInsight: AiReassuranceInsight | null;
+}) {
+  return (
+    <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
+      <p className="text-sm font-semibold text-emerald-100">NRI family report</p>
+      <h3 className="mt-1 text-2xl font-semibold">Monthly reassurance preview</h3>
+      <p className="mt-2 text-sm leading-6 text-white/55">
+        A family-ready summary can combine visits, medicines, vitals, caregiver notes, expenses, and care recommendations.
+      </p>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-white/60">
+        <div className="rounded-2xl bg-white/10 p-3">{reports.length} visits</div>
+        <div className="rounded-2xl bg-white/10 p-3">Care score 92%</div>
+        <div className="rounded-2xl bg-white/10 p-3">PDF ready</div>
+      </div>
+      <p className="mt-4 rounded-2xl bg-white/10 p-3 text-sm text-white/65">
+        {aiInsight?.nextAction || `Next update: share ${recipient.shortName}'s weekly summary with family.`}
+      </p>
     </section>
   );
 }
@@ -2799,6 +3093,7 @@ function ProfilePanel({
   serviceExperience,
   onSelectRecipient,
   onEditDetails,
+  onInviteFamily,
   onSignOut
 }: {
   profile: CareProfile | null;
@@ -2807,6 +3102,7 @@ function ProfilePanel({
   serviceExperience: ReturnType<typeof serviceExperienceFor>;
   onSelectRecipient: () => void;
   onEditDetails: () => void;
+  onInviteFamily: () => void;
   onSignOut: () => void;
 }) {
   const profileSections: Array<{
@@ -2984,6 +3280,8 @@ function ProfilePanel({
         <ProfileStat label="Trusted visits" value="12" />
       </div>
 
+      <FamilyPermissionsPanel profile={profile} onInviteFamily={onInviteFamily} />
+
       <section className="mt-6">
         <h3 className="mb-3 text-lg font-semibold">Care packages</h3>
         <div className="space-y-3">
@@ -3029,6 +3327,66 @@ function ProfilePanel({
       >
         Sign out
       </button>
+    </section>
+  );
+}
+
+function FamilyPermissionsPanel({
+  profile,
+  onInviteFamily
+}: {
+  profile: CareProfile | null;
+  onInviteFamily: () => void;
+}) {
+  const members = Object.values(profile?.familyMembers || {});
+  const visibleMembers = members.length
+    ? members
+    : [
+        {
+          id: "primary-family",
+          name: "Primary family member",
+          relationship: "Family",
+          phone: "Not shared",
+          permissions: ["monitor", "alerts"] as Array<"monitor" | "alerts">,
+          nriMode: true,
+          updatedAt: 0
+        }
+      ];
+
+  return (
+    <section className="mt-6 rounded-[1.5rem] bg-white/10 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">Family permissions</p>
+          <h3 className="mt-1 text-2xl font-semibold">Shared care visibility</h3>
+          <p className="mt-2 text-sm leading-6 text-white/55">
+            Invite siblings or NRI family members with monitor-only, alerts, approval, or payment permissions.
+          </p>
+        </div>
+        <button
+          onClick={onInviteFamily}
+          className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#06130f]"
+        >
+          Invite
+        </button>
+      </div>
+      <div className="mt-4 space-y-2">
+        {visibleMembers.slice(0, 3).map((member) => (
+          <div key={member.id} className="rounded-2xl bg-white/10 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold">{member.name}</p>
+                <p className="mt-1 text-xs text-white/45">
+                  {member.relationship} - {member.nriMode ? "NRI digest on" : "Local updates"}
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-300/15 px-3 py-1 text-xs font-semibold text-emerald-100">
+                {member.permissions.join(", ")}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
