@@ -567,7 +567,34 @@ export const TrustedBooking = {
       "customer"
     );
 
-    await database.ref().update(bookingIndexes(nextBooking, booking));
+    const updates = bookingIndexes(nextBooking, booking);
+
+    if (booking.caretakerId) {
+      const caretakerSnapshot = await database.ref(`caretakers/${booking.caretakerId}`).get();
+      const caretaker = caretakerSnapshot.val() as CaretakerMatchProfile | null;
+      const previousRating = caretaker?.rating || rating.score;
+      const previousRepeats = caretaker?.repeatVisits || 0;
+      const nextRepeats = previousRepeats + 1;
+      const nextRating = Number(
+        ((previousRating * Math.max(1, previousRepeats) + rating.score) /
+          Math.max(2, previousRepeats + 1)).toFixed(2)
+      );
+
+      updates[`caretakers/${booking.caretakerId}/rating`] = nextRating;
+      updates[`caretakers/${booking.caretakerId}/repeatVisits`] = nextRepeats;
+      updates[`caretakers/${booking.caretakerId}/lastRatedAt`] = Date.now();
+      updates[`trustLedger/caregivers/${booking.caretakerId}/${booking.id}`] = {
+        bookingId: booking.id,
+        customerId: booking.customerId,
+        serviceType: booking.serviceType,
+        score: Math.min(5, Math.max(1, rating.score)),
+        note: rating.note,
+        ratedBy: rating.ratedBy,
+        ratedAt: Date.now()
+      };
+    }
+
+    await database.ref().update(updates);
     return { ok: true as const, booking: nextBooking };
   },
 

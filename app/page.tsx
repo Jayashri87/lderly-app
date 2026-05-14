@@ -138,6 +138,39 @@ type AiReassuranceInsight = {
   createdAt: number;
 };
 
+type CaregiverTrustProfile = {
+  uid: string;
+  name: string;
+  status: string;
+  trustScore: number;
+  rating: number;
+  punctualityScore: number;
+  repeatVisits: number;
+  yearsExperience: number;
+  languages: string[];
+  skills: string[];
+  badges: string[];
+  signals: string[];
+};
+
+type VisitProof = {
+  bookingId: string;
+  status: "pending" | "verified";
+  serviceType: string;
+  caretakerName: string;
+  timestampLabel: string;
+  locationLabel: string;
+  gpsVerified: boolean;
+  timestampVerified: boolean;
+  reportReady: boolean;
+  vitalsSummary: string;
+  medicineSummary: string;
+  familySummary: string;
+  caregiverNote: string;
+  proofSignals: string[];
+  attachments: VisitReport["attachments"];
+};
+
 type RecipientDetails = {
   fullName: string;
   age: string;
@@ -793,6 +826,8 @@ export default function CustomerApp() {
   );
   const [paymentMessage, setPaymentMessage] = useState("");
   const [aiInsight, setAiInsight] = useState<AiReassuranceInsight | null>(null);
+  const [caregiverTrust, setCaregiverTrust] = useState<CaregiverTrustProfile | null>(null);
+  const [visitProof, setVisitProof] = useState<VisitProof | null>(null);
   const lastStatusEventRef = useRef("");
   const lastStepEventRef = useRef("");
   const lastAiInsightRef = useRef("");
@@ -972,6 +1007,64 @@ export default function CustomerApp() {
     visibleBooking?.id,
     visibleJourney?.id
   ]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    const caretakerId = visibleBooking?.caretakerId || visibleJourney?.caretakerId;
+
+    if (!caretakerId) {
+      const timeout = window.setTimeout(() => setCaregiverTrust(null), 0);
+      return () => window.clearTimeout(timeout);
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/trust/caregiver/${encodeURIComponent(caretakerId)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { profile?: CaregiverTrustProfile } | null) => {
+        if (!cancelled) {
+          setCaregiverTrust(payload?.profile || null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCaregiverTrust(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, visibleBooking?.caretakerId, visibleJourney?.caretakerId]);
+
+  useEffect(() => {
+    if (!session || !visibleBooking?.id) {
+      const timeout = window.setTimeout(() => setVisitProof(null), 0);
+      return () => window.clearTimeout(timeout);
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/reports/visit-proof?bookingId=${encodeURIComponent(visibleBooking.id)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { proof?: VisitProof } | null) => {
+        if (!cancelled) {
+          setVisitProof(payload?.proof || null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVisitProof(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reports.length, session, visibleBooking?.id, visibleBooking?.updatedAt]);
 
   const selectTab = (tab: TabKey, source: string) => {
     trackProductEvent("customer_navigation_selected", {
@@ -1377,6 +1470,7 @@ export default function CustomerApp() {
                     recipient={recipient}
                     booking={visibleBooking}
                     journey={visibleJourney}
+                    trustProfile={caregiverTrust}
                     onRebook={rebookPreviousCare}
                   />
                   <SessionSummaryPreview
@@ -1389,6 +1483,7 @@ export default function CustomerApp() {
                     reports={reports}
                     booking={visibleBooking}
                     journey={visibleJourney}
+                    proof={visitProof}
                   />
                   <NriMonthlyReportPreview
                     recipient={recipient}
@@ -2162,17 +2257,22 @@ function TrustedCaregiverProfile({
   recipient,
   booking,
   journey,
+  trustProfile,
   onRebook
 }: {
   recipient: Recipient;
   booking: CareBooking | null;
   journey: CareJourney | null;
+  trustProfile: CaregiverTrustProfile | null;
   onRebook: () => void;
 }) {
-  const caregiverName = journey?.caretakerName || booking?.caretakerName || "Anita";
+  const caregiverName = trustProfile?.name || journey?.caretakerName || booking?.caretakerName || "Anita";
   const hasAssignedCaregiver = Boolean(
     caregiverName && caregiverName !== "Assigning now" && caregiverName !== "Best caregiver nearby"
   );
+  const badges = trustProfile?.badges?.length
+    ? trustProfile.badges
+    : ["ID verified", "Police checked", "4.9 rating", "12 repeat visits"];
 
   return (
     <section className="mt-5 rounded-[1.5rem] bg-white p-4 text-[#06130f]">
@@ -2189,7 +2289,7 @@ function TrustedCaregiverProfile({
               : `Best available caregiver will be shown after matching`}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {["ID verified", "Police checked", "4.9 rating", "12 repeat visits"].map((signal) => (
+            {badges.slice(0, 4).map((signal) => (
               <span
                 key={signal}
                 className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
@@ -2201,9 +2301,12 @@ function TrustedCaregiverProfile({
         </div>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-        <CaregiverTrustMetric label="Trust score" value="96%" />
-        <CaregiverTrustMetric label="Punctuality" value="98%" />
-        <CaregiverTrustMetric label="Languages" value="Kannada, Hindi" />
+        <CaregiverTrustMetric label="Trust score" value={`${trustProfile?.trustScore ?? 96}%`} />
+        <CaregiverTrustMetric label="Punctuality" value={`${trustProfile?.punctualityScore ?? 98}%`} />
+        <CaregiverTrustMetric
+          label="Languages"
+          value={trustProfile?.languages?.slice(0, 2).join(", ") || "Kannada, Hindi"}
+        />
       </div>
       <button
         onClick={onRebook}
@@ -2271,16 +2374,25 @@ function VisitProofSystem({
   recipient,
   reports,
   booking,
-  journey
+  journey,
+  proof
 }: {
   recipient: Recipient;
   reports: VisitReport[];
   booking: CareBooking | null;
   journey: CareJourney | null;
+  proof: VisitProof | null;
 }) {
   const latestReport = reports[0];
   const timestamp = latestReport?.completedAt || booking?.updatedAt || journey?.updatedAt || 0;
-  const proofItems = latestReport
+  const proofItems = proof
+    ? [
+        { label: "Timestamp", value: proof.timestampLabel },
+        { label: "Vitals", value: proof.vitalsSummary },
+        { label: "Medicine", value: proof.medicineSummary },
+        { label: "GPS", value: proof.locationLabel }
+      ]
+    : latestReport
     ? [
         { label: "Completed", value: timestamp ? new Date(timestamp).toLocaleString() : "Verified after visit" },
         { label: "Vitals", value: latestReport.vitalsSummary },
@@ -2316,8 +2428,20 @@ function VisitProofSystem({
           </div>
         ))}
       </div>
+      {proof?.proofSignals?.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {proof.proofSignals.map((signal) => (
+            <span
+              key={signal}
+              className="rounded-full bg-emerald-200/15 px-3 py-1 text-xs font-semibold text-emerald-100"
+            >
+              {signal}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-4 space-y-2">
-        {(latestReport?.attachments || [
+        {(proof?.attachments || latestReport?.attachments || [
           { label: "Visit photo", status: "pending" as const },
           { label: "Voice summary", status: "pending" as const }
         ]).slice(0, 3).map((attachment) => (

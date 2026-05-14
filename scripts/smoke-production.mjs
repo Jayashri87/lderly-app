@@ -291,7 +291,9 @@ const cleanupBooking = async (booking) => {
     "caretakers/smoke-backup-caretaker/activeAssignments": 0,
     [`operations/bookingsByCaretaker/demo-caretaker/${booking.id}`]: null,
     [`operations/bookingsByCaretaker/smoke-backup-caretaker/${booking.id}`]: null,
-    [`operations/reassignmentQueue/completed/${booking.id}`]: null
+    [`operations/reassignmentQueue/completed/${booking.id}`]: null,
+    [`trustLedger/caregivers/demo-caretaker/${booking.id}`]: null,
+    [`trustLedger/caregivers/smoke-backup-caretaker/${booking.id}`]: null
   };
 
   await database.ref().update(updates);
@@ -480,12 +482,24 @@ try {
     "caregiver trust profile UI is prepared"
   );
   expect(
+    status.json?.productionReadiness?.caregiverTrustProfileApi === true,
+    "caregiver trust profile API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.familyPermissionsUi === true,
     "family permissions UI is prepared"
   );
   expect(
     status.json?.productionReadiness?.visitProofUi === true,
     "visit proof UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.visitProofApi === true,
+    "visit proof API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.trustLedgerRatingUpdates === true,
+    "trust ledger rating updates are prepared"
   );
   expect(
     status.json?.productionReadiness?.sameCaregiverRebookingUi === true,
@@ -1511,6 +1525,21 @@ try {
   );
   expect(ratingResult.response.ok, "customer can rate completed care", ratingResult.text);
 
+  const trustProfileResult = await request(
+    `/api/trust/caregiver/${encodeURIComponent("demo-caretaker")}`,
+    {},
+    customerCookie
+  );
+  expect(
+    trustProfileResult.response.ok,
+    "customer can read caregiver trust profile",
+    trustProfileResult.text
+  );
+  expect(
+    trustProfileResult.json?.profile?.trustScore >= 0,
+    "caregiver trust profile includes trust score"
+  );
+
   const reportId = `smoke-report-${Date.now()}`;
   await database.ref().update({
     [`reports/byId/${reportId}`]: {
@@ -1551,6 +1580,21 @@ try {
     id: reportId,
     userId: booking.customerId
   });
+
+  const visitProofResult = await request(
+    `/api/reports/visit-proof?bookingId=${encodeURIComponent(booking.id)}`,
+    {},
+    customerCookie
+  );
+  expect(visitProofResult.response.ok, "customer can read visit proof", visitProofResult.text);
+  expect(
+    visitProofResult.json?.proof?.reportReady === true,
+    "visit proof links completed report"
+  );
+  expect(
+    Array.isArray(visitProofResult.json?.proof?.proofSignals),
+    "visit proof includes service proof signals"
+  );
 
   const familyAccessResult = await request(
     "/api/reports/family-access",
