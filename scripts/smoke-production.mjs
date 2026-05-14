@@ -125,9 +125,9 @@ const login = async (role) => {
   return result.cookie;
 };
 
-const buildSmokeBooking = () => {
+const buildSmokeBooking = (suffix = "") => {
   const now = Date.now();
-  const bookingId = `smoke-booking-${now}`;
+  const bookingId = `smoke-booking-${now}${suffix}`;
   const scheduledFor = now + 60 * 60 * 1000;
   const dateKey = new Date(scheduledFor).toISOString().slice(0, 10);
   const hourKey = new Date(scheduledFor).toISOString().slice(0, 13);
@@ -240,6 +240,28 @@ const seedCaretaker = async () => {
     familiarFamilies: ["demo-customer"],
     activeBookingId: null
   });
+  await database.ref("caretakers/smoke-backup-caretaker").update({
+    uid: "smoke-backup-caretaker",
+    name: "Smoke Backup Caretaker",
+    available: true,
+    status: "available",
+    city: "Bengaluru",
+    zone: "South",
+    skills: ["doctor_visit", "lab_support", "medicine_help"],
+    languages: ["English", "Hindi"],
+    rating: 4.7,
+    activeAssignments: 0,
+    maxAssignments: 4,
+    verified: true,
+    trained: true,
+    yearsExperience: 4,
+    serviceZones: ["South", "Central"],
+    punctualityScore: 96,
+    repeatVisits: 0,
+    familiarFamilies: [],
+    currentLocation: { lat: 12.986, lng: 77.607 },
+    activeBookingId: null
+  });
   pass("smoke caretaker seeded");
 };
 
@@ -264,7 +286,12 @@ const cleanupBooking = async (booking) => {
     [`operations/bookingsByZone/South/${booking.id}`]: null,
     [`operations/bookingsByCustomer/${booking.customerId}/${booking.id}`]: null,
     "caretakers/demo-caretaker/activeBookingId": null,
-    [`operations/bookingsByCaretaker/demo-caretaker/${booking.id}`]: null
+    "caretakers/demo-caretaker/activeAssignments": 0,
+    "caretakers/smoke-backup-caretaker/activeBookingId": null,
+    "caretakers/smoke-backup-caretaker/activeAssignments": 0,
+    [`operations/bookingsByCaretaker/demo-caretaker/${booking.id}`]: null,
+    [`operations/bookingsByCaretaker/smoke-backup-caretaker/${booking.id}`]: null,
+    [`operations/reassignmentQueue/completed/${booking.id}`]: null
   };
 
   await database.ref().update(updates);
@@ -387,6 +414,34 @@ try {
   expect(
     status.json?.productionReadiness?.realtimeSlaExperience === true,
     "realtime SLA experience is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.dispatchIntelligenceApi === true,
+    "dispatch intelligence API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.caregiverReassignmentApi === true,
+    "caregiver reassignment API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.delayedAssignmentQueue === true,
+    "delayed assignment queue is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.dispatchConflictDetection === true,
+    "dispatch conflict detection is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.backupCaregiverRecommendations === true,
+    "backup caregiver recommendations are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.opsCommandDispatchUi === true,
+    "ops command dispatch UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.liveCaregiverAvailabilityBoard === true,
+    "live caregiver availability board is prepared"
   );
   expect(
     status.json?.productionReadiness?.freeAiReassuranceApi === true,
@@ -785,6 +840,65 @@ try {
   expect(
     caregiverIntelResult.json?.snapshot?.averageReliability >= 0,
     "caregiver intelligence returns reliability score"
+  );
+  expect(
+    Array.isArray(caregiverIntelResult.json?.snapshot?.dispatchRecommendations),
+    "caregiver intelligence returns dispatch recommendations"
+  );
+  expect(
+    Array.isArray(caregiverIntelResult.json?.snapshot?.conflicts),
+    "caregiver intelligence returns dispatch conflict list"
+  );
+  expect(
+    typeof caregiverIntelResult.json?.snapshot?.delayedAssignments === "number",
+    "caregiver intelligence returns delayed assignment count"
+  );
+
+  const reassignmentBooking = buildSmokeBooking("-reassign");
+  const createReassignmentResult = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      body: JSON.stringify({ booking: reassignmentBooking })
+    },
+    customerCookie
+  );
+  createdPaths.push(reassignmentBooking);
+  expect(
+    createReassignmentResult.response.ok,
+    "customer can create reassignment smoke booking",
+    createReassignmentResult.text
+  );
+
+  const assignReassignmentResult = await request(
+    `/api/bookings/${encodeURIComponent(reassignmentBooking.id)}/assign`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(
+    assignReassignmentResult.response.ok,
+    "admin can assign reassignment smoke booking",
+    assignReassignmentResult.text
+  );
+  const originallyAssignedCaretaker =
+    assignReassignmentResult.json?.booking?.caretakerId || "";
+
+  const reassignResult = await request(
+    `/api/bookings/${encodeURIComponent(reassignmentBooking.id)}/reassign`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(reassignResult.response.ok, "admin can reassign backup caregiver", reassignResult.text);
+  expect(
+    Boolean(reassignResult.json?.booking?.caretakerId) &&
+      reassignResult.json.booking.caretakerId !== originallyAssignedCaretaker,
+    "reassignment selects a different backup caregiver"
   );
 
   const emergencyCommandResult = await request(

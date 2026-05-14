@@ -198,6 +198,28 @@ const distanceKm = (from: CareLocation, to: CareLocation) => {
   return Number((earthKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
 };
 
+const availableCaretakersFor = (
+  caretakers: CaretakerMatchProfile[],
+  excludedCaretakerId = ""
+) =>
+  caretakers.filter(
+    (caretaker) =>
+      caretaker.uid !== excludedCaretakerId &&
+      caretaker.available &&
+      caretaker.status !== "offline" &&
+      caretaker.status !== "on_visit" &&
+      caretaker.activeAssignments < caretaker.maxAssignments
+  );
+
+const bestCaretakerFor = (
+  booking: CareBooking,
+  caretakers: CaretakerMatchProfile[],
+  excludedCaretakerId = ""
+) =>
+  availableCaretakersFor(caretakers, excludedCaretakerId).sort(
+    (a, b) => scoreCaretaker(booking, b) - scoreCaretaker(booking, a)
+  )[0] || null;
+
 export const TrustedBooking = {
   async create(booking: CareBooking) {
     const database = getAdminDatabase();
@@ -237,16 +259,8 @@ export const TrustedBooking = {
     const caretakerSnapshot = await database.ref("caretakers").get();
     const caretakers = Object.values(
       (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
-    ).filter(
-      (caretaker) =>
-        caretaker.available &&
-        caretaker.status !== "offline" &&
-        caretaker.status !== "on_visit" &&
-        caretaker.activeAssignments < caretaker.maxAssignments
     );
-    const bestCaretaker =
-      caretakers.sort((a, b) => scoreCaretaker(booking, b) - scoreCaretaker(booking, a))[0] ||
-      null;
+    const bestCaretaker = bestCaretakerFor(booking, caretakers);
 
     if (!bestCaretaker) {
       return { ok: false as const, status: 409, error: "No available caretaker" };
@@ -292,6 +306,118 @@ export const TrustedBooking = {
         (bestCaretaker.activeAssignments || 0) + 1,
       [`caretakers/${bestCaretaker.uid}/status`]: "standby"
     });
+    return { ok: true as const, booking: nextBooking };
+  },
+
+  async reassign(bookingId: string) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const bookingSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
+    const booking = bookingSnapshot.val() as CareBooking | null;
+
+    if (!booking) {
+      return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (
+      ["completed", "payment_settled", "report_generated", "cancelled", "none"].includes(
+        booking.status
+      )
+    ) {
+      return { ok: false as const, status: 409, error: "Booking cannot be reassigned" };
+    }
+
+    const caretakerSnapshot = await database.ref("caretakers").get();
+    const caretakers = Object.values(
+      (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
+    );
+    const bestCaretaker = bestCaretakerFor(booking, caretakers, booking.caretakerId);
+
+    if (!bestCaretaker) {
+      return { ok: false as const, status: 409, error: "No backup caretaker available" };
+    }
+
+    const previousCaretakerId = booking.caretakerId;
+    const nextBooking = enrichBooking(
+      {
+        ...booking,
+        status: "assigned",
+        caretakerId: bestCaretaker.uid,
+        caretakerName: bestCaretaker.name,
+        matching: {
+          ...booking.matching,
+          preferredCaretakerId: bestCaretaker.uid
+        },
+        tracking: {
+          ...(booking.tracking || {
+            customerLocation: { lat: 12.9716, lng: 77.5946 },
+            caretakerLocation: { lat: 12.985, lng: 77.61 },
+            destinationLabel: "Care location",
+            distanceKm: 3.2,
+            etaMinutes: 10,
+            lastLocationAt: Date.now(),
+            routeStatus: "pending" as const
+          }),
+          caretakerLocation:
+            bestCaretaker.currentLocation ||
+            booking.tracking?.caretakerLocation || { lat: 12.985, lng: 77.61 },
+          etaMinutes: etaFromDistance(
+            distanceKm(
+              bestCaretaker.currentLocation ||
+                booking.tracking?.caretakerLocation || { lat: 12.985, lng: 77.61 },
+              booking.tracking?.customerLocation || { lat: 12.9716, lng: 77.5946 }
+            )
+          )
+        },
+        timeline: [
+          ...booking.timeline,
+          { label: `Ops reassigned ${bestCaretaker.name} as backup caregiver`, at: Date.now() }
+        ],
+        sla: {
+          ...(booking.sla || {
+            assignmentDueAt: booking.createdAt + 10 * 60 * 1000,
+            arrivalDueAt: booking.scheduledFor + 20 * 60 * 1000,
+            status: "healthy" as const,
+            breachReason: ""
+          }),
+          status: "watch" as const,
+          breachReason: "Reassignment completed after ops review"
+        }
+      },
+      "admin"
+    );
+    const updates: Record<string, unknown> = {
+      ...bookingIndexes(nextBooking, booking),
+      [`caretakers/${bestCaretaker.uid}/activeAssignments`]:
+        (bestCaretaker.activeAssignments || 0) + 1,
+      [`caretakers/${bestCaretaker.uid}/status`]: "standby",
+      [`operations/reassignmentQueue/completed/${booking.id}`]: {
+        bookingId: booking.id,
+        previousCaretakerId,
+        nextCaretakerId: bestCaretaker.uid,
+        reason: booking.sla?.breachReason || "Ops backup reassignment",
+        createdAt: Date.now()
+      }
+    };
+
+    if (previousCaretakerId) {
+      const previousAssignments =
+        ((await database.ref(`caretakers/${previousCaretakerId}/activeAssignments`).get()).val() ||
+          1) as number;
+
+      updates[`caretakers/${previousCaretakerId}/activeAssignments`] = Math.max(
+        0,
+        previousAssignments - 1
+      );
+      updates[`caretakers/${previousCaretakerId}/activeBookingId`] = null;
+      updates[`caretakers/${previousCaretakerId}/status`] = "available";
+    }
+
+    await database.ref().update(updates);
     return { ok: true as const, booking: nextBooking };
   },
 

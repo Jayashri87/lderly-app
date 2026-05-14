@@ -40,6 +40,9 @@ export type OpsKpis = {
     healthyRate: number;
     breachedRate: number;
     atRiskBookings: number;
+    delayedAssignments: number;
+    delayedArrivals: number;
+    reassignmentCandidates: number;
   };
   funnelAnalytics: {
     totalEvents: number;
@@ -67,6 +70,7 @@ export type OpsKpis = {
 
 type BookingMetricRecord = {
   status?: string;
+  caretakerId?: string;
   sla?: {
     status?: string;
   };
@@ -269,6 +273,16 @@ export const Observability = {
           booking.status
         )
     ).length;
+    const delayedAssignments = bookings.filter(
+      (booking) =>
+        ["requested", "searching"].includes(booking.status || "") &&
+        ["watch", "breached"].includes(booking.sla?.status || "")
+    ).length;
+    const delayedArrivals = bookings.filter(
+      (booking) =>
+        ["assigned", "accepted", "en_route"].includes(booking.status || "") &&
+        ["watch", "breached"].includes(booking.sla?.status || "")
+    ).length;
 
     return {
       ok: true,
@@ -320,6 +334,13 @@ export const Observability = {
             : 0,
           atRiskBookings: bookings.filter((booking) =>
             ["watch", "breached"].includes(booking.sla?.status || "")
+          ).length,
+          delayedAssignments,
+          delayedArrivals,
+          reassignmentCandidates: bookings.filter(
+            (booking) =>
+              Boolean(booking.caretakerId) &&
+              ["watch", "breached"].includes(booking.sla?.status || "")
           ).length
         },
         funnelAnalytics: {

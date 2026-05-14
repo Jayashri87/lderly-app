@@ -81,6 +81,9 @@ type OpsKpis = {
     healthyRate: number;
     breachedRate: number;
     atRiskBookings: number;
+    delayedAssignments: number;
+    delayedArrivals: number;
+    reassignmentCandidates: number;
   };
   funnelAnalytics?: {
     totalEvents: number;
@@ -120,6 +123,41 @@ type CaregiverIntelligenceSnapshot = {
     activeAssignments: number;
     maxAssignments: number;
     signals: string[];
+    availabilityScore: number;
+    activeBookingId: string;
+    lastSeenAt: number;
+  }>;
+  delayedAssignments: number;
+  reassignmentRecommendations: number;
+  dispatchRecommendations: Array<{
+    bookingId: string;
+    customerName: string;
+    serviceType: string;
+    status: string;
+    priority: "normal" | "urgent" | "critical";
+    slaStatus: "healthy" | "watch" | "breached";
+    delayMinutes: number;
+    currentCaretakerId: string;
+    currentCaretakerName: string;
+    recommendedCaretakerId: string;
+    recommendedCaretakerName: string;
+    backupCaretakerId: string;
+    backupCaretakerName: string;
+    matchScore: number;
+    backupScore: number;
+    proximityKm: number;
+    skillScore: number;
+    reliabilityScore: number;
+    risk: "healthy" | "watch" | "breach";
+    reason: string;
+  }>;
+  conflicts: Array<{
+    caretakerId: string;
+    caretakerName: string;
+    activeAssignments: number;
+    maxAssignments: number;
+    status: string;
+    severity: "watch" | "breach";
   }>;
 };
 
@@ -333,6 +371,22 @@ export default function OpsApp() {
           timeline: booking.timeline
         }
       : journey;
+  const dispatchRecommendations = caregiverIntel?.dispatchRecommendations || [];
+  const dispatchConflicts = caregiverIntel?.conflicts || [];
+  const reassignBooking = async (recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number]) => {
+    trackProductEvent("ops_reassignment_clicked", {
+      bookingId: recommendation.bookingId,
+      service: recommendation.serviceType,
+      currentCaretakerId: recommendation.currentCaretakerId,
+      backupCaretakerId: recommendation.recommendedCaretakerId || recommendation.backupCaretakerId,
+      risk: recommendation.risk,
+      slaStatus: recommendation.slaStatus
+    });
+
+    await fetch(`/api/bookings/${encodeURIComponent(recommendation.bookingId)}/reassign`, {
+      method: "POST"
+    });
+  };
 
   return (
     <main className="min-h-screen bg-[#071018] text-white">
@@ -451,7 +505,10 @@ export default function OpsApp() {
             <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
               <SlaTile label="Watch" value={String(opsKpis?.slaWatch ?? 0)} />
               <SlaTile label="Breached" value={String(opsKpis?.slaBreached ?? 0)} />
-              <SlaTile label="Support" value={String(opsKpis?.supportOpen ?? 0)} />
+              <SlaTile
+                label="Reassign"
+                value={String(opsKpis?.slaAnalytics?.reassignmentCandidates ?? 0)}
+              />
             </div>
           </div>
 
@@ -495,6 +552,75 @@ export default function OpsApp() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
+          <div className="rounded-[2rem] bg-white p-5 text-[#071018]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-700">Dispatch intelligence</p>
+                <h2 className="mt-2 text-2xl font-semibold">
+                  {dispatchRecommendations.length
+                    ? `${dispatchRecommendations.length} bookings need dispatch attention`
+                    : "No delayed dispatch queue"}
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Backup caregiver matching now considers availability, reliability, proximity, zone, capacity, and skill fit.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {caregiverIntel?.reassignmentRecommendations ?? 0} backup options
+              </span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {dispatchRecommendations.slice(0, 4).map((recommendation) => (
+                <DispatchRecommendationCard
+                  key={recommendation.bookingId}
+                  recommendation={recommendation}
+                  onReassign={() => reassignBooking(recommendation)}
+                />
+              ))}
+              {dispatchRecommendations.length === 0 && (
+                <div className="rounded-3xl bg-slate-100 p-4 text-sm text-slate-500">
+                  Assignment and arrival SLAs are calm. Recommendations will appear when a booking is delayed or missing a caregiver.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] bg-white/10 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-200">Live caregiver board</p>
+                <h2 className="mt-2 text-2xl font-semibold">
+                  {caregiverIntel?.online ?? 0} online caregivers
+                </h2>
+              </div>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
+                {dispatchConflicts.length} conflicts
+              </span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {(caregiverIntel?.caretakers || []).slice(0, 5).map((caretaker) => (
+                <CaregiverAvailabilityRow key={caretaker.uid} caretaker={caretaker} />
+              ))}
+            </div>
+            {dispatchConflicts.length > 0 && (
+              <div className="mt-5 rounded-3xl bg-red-500/15 p-4">
+                <p className="font-semibold text-red-100">Dispatch conflicts</p>
+                <div className="mt-3 space-y-2">
+                  {dispatchConflicts.slice(0, 3).map((conflict) => (
+                    <div key={conflict.caretakerId} className="rounded-2xl bg-white/10 p-3 text-sm">
+                      <p className="font-semibold">{conflict.caretakerName}</p>
+                      <p className="mt-1 text-white/50">
+                        {conflict.status} - {conflict.activeAssignments}/{conflict.maxAssignments} active assignments
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -935,6 +1061,90 @@ function FunnelTile({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl bg-slate-100 p-3">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function DispatchRecommendationCard({
+  recommendation,
+  onReassign
+}: {
+  recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number];
+  onReassign: () => void;
+}) {
+  const riskClass =
+    recommendation.risk === "breach"
+      ? "bg-red-100 text-red-700"
+      : recommendation.risk === "watch"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-emerald-100 text-emerald-700";
+
+  return (
+    <div className="rounded-3xl bg-slate-100 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold">{recommendation.serviceType}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {recommendation.customerName} - {recommendation.status} -{" "}
+            {recommendation.delayMinutes ? `${recommendation.delayMinutes}m delayed` : "on time"}
+          </p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${riskClass}`}>
+          {recommendation.risk}
+        </span>
+      </div>
+      <div className="mt-4 rounded-2xl bg-white p-3 text-sm">
+        <p className="font-semibold">
+          Recommend {recommendation.recommendedCaretakerName || "backup caregiver"}
+        </p>
+        <p className="mt-1 text-slate-500">{recommendation.reason}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+        <FunnelTile label="Match" value={`${recommendation.matchScore}%`} />
+        <FunnelTile label="Skill" value={`${recommendation.skillScore}%`} />
+        <FunnelTile label="Distance" value={`${recommendation.proximityKm} km`} />
+      </div>
+      <button
+        onClick={onReassign}
+        disabled={!recommendation.recommendedCaretakerId}
+        className="mt-4 w-full rounded-full bg-[#071018] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+      >
+        Reassign to recommended caregiver
+      </button>
+    </div>
+  );
+}
+
+function CaregiverAvailabilityRow({
+  caretaker
+}: {
+  caretaker: CaregiverIntelligenceSnapshot["caretakers"][number];
+}) {
+  const statusClass =
+    caretaker.risk === "trusted"
+      ? "bg-emerald-300 text-[#071018]"
+      : caretaker.risk === "offline"
+        ? "bg-white/10 text-white/50"
+        : "bg-amber-300 text-[#071018]";
+
+  return (
+    <div className="rounded-2xl bg-white/10 p-4 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{caretaker.name}</p>
+          <p className="mt-1 text-white/50">
+            {caretaker.status} - {caretaker.zone} - {caretaker.activeAssignments}/{caretaker.maxAssignments} active
+          </p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+          {caretaker.reliabilityScore}%
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-white/55">
+        <div className="rounded-2xl bg-white/10 p-2">Availability {caretaker.availabilityScore}%</div>
+        <div className="rounded-2xl bg-white/10 p-2">Rating {caretaker.rating.toFixed(1)}</div>
+        <div className="rounded-2xl bg-white/10 p-2">{caretaker.repeatVisits} repeats</div>
+      </div>
     </div>
   );
 }
