@@ -169,7 +169,34 @@ type EmergencyCommandSnapshot = {
   partnerDispatchCount: number;
   criticalBookings: number;
   openAlerts: number;
+  panicCount: number;
+  delayedBookingCount: number;
+  queues: {
+    command: CommandQueueItem[];
+    emergency: CommandQueueItem[];
+    panic: CommandQueueItem[];
+    incidents: CommandQueueItem[];
+    delayedBookings: CommandQueueItem[];
+    alerts: CommandQueueItem[];
+  };
   escalationOrder: string[];
+  nextAction: string;
+};
+
+type CommandQueueItem = {
+  id: string;
+  type: "alert" | "booking" | "emergency" | "incident";
+  severity: string;
+  title: string;
+  subtitle: string;
+  status: string;
+  bookingId?: string;
+  customerName?: string;
+  caretakerName?: string;
+  currentStage?: string;
+  ageMinutes: number;
+  dueInMinutes: number;
+  risk: string;
   nextAction: string;
 };
 
@@ -373,6 +400,10 @@ export default function OpsApp() {
       : journey;
   const dispatchRecommendations = caregiverIntel?.dispatchRecommendations || [];
   const dispatchConflicts = caregiverIntel?.conflicts || [];
+  const commandQueue = emergencyCommand?.queues?.command || [];
+  const panicQueue = emergencyCommand?.queues?.panic || [];
+  const incidentQueue = emergencyCommand?.queues?.incidents || [];
+  const delayedBookingQueue = emergencyCommand?.queues?.delayedBookings || [];
   const reassignBooking = async (recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number]) => {
     trackProductEvent("ops_reassignment_clicked", {
       bookingId: recommendation.bookingId,
@@ -386,6 +417,37 @@ export default function OpsApp() {
     await fetch(`/api/bookings/${encodeURIComponent(recommendation.bookingId)}/reassign`, {
       method: "POST"
     });
+  };
+  const runCommandAction = async (
+    item: CommandQueueItem,
+    action: "acknowledge" | "resolve_incident" | "escalate_booking" | "resolve_alert"
+  ) => {
+    trackProductEvent("ops_command_center_action", {
+      action,
+      targetType: item.type,
+      targetId: item.id,
+      severity: item.severity,
+      risk: item.risk
+    });
+
+    await fetch("/api/ops/emergency-command", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action,
+        targetType: item.type,
+        targetId: item.id,
+        note: `${action} from Ops Command Center`
+      })
+    });
+
+    const response = await fetch("/api/ops/emergency-command");
+    if (response.ok) {
+      const payload = (await response.json()) as { snapshot: EmergencyCommandSnapshot };
+      setEmergencyCommand(payload.snapshot);
+    }
   };
 
   return (
@@ -471,6 +533,94 @@ export default function OpsApp() {
             label="Command"
             value={emergencyCommand?.commandLevel?.toUpperCase() || "GREEN"}
           />
+        </section>
+
+        <section className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+          <div
+            className={`rounded-[2rem] p-5 ${
+              emergencyCommand?.commandLevel === "red"
+                ? "bg-red-500/20"
+                : emergencyCommand?.commandLevel === "amber"
+                  ? "bg-amber-300/15"
+                  : "bg-emerald-300/15"
+            }`}
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white/65">Ops command center</p>
+                <h2 className="mt-2 text-2xl font-semibold">
+                  {commandQueue.length
+                    ? `${commandQueue.length} live issues need ownership`
+                    : "All critical queues are calm"}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-white/60">
+                  {emergencyCommand?.nextAction ||
+                    "Emergency, incident, panic, and SLA queues are monitored here."}
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#071018]">
+                {emergencyCommand?.commandLevel?.toUpperCase() || "GREEN"}
+              </span>
+            </div>
+            <div className="mt-5 grid grid-cols-4 gap-2 text-center text-xs">
+              <SlaTile label="SOS" value={String(emergencyCommand?.emergencyCount ?? 0)} />
+              <SlaTile label="Panic" value={String(emergencyCommand?.panicCount ?? 0)} />
+              <SlaTile label="Incidents" value={String(emergencyCommand?.incidentCount ?? 0)} />
+              <SlaTile label="Delayed" value={String(emergencyCommand?.delayedBookingCount ?? 0)} />
+            </div>
+            <div className="mt-5 space-y-3">
+              {commandQueue.slice(0, 5).map((item) => (
+                <CommandQueueCard
+                  key={`${item.type}-${item.id}`}
+                  item={item}
+                  onAcknowledge={() => runCommandAction(item, "acknowledge")}
+                  onEscalate={() => runCommandAction(item, "escalate_booking")}
+                  onResolve={() =>
+                    runCommandAction(
+                      item,
+                      item.type === "incident"
+                        ? "resolve_incident"
+                        : item.type === "alert"
+                          ? "resolve_alert"
+                          : "acknowledge"
+                    )
+                  }
+                />
+              ))}
+              {commandQueue.length === 0 && (
+                <div className="rounded-3xl bg-white/10 p-4 text-sm text-white/60">
+                  No emergency, panic, incident, or delayed SLA item needs action right now.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] bg-white p-5 text-[#071018]">
+            <p className="text-sm font-semibold text-blue-700">Queue breakdown</p>
+            <h2 className="mt-2 text-2xl font-semibold">Operational ownership</h2>
+            <div className="mt-5 space-y-3">
+              <QueueSummary
+                title="Panic / SOS"
+                count={panicQueue.length}
+                subtitle="Immediate unsafe, distress, fall, or SOS signals."
+              />
+              <QueueSummary
+                title="Emergency escalations"
+                count={emergencyCommand?.queues?.emergency?.length || 0}
+                subtitle="Customer, family, ops, ambulance, hospital chain."
+              />
+              <QueueSummary
+                title="Care incidents"
+                count={incidentQueue.length}
+                subtitle="Medical, service, safety, and fall-risk incident reports."
+              />
+              <QueueSummary
+                title="Delayed bookings"
+                count={delayedBookingQueue.length}
+                subtitle="Assignment or arrival SLA watch and breach queue."
+              />
+            </div>
+          </div>
         </section>
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[.95fr_1.05fr]">
@@ -1061,6 +1211,99 @@ function FunnelTile({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl bg-slate-100 p-3">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function CommandQueueCard({
+  item,
+  onAcknowledge,
+  onEscalate,
+  onResolve
+}: {
+  item: CommandQueueItem;
+  onAcknowledge: () => void;
+  onEscalate: () => void;
+  onResolve: () => void;
+}) {
+  const riskClass =
+    item.risk === "critical" || item.risk === "breach"
+      ? "bg-red-100 text-red-700"
+      : item.risk === "high"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-white/10 text-white";
+  const canEscalate = item.type === "booking";
+  const canResolve = item.type === "incident" || item.type === "alert";
+
+  return (
+    <div className="rounded-3xl bg-white p-4 text-[#071018]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold">{item.title}</p>
+          <p className="mt-1 text-sm text-slate-500">{item.subtitle}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${riskClass}`}>
+          {item.severity}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+        <FunnelTile label="Age" value={`${item.ageMinutes}m`} />
+        <FunnelTile label="Due" value={`${item.dueInMinutes}m`} />
+        <FunnelTile label="Type" value={item.type} />
+      </div>
+      <p className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm text-slate-600">
+        {item.nextAction}
+      </p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <button
+          onClick={onAcknowledge}
+          className="rounded-full bg-[#071018] px-3 py-3 text-xs font-semibold text-white"
+        >
+          Own
+        </button>
+        <button
+          onClick={onEscalate}
+          disabled={!canEscalate}
+          className="rounded-full bg-red-100 px-3 py-3 text-xs font-semibold text-red-700 disabled:bg-slate-100 disabled:text-slate-400"
+        >
+          Escalate
+        </button>
+        <button
+          onClick={onResolve}
+          disabled={!canResolve}
+          className="rounded-full bg-emerald-100 px-3 py-3 text-xs font-semibold text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400"
+        >
+          Resolve
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QueueSummary({
+  title,
+  count,
+  subtitle
+}: {
+  title: string;
+  count: number;
+  subtitle: string;
+}) {
+  return (
+    <div className="rounded-3xl bg-slate-100 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{title}</p>
+          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            count ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+          }`}
+        >
+          {count}
+        </span>
+      </div>
     </div>
   );
 }

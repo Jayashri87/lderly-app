@@ -396,6 +396,30 @@ try {
     "emergency command center API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.opsCommandCenterQueues === true,
+    "ops command center queues are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.opsCommandCenterActions === true,
+    "ops command center actions are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.emergencyQueueUi === true,
+    "emergency queue UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.incidentQueueUi === true,
+    "incident queue UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.panicSosQueueUi === true,
+    "panic SOS queue UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.delayedBookingQueueUi === true,
+    "delayed booking queue UI is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.tanstackQueryProvider === true,
     "TanStack Query provider is prepared"
   );
@@ -900,6 +924,43 @@ try {
       reassignResult.json.booking.caretakerId !== originallyAssignedCaretaker,
     "reassignment selects a different backup caregiver"
   );
+  const commandEscalateBookingResult = await request(
+    "/api/ops/emergency-command",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: "escalate_booking",
+        targetType: "booking",
+        targetId: reassignmentBooking.id,
+        note: "Smoke command center booking escalation"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    commandEscalateBookingResult.response.ok,
+    "admin can escalate booking from command center",
+    commandEscalateBookingResult.text
+  );
+  if (commandEscalateBookingResult.json?.action?.id) {
+    createdReliability.push({
+      kind: "commandAction",
+      id: commandEscalateBookingResult.json.action.id,
+      targetType: "booking",
+      targetId: reassignmentBooking.id
+    });
+    const generatedAlertId = String(commandEscalateBookingResult.json.action.note || "").match(
+      /alert:(ops-alert-[\w-]+)/
+    )?.[1];
+    if (generatedAlertId) {
+      createdReliability.push({
+        kind: "opsAlert",
+        id: generatedAlertId,
+        alertKind: "sla_breach",
+        severity: "critical"
+      });
+    }
+  }
 
   const emergencyCommandResult = await request(
     "/api/ops/emergency-command",
@@ -914,6 +975,18 @@ try {
   expect(
     ["green", "amber", "red"].includes(emergencyCommandResult.json?.snapshot?.commandLevel),
     "emergency command center returns command level"
+  );
+  expect(
+    Array.isArray(emergencyCommandResult.json?.snapshot?.queues?.command),
+    "emergency command center returns unified command queue"
+  );
+  expect(
+    Array.isArray(emergencyCommandResult.json?.snapshot?.queues?.delayedBookings),
+    "emergency command center returns delayed booking queue"
+  );
+  expect(
+    typeof emergencyCommandResult.json?.snapshot?.panicCount === "number",
+    "emergency command center returns panic queue count"
   );
 
   const reassuranceResult = await request(
@@ -1105,6 +1178,32 @@ try {
       bookingId: booking.id,
       severity: "medium"
     });
+    const incidentResolveResult = await request(
+      "/api/ops/emergency-command",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          action: "resolve_incident",
+          targetType: "incident",
+          targetId: incidentResult.json.incident.id,
+          note: "Smoke command center incident resolution"
+        })
+      },
+      adminCookie
+    );
+    expect(
+      incidentResolveResult.response.ok,
+      "admin can resolve incident from command center",
+      incidentResolveResult.text
+    );
+    if (incidentResolveResult.json?.action?.id) {
+      createdReliability.push({
+        kind: "commandAction",
+        id: incidentResolveResult.json.action.id,
+        targetType: "incident",
+        targetId: incidentResult.json.incident.id
+      });
+    }
   }
 
   const trainingBadgeResult = await request(
@@ -1676,6 +1775,15 @@ try {
           [`operations/internalAlerts/byId/${item.id}`]: null,
           [`operations/internalAlerts/byKind/${item.alertKind}/${item.id}`]: null,
           [`operations/internalAlerts/bySeverity/${item.severity}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "commandAction") {
+      await database
+        .ref()
+        .update({
+          [`operations/commandCenter/actions/${item.id}`]: null,
+          [`operations/commandCenter/acknowledged/${item.targetType}/${item.targetId}`]: null
         })
         .catch(() => undefined);
     }
