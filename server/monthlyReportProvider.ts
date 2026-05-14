@@ -40,6 +40,12 @@ export const MonthlyReportProvider = {
       return result;
     }, {});
     const watchCount = reports.filter((report) => report.aiSummary?.riskLevel === "watch").length;
+    const topNextActions = reports
+      .map((report) => report.aiSummary?.nextBestAction)
+      .filter((action): action is string => Boolean(action))
+      .slice(0, 5);
+    const mostUsedService =
+      Object.entries(services).sort((a, b) => b[1] - a[1])[0]?.[0] || "No visits yet";
     const id = `monthly-${userId}-${monthKey}`;
     const monthlyReport = {
       id,
@@ -51,6 +57,17 @@ export const MonthlyReportProvider = {
       familyHeadline: reports.length
         ? `${reports.length} care updates summarized for family`
         : "No completed visits found for this month",
+      aiNarrative: reports.length
+        ? watchCount
+          ? `${watchCount} visit(s) need follow-up. Most care activity was ${mostUsedService}.`
+          : `Care looked stable this month. Most care activity was ${mostUsedService}.`
+        : "No completed visits were found, so the family report is ready as an empty-month check-in.",
+      anomalySignals: [
+        ...(watchCount ? ["watch_visit_reports"] : []),
+        ...(reports.length === 0 ? ["no_completed_visits"] : []),
+        ...(Object.keys(services).length >= 3 ? ["multi_service_coordination"] : [])
+      ],
+      topNextActions,
       highlights: reports.slice(0, 5).map((report) => ({
         reportId: report.id,
         serviceType: report.serviceType,

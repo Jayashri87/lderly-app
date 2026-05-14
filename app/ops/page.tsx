@@ -183,6 +183,26 @@ type EmergencyCommandSnapshot = {
   nextAction: string;
 };
 
+type AiOpsSummary = {
+  id: string;
+  generatedAt: number;
+  riskLevel: "green" | "amber" | "red";
+  headline: string;
+  narrative: string;
+  counters: {
+    activeBookings: number;
+    breachedBookings: number;
+    watchBookings: number;
+    openIncidents: number;
+    highRiskFamilies: number;
+    watchFamilies: number;
+    openAlerts: number;
+  };
+  recommendations: string[];
+  anomalySignals: string[];
+  model: string;
+};
+
 type CommandQueueItem = {
   id: string;
   type: "alert" | "booking" | "emergency" | "incident";
@@ -216,6 +236,7 @@ export default function OpsApp() {
     useState<CaregiverIntelligenceSnapshot | null>(null);
   const [emergencyCommand, setEmergencyCommand] =
     useState<EmergencyCommandSnapshot | null>(null);
+  const [aiOpsSummary, setAiOpsSummary] = useState<AiOpsSummary | null>(null);
   const [opsNow, setOpsNow] = useState(0);
 
   useEffect(() => {
@@ -449,6 +470,27 @@ export default function OpsApp() {
       setEmergencyCommand(payload.snapshot);
     }
   };
+  const generateAiOpsSummary = async () => {
+    trackProductEvent("ops_ai_summary_requested", {
+      commandLevel: emergencyCommand?.commandLevel || "green",
+      activeBookings: opsKpis?.activeBookings ?? 0,
+      delayedBookings: emergencyCommand?.delayedBookingCount ?? 0,
+      openIncidents: emergencyCommand?.incidentCount ?? 0
+    });
+
+    const response = await fetch("/api/ai/ops-summary", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+
+    if (response.ok) {
+      const payload = (await response.json()) as { summary: AiOpsSummary };
+      setAiOpsSummary(payload.summary);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#071018] text-white">
@@ -619,6 +661,69 @@ export default function OpsApp() {
                 count={delayedBookingQueue.length}
                 subtitle="Assignment or arrival SLA watch and breach queue."
               />
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] bg-white p-5 text-[#071018]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+                <Sparkles size={16} />
+                AI ops assistant
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">
+                {aiOpsSummary?.headline || "Generate a calm operational brief"}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                {aiOpsSummary?.narrative ||
+                  "Summarizes live bookings, SLA pressure, incident risk, care-risk signals, and next best actions for the ops team."}
+              </p>
+            </div>
+            <button
+              onClick={generateAiOpsSummary}
+              className="rounded-full bg-[#071018] px-5 py-3 text-sm font-semibold text-white"
+            >
+              Generate ops summary
+            </button>
+          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+            <div
+              className={`rounded-3xl p-4 text-sm ${
+                aiOpsSummary?.riskLevel === "red"
+                  ? "bg-red-50 text-red-800"
+                  : aiOpsSummary?.riskLevel === "amber"
+                    ? "bg-amber-50 text-amber-800"
+                    : "bg-emerald-50 text-emerald-800"
+            }`}
+          >
+              <p className="text-xs font-semibold uppercase">Risk level</p>
+              <p className="mt-2 text-2xl font-semibold">
+                {(aiOpsSummary?.riskLevel || emergencyCommand?.commandLevel || "green").toUpperCase()}
+              </p>
+              <p className="mt-2 text-xs opacity-75">{aiOpsSummary?.model || "free deterministic intelligence"}</p>
+            </div>
+            <div className="rounded-3xl bg-slate-100 p-4 text-sm">
+              <p className="font-semibold">Anomaly signals</p>
+              <div className="mt-3 space-y-2 text-slate-600">
+                {(aiOpsSummary?.anomalySignals?.length
+                  ? aiOpsSummary.anomalySignals
+                  : ["No generated anomaly signals yet."]
+                ).map((signal) => (
+                  <p key={signal}>{signal}</p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-3xl bg-slate-100 p-4 text-sm">
+              <p className="font-semibold">Next best actions</p>
+              <div className="mt-3 space-y-2 text-slate-600">
+                {(aiOpsSummary?.recommendations?.length
+                  ? aiOpsSummary.recommendations
+                  : ["Generate a summary to see recommended ops actions."]
+                ).map((recommendation) => (
+                  <p key={recommendation}>{recommendation}</p>
+                ))}
+              </div>
             </div>
           </div>
         </section>

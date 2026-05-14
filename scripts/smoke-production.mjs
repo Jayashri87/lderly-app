@@ -498,6 +498,22 @@ try {
     "AI daily care summary UI is prepared"
   );
   expect(
+    status.json?.productionReadiness?.aiOpsSummaryApi === true,
+    "AI ops summary API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.aiCaregiverNoteCleanupApi === true,
+    "AI caregiver note cleanup API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.aiAnomalySignals === true,
+    "AI anomaly signals are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.aiMonthlyReportIntelligence === true,
+    "AI monthly report intelligence is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.caregiverTrustProfileUi === true,
     "caregiver trust profile UI is prepared"
   );
@@ -1211,6 +1227,66 @@ try {
     userId: booking.customerId
   });
 
+  const aiOpsSummaryResult = await request(
+    "/api/ai/ops-summary",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(
+    aiOpsSummaryResult.response.ok,
+    "admin can generate AI ops summary",
+    aiOpsSummaryResult.text
+  );
+  expect(
+    Boolean(aiOpsSummaryResult.json?.summary?.headline),
+    "AI ops summary includes headline"
+  );
+  expect(
+    Array.isArray(aiOpsSummaryResult.json?.summary?.anomalySignals),
+    "AI ops summary includes anomaly signals"
+  );
+  if (aiOpsSummaryResult.json?.summary?.id) {
+    createdReliability.push({
+      kind: "aiOpsSummary",
+      id: aiOpsSummaryResult.json.summary.id
+    });
+  }
+
+  const noteCleanupResult = await request(
+    "/api/ai/caregiver-note",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        rawNote: "Mom felt dizzy in the morning but medicine was completed on time.",
+        serviceType: booking.serviceType,
+        recipientName: "Smoke Mom"
+      })
+    },
+    caretakerCookie
+  );
+  expect(
+    noteCleanupResult.response.ok,
+    "caretaker can clean caregiver note with AI",
+    noteCleanupResult.text
+  );
+  expect(
+    Boolean(noteCleanupResult.json?.note?.familyMessage),
+    "AI caregiver note includes family message"
+  );
+  expect(
+    Array.isArray(noteCleanupResult.json?.note?.riskTags),
+    "AI caregiver note includes risk tags"
+  );
+  if (noteCleanupResult.json?.note?.id) {
+    createdReliability.push({
+      kind: "aiCaregiverNote",
+      id: noteCleanupResult.json.note.id
+    });
+  }
+
   const incidentResult = await request(
     "/api/care-quality/incident",
     {
@@ -1708,6 +1784,14 @@ try {
     typeof monthlyReportResult.json?.monthlyReport?.totalVisits === "number",
     "monthly report includes visit count"
   );
+  expect(
+    Boolean(monthlyReportResult.json?.monthlyReport?.aiNarrative),
+    "monthly report includes AI narrative"
+  );
+  expect(
+    Array.isArray(monthlyReportResult.json?.monthlyReport?.anomalySignals),
+    "monthly report includes anomaly signals"
+  );
   if (monthlyReportResult.json?.monthlyReport?.id) {
     createdReliability.push({
       kind: "monthlyReport",
@@ -1943,6 +2027,12 @@ try {
           [`aiReassurance/byBooking/${item.bookingId}/${item.id}`]: null
         })
         .catch(() => undefined);
+    }
+    if (item.kind === "aiOpsSummary") {
+      await database.ref(`aiOpsSummaries/byId/${item.id}`).remove().catch(() => undefined);
+    }
+    if (item.kind === "aiCaregiverNote") {
+      await database.ref(`aiCaregiverNotes/byId/${item.id}`).remove().catch(() => undefined);
     }
     if (item.kind === "monthlyReport") {
       await database
