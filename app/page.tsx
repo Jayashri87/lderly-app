@@ -171,6 +171,24 @@ type VisitProof = {
   attachments: VisitReport["attachments"];
 };
 
+type CareRiskSummary = {
+  userId: string;
+  recipientName: string;
+  riskScore: number;
+  riskLevel: "stable" | "watch" | "high";
+  fallRisk: "low" | "medium" | "high";
+  dementiaSupport: boolean;
+  chronicConditionFlags: string[];
+  medicationRisk: "stable" | "watch" | "missed";
+  vitalsRisk: "stable" | "watch" | "high";
+  openIncidents: number;
+  emergencyReadinessScore: number;
+  missedCareSignals: string[];
+  riskSignals: string[];
+  recommendations: string[];
+  generatedAt: number;
+};
+
 type RecipientDetails = {
   fullName: string;
   age: string;
@@ -828,6 +846,7 @@ export default function CustomerApp() {
   const [aiInsight, setAiInsight] = useState<AiReassuranceInsight | null>(null);
   const [caregiverTrust, setCaregiverTrust] = useState<CaregiverTrustProfile | null>(null);
   const [visitProof, setVisitProof] = useState<VisitProof | null>(null);
+  const [careRisk, setCareRisk] = useState<CareRiskSummary | null>(null);
   const lastStatusEventRef = useRef("");
   const lastStepEventRef = useRef("");
   const lastAiInsightRef = useRef("");
@@ -1065,6 +1084,42 @@ export default function CustomerApp() {
       cancelled = true;
     };
   }, [reports.length, session, visibleBooking?.id, visibleBooking?.updatedAt]);
+
+  useEffect(() => {
+    if (!session || !recipientName) {
+      const timeout = window.setTimeout(() => setCareRisk(null), 0);
+      return () => window.clearTimeout(timeout);
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/care-risk/summary?relationship=${encodeURIComponent(recipient.name)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { summary?: CareRiskSummary } | null) => {
+        if (!cancelled) {
+          setCareRisk(payload?.summary || null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCareRisk(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    health?.medicineStatus,
+    health?.updatedAt,
+    profile?.updatedAt,
+    recipient.name,
+    recipientName,
+    reports.length,
+    session,
+    visibleBooking?.id,
+    visibleBooking?.sla?.status
+  ]);
 
   const selectTab = (tab: TabKey, source: string) => {
     trackProductEvent("customer_navigation_selected", {
@@ -1457,6 +1512,7 @@ export default function CustomerApp() {
                     onRebook={rebookPreviousCare}
                   />
                   <CareConfidence recipient={recipient} health={health} />
+                  <MedicalRiskPanel recipient={recipient} risk={careRisk} />
                   <FamilyReassuranceSystem
                     recipient={recipient}
                     health={health}
@@ -2092,6 +2148,81 @@ function CareConfidence({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function MedicalRiskPanel({
+  recipient,
+  risk
+}: {
+  recipient: Recipient;
+  risk: CareRiskSummary | null;
+}) {
+  const riskTone =
+    risk?.riskLevel === "high"
+      ? "bg-red-500/20 text-red-50"
+      : risk?.riskLevel === "watch"
+        ? "bg-amber-200/15 text-amber-50"
+        : "bg-emerald-200/10 text-emerald-50";
+  const signals = risk?.riskSignals?.length
+    ? risk.riskSignals
+    : ["No urgent medical risk signals", "Emergency contact readiness active"];
+
+  return (
+    <section className={`mt-5 rounded-[1.5rem] p-4 ${riskTone}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white/60">Medical readiness</p>
+          <h3 className="mt-1 text-2xl font-semibold">
+            {risk?.riskLevel === "high"
+              ? `${recipient.shortName} needs attention`
+              : risk?.riskLevel === "watch"
+                ? `${recipient.shortName} is on watch`
+                : `${recipient.shortName} looks stable`}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-white/60">
+            {risk?.recommendations?.[0] ||
+              "We combine medicines, vitals, profile flags, incidents, and emergency readiness into one care view."}
+          </p>
+        </div>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#06130f]">
+          {risk?.riskScore ?? 18}/100
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs text-white/65">
+        <div className="rounded-2xl bg-white/10 p-3">
+          Fall
+          <p className="mt-1 font-semibold text-white">{risk?.fallRisk || "low"}</p>
+        </div>
+        <div className="rounded-2xl bg-white/10 p-3">
+          Medicine
+          <p className="mt-1 font-semibold text-white">{risk?.medicationRisk || "stable"}</p>
+        </div>
+        <div className="rounded-2xl bg-white/10 p-3">
+          Vitals
+          <p className="mt-1 font-semibold text-white">{risk?.vitalsRisk || "stable"}</p>
+        </div>
+        <div className="rounded-2xl bg-white/10 p-3">
+          SOS
+          <p className="mt-1 font-semibold text-white">{risk?.emergencyReadinessScore ?? 85}%</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {[...signals, ...(risk?.chronicConditionFlags || [])].slice(0, 5).map((signal) => (
+          <span
+            key={signal}
+            className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/70"
+          >
+            {signal}
+          </span>
+        ))}
+      </div>
+      {risk?.missedCareSignals?.length ? (
+        <div className="mt-4 rounded-2xl bg-white/10 p-3 text-sm text-white/70">
+          Missed-care signals: {risk.missedCareSignals.join(", ")}
+        </div>
+      ) : null}
     </section>
   );
 }

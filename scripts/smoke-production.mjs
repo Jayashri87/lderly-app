@@ -374,6 +374,26 @@ try {
     "medication adherence API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.careRiskSummaryApi === true,
+    "care risk summary API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.fallRiskIndicators === true,
+    "fall risk indicators are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.missedCareDetection === true,
+    "missed care detection is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.emergencyReadinessScore === true,
+    "emergency readiness score is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.dementiaChronicConditionFlags === true,
+    "dementia and chronic condition flags are prepared"
+  );
+  expect(
     status.json?.productionReadiness?.incidentReportApi === true,
     "incident report API is prepared"
   );
@@ -1167,6 +1187,29 @@ try {
       bookingId: booking.id
     });
   }
+
+  const careRiskResult = await request(
+    `/api/care-risk/summary?userId=${encodeURIComponent(booking.customerId)}&relationship=Mom`,
+    {},
+    adminCookie
+  );
+  expect(careRiskResult.response.ok, "admin can read care risk summary", careRiskResult.text);
+  expect(
+    typeof careRiskResult.json?.summary?.riskScore === "number",
+    "care risk summary includes risk score"
+  );
+  expect(
+    typeof careRiskResult.json?.summary?.emergencyReadinessScore === "number",
+    "care risk summary includes emergency readiness score"
+  );
+  expect(
+    Array.isArray(careRiskResult.json?.summary?.recommendations),
+    "care risk summary includes recommendations"
+  );
+  createdReliability.push({
+    kind: "careRisk",
+    userId: booking.customerId
+  });
 
   const incidentResult = await request(
     "/api/care-quality/incident",
@@ -1990,6 +2033,9 @@ try {
           [`medicationAdherence/byBooking/${item.bookingId}/${item.id}`]: null
         })
         .catch(() => undefined);
+    }
+    if (item.kind === "careRisk") {
+      await database.ref(`careRisk/byUser/${item.userId}`).remove().catch(() => undefined);
     }
     if (item.kind === "incident") {
       await database
