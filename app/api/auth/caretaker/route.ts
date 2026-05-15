@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { attachRoleSession, createSessionId } from "../../../../server/authSession";
 import { registerRoleSession } from "../../../../server/sessionRegistry";
+import {
+  requireAuthAttempt,
+  verifyConfiguredCredential
+} from "../../../../server/authGuards";
 
 export async function POST(request: NextRequest) {
+  const limited = requireAuthAttempt(request, "caretaker", 6);
+  if (limited) {
+    return limited;
+  }
+
   const body = (await request.json()) as {
     username?: string;
     password?: string;
@@ -10,26 +19,34 @@ export async function POST(request: NextRequest) {
   const expectedUsername = process.env.LDERLY_CARETAKER_USERNAME;
   const expectedPassword = process.env.LDERLY_CARETAKER_PASSWORD;
 
-  if (!expectedUsername || !expectedPassword) {
+  const credential = verifyConfiguredCredential({
+    username: body.username,
+    password: body.password,
+    expectedUsername,
+    expectedPassword
+  });
+
+  if (credential === "unconfigured") {
     return NextResponse.json(
       { error: "Caretaker credentials are not configured" },
       { status: 503 }
     );
   }
 
-  if (body.username !== expectedUsername || body.password !== expectedPassword) {
+  if (credential !== "valid") {
     return NextResponse.json(
       { error: "Invalid caretaker credentials" },
       { status: 401 }
     );
   }
 
+  const signedUsername = expectedUsername!;
   const sessionId = createSessionId();
   const timestamp = Date.now();
   const response = attachRoleSession(
     NextResponse.json({ ok: true, role: "caretaker" }),
     "caretaker",
-    body.username,
+    signedUsername,
     "demo-caretaker",
     sessionId
   );
@@ -37,7 +54,7 @@ export async function POST(request: NextRequest) {
   await registerRoleSession(request, {
     sessionId,
     role: "caretaker",
-    username: body.username,
+    username: signedUsername,
     uid: "demo-caretaker",
     createdAt: timestamp,
     expiresAt: timestamp + 1000 * 60 * 60 * 12

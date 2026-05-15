@@ -79,7 +79,7 @@ export const attachRoleSession = (
 
   response.cookies.set(cookieName, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 12
@@ -106,7 +106,7 @@ export const requireRole = (request: NextRequest, roles: UserRole[]) => {
 export const clearRoleSession = (response: NextResponse) => {
   response.cookies.set(cookieName, "", {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 0

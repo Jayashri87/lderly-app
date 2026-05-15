@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { attachRoleSession, createSessionId } from "../../../../../server/authSession";
 import { registerRoleSession } from "../../../../../server/sessionRegistry";
+import { requireAuthAttempt } from "../../../../../server/authGuards";
 
 const normalizePhone = (value: string) => value.replace(/[^\d]/g, "");
 
 export async function POST(request: NextRequest) {
+  const limited = requireAuthAttempt(request, "customer-otp", 8);
+  if (limited) {
+    return limited;
+  }
+
   const body = (await request.json()) as {
     phone?: string;
     otp?: string;

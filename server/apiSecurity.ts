@@ -26,14 +26,34 @@ const clientIpFor = (request: NextRequest) =>
   request.headers.get("x-real-ip") ||
   "local";
 
+const isLikelyBrowserRequest = (request: NextRequest) => {
+  const userAgent = request.headers.get("user-agent") || "";
+  const accept = request.headers.get("accept") || "";
+
+  return /mozilla|chrome|safari|firefox|edg/i.test(userAgent) || accept.includes("text/html");
+};
+
 const sameOriginCheck = (request: NextRequest) => {
   const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
 
-  if (!origin) {
+  if (origin) {
+    return origin === request.nextUrl.origin;
+  }
+
+  if (referer) {
+    try {
+      return new URL(referer).origin === request.nextUrl.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) {
     return true;
   }
 
-  return origin === request.nextUrl.origin;
+  return !isLikelyBrowserRequest(request);
 };
 
 export const jsonError = (message: string, status: number) =>
@@ -49,6 +69,32 @@ export const parseJsonBody = async <T>(request: NextRequest): Promise<T | null> 
 
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
+
+export const checkRateLimit = (
+  request: NextRequest,
+  key: string,
+  limit = 60,
+  windowMs = rateWindowMs
+) => {
+  const bucketKey = `${key}:${clientIpFor(request)}`;
+  const now = Date.now();
+  const bucket = buckets.get(bucketKey);
+
+  if (!bucket || bucket.resetAt < now) {
+    buckets.set(bucketKey, {
+      count: 1,
+      resetAt: now + windowMs
+    });
+    return { ok: true, remaining: Math.max(0, limit - 1), resetAt: now + windowMs };
+  }
+
+  bucket.count += 1;
+  return {
+    ok: bucket.count <= limit,
+    remaining: Math.max(0, limit - bucket.count),
+    resetAt: bucket.resetAt
+  };
+};
 
 export const requireApiSession = async (
   request: NextRequest,
@@ -81,24 +127,14 @@ export const requireApiSession = async (
     return { ok: false, response: jsonError("Invalid request origin", 403) };
   }
 
-  const limit = options.rateLimit ?? 60;
-  const key = `${session.uid || session.username}:${request.nextUrl.pathname}:${clientIpFor(
-    request
-  )}`;
-  const now = Date.now();
-  const bucket = buckets.get(key);
+  const rateLimit = checkRateLimit(
+    request,
+    `api:${session.uid || session.username}:${request.nextUrl.pathname}`,
+    options.rateLimit ?? 60
+  );
 
-  if (!bucket || bucket.resetAt < now) {
-    buckets.set(key, {
-      count: 1,
-      resetAt: now + rateWindowMs
-    });
-  } else {
-    bucket.count += 1;
-
-    if (bucket.count > limit) {
-      return { ok: false, response: jsonError("Too many requests", 429) };
-    }
+  if (!rateLimit.ok) {
+    return { ok: false, response: jsonError("Too many requests", 429) };
   }
 
   return { ok: true, session };

@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { attachRoleSession, createSessionId } from "../../../../server/authSession";
 import { registerRoleSession } from "../../../../server/sessionRegistry";
+import {
+  requireAuthAttempt,
+  verifyConfiguredCredential
+} from "../../../../server/authGuards";
 
 export async function POST(request: NextRequest) {
+  const limited = requireAuthAttempt(request, "customer", 8);
+  if (limited) {
+    return limited;
+  }
+
   const body = (await request.json()) as {
     username?: string;
     password?: string;
@@ -10,20 +19,28 @@ export async function POST(request: NextRequest) {
   const expectedUsername = process.env.LDERLY_CUSTOMER_USERNAME;
   const expectedPassword = process.env.LDERLY_CUSTOMER_PASSWORD;
 
-  if (!expectedUsername || !expectedPassword) {
+  const credential = verifyConfiguredCredential({
+    username: body.username,
+    password: body.password,
+    expectedUsername,
+    expectedPassword
+  });
+
+  if (credential === "unconfigured") {
     return NextResponse.json(
       { error: "Customer credentials are not configured" },
       { status: 503 }
     );
   }
 
-  if (body.username !== expectedUsername || body.password !== expectedPassword) {
+  if (credential !== "valid") {
     return NextResponse.json(
       { error: "Invalid customer credentials" },
       { status: 401 }
     );
   }
 
+  const signedUsername = expectedUsername!;
   const sessionId = createSessionId();
   const timestamp = Date.now();
   const response = attachRoleSession(
@@ -34,7 +51,7 @@ export async function POST(request: NextRequest) {
       name: "Customer"
     }),
     "customer",
-    body.username,
+    signedUsername,
     "demo-customer",
     sessionId
   );
@@ -42,7 +59,7 @@ export async function POST(request: NextRequest) {
   await registerRoleSession(request, {
     sessionId,
     role: "customer",
-    username: body.username,
+    username: signedUsername,
     uid: "demo-customer",
     createdAt: timestamp,
     expiresAt: timestamp + 1000 * 60 * 60 * 12
