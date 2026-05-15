@@ -36,11 +36,15 @@ export async function POST(
       }
     },
     () =>
-      TrustedBooking.rate(bookingId, {
-        score: body.score!,
-        note: body.note?.trim() || "Care completed well",
-        ratedBy: auth.session.uid || auth.session.username
-      })
+      TrustedBooking.rate(
+        bookingId,
+        {
+          score: body.score!,
+          note: body.note?.trim() || "Care completed well",
+          ratedBy: auth.session.uid || auth.session.username
+        },
+        auth.session
+      )
   );
 
   if (!result.ok) {

@@ -5,8 +5,15 @@ import type {
   CareLocation,
   CaretakerMatchProfile
 } from "../services/bookingService";
+import type { UserRole } from "../services/authService";
 import { getAdminDatabase } from "./firebaseAdmin";
 import { enrichBookingLocation } from "./locationProvider";
+
+type BookingActor = {
+  role: UserRole;
+  uid?: string;
+  username?: string;
+};
 
 const transitionMap: Record<BookingStatus, BookingStatus[]> = {
   none: ["requested"],
@@ -220,6 +227,26 @@ const bestCaretakerFor = (
     (a, b) => scoreCaretaker(booking, b) - scoreCaretaker(booking, a)
   )[0] || null;
 
+const canAccessBooking = (
+  booking: CareBooking,
+  actor: BookingActor | undefined,
+  action: "cancel" | "rate" | "status"
+) => {
+  if (!actor || actor.role === "admin") {
+    return true;
+  }
+
+  if (actor.role === "customer") {
+    return booking.customerId === actor.uid && ["cancel", "rate"].includes(action);
+  }
+
+  if (actor.role === "caretaker") {
+    return booking.caretakerId === actor.uid && ["cancel", "status"].includes(action);
+  }
+
+  return false;
+};
+
 export const TrustedBooking = {
   async create(booking: CareBooking) {
     const database = getAdminDatabase();
@@ -421,7 +448,7 @@ export const TrustedBooking = {
     return { ok: true as const, booking: nextBooking };
   },
 
-  async updateStatus(bookingId: string, status: BookingStatus) {
+  async updateStatus(bookingId: string, status: BookingStatus, actor?: BookingActor) {
     const database = getAdminDatabase();
 
     if (!database) {
@@ -433,6 +460,10 @@ export const TrustedBooking = {
 
     if (!booking) {
       return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (!canAccessBooking(booking, actor, "status")) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
     }
 
     if (!canTransition(booking.status, status)) {
@@ -464,7 +495,7 @@ export const TrustedBooking = {
         tracking: nextTracking,
         timeline: [...booking.timeline, { label: stepLabels[status], at: Date.now() }]
       },
-      "admin"
+      actor?.role || "admin"
     );
 
     const updates = bookingIndexes(nextBooking, booking);
@@ -489,7 +520,8 @@ export const TrustedBooking = {
     cancellation: {
       cancelledBy: "customer" | "caretaker" | "admin" | "system";
       reason: string;
-    }
+    },
+    actor?: BookingActor
   ) {
     const database = getAdminDatabase();
 
@@ -502,6 +534,10 @@ export const TrustedBooking = {
 
     if (!booking) {
       return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (!canAccessBooking(booking, actor, "cancel")) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
     }
 
     if (!canTransition(booking.status, "cancelled")) {
@@ -536,7 +572,11 @@ export const TrustedBooking = {
     return { ok: true as const, booking: nextBooking };
   },
 
-  async rate(bookingId: string, rating: { score: number; note: string; ratedBy: string }) {
+  async rate(
+    bookingId: string,
+    rating: { score: number; note: string; ratedBy: string },
+    actor?: BookingActor
+  ) {
     const database = getAdminDatabase();
 
     if (!database) {
@@ -548,6 +588,10 @@ export const TrustedBooking = {
 
     if (!booking) {
       return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (!canAccessBooking(booking, actor, "rate")) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
     }
 
     const nextBooking = enrichBooking(

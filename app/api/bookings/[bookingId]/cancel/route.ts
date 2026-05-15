@@ -38,10 +38,14 @@ export async function POST(
       }
     },
     () =>
-      TrustedBooking.cancel(bookingId, {
-        cancelledBy: auth.session.role,
-        reason: body.reason!.trim()
-      })
+      TrustedBooking.cancel(
+        bookingId,
+        {
+          cancelledBy: auth.session.role,
+          reason: body.reason!.trim()
+        },
+        auth.session
+      )
   );
 
   if (!result.ok) {

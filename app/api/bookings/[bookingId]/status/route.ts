@@ -50,7 +50,7 @@ export async function POST(
         nextStatus: body.status
       }
     },
-    () => TrustedBooking.updateStatus(bookingId, body.status as BookingStatus)
+    () => TrustedBooking.updateStatus(bookingId, body.status as BookingStatus, auth.session)
   );
 
   if (!result.ok) {

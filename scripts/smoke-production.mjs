@@ -642,6 +642,58 @@ try {
   const customerRead = await database.ref(`bookings/byId/${booking.id}`).get();
   expect(customerRead.exists(), "booking persisted in Firebase");
 
+  const foreignBooking = {
+    ...buildSmokeBooking("-foreign"),
+    customerId: "other-customer",
+    customerName: "Other Customer",
+    caretakerId: "other-caretaker",
+    caretakerName: "Other Caretaker"
+  };
+  await database.ref(`bookings/byId/${foreignBooking.id}`).set(foreignBooking);
+  createdPaths.push(foreignBooking);
+
+  const crossCustomerCancelResult = await request(
+    `/api/bookings/${encodeURIComponent(foreignBooking.id)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: "Cross-customer denial smoke check" })
+    },
+    customerCookie
+  );
+  expect(
+    crossCustomerCancelResult.response.status === 403,
+    "customer cannot cancel another customer's booking",
+    crossCustomerCancelResult.text
+  );
+
+  const crossCaretakerStatusResult = await request(
+    `/api/bookings/${encodeURIComponent(foreignBooking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "accepted" })
+    },
+    caretakerCookie
+  );
+  expect(
+    crossCaretakerStatusResult.response.status === 403,
+    "caretaker cannot update another caretaker's booking",
+    crossCaretakerStatusResult.text
+  );
+
+  const crossCustomerRatingResult = await request(
+    `/api/bookings/${encodeURIComponent(foreignBooking.id)}/rating`,
+    {
+      method: "POST",
+      body: JSON.stringify({ score: 5, note: "Cross-customer denial smoke check" })
+    },
+    customerCookie
+  );
+  expect(
+    crossCustomerRatingResult.response.status === 403,
+    "customer cannot rate another customer's booking",
+    crossCustomerRatingResult.text
+  );
+
   const checkoutResult = await request(
     "/api/payments/checkout",
     {
