@@ -292,6 +292,19 @@ const cleanupBooking = async (booking) => {
     [`operations/bookingsByCaretaker/demo-caretaker/${booking.id}`]: null,
     [`operations/bookingsByCaretaker/smoke-backup-caretaker/${booking.id}`]: null,
     [`operations/reassignmentQueue/completed/${booking.id}`]: null,
+    [`operations/recoveryQueue/byBooking/${booking.id}`]: null,
+    [`operations/recoveryQueue/byId/recovery-${booking.id}-assignment`]: null,
+    [`operations/recoveryQueue/byId/recovery-${booking.id}-arrival`]: null,
+    [`operations/recoveryQueue/byId/recovery-${booking.id}-visit-start`]: null,
+    [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-assignment`]: null,
+    [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-assignment`]: null,
+    [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-assignment`]: null,
+    [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-arrival`]: null,
+    [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-arrival`]: null,
+    [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-arrival`]: null,
+    [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-visit-start`]: null,
+    [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-visit-start`]: null,
+    [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-visit-start`]: null,
     [`trustLedger/caregivers/demo-caretaker/${booking.id}`]: null,
     [`trustLedger/caregivers/smoke-backup-caretaker/${booking.id}`]: null
   };
@@ -468,6 +481,22 @@ try {
   expect(
     status.json?.productionReadiness?.opsCommandCenterActions === true,
     "ops command center actions are prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.opsRecoveryApi === true,
+    "ops recovery API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.staleBookingRecovery === true,
+    "stale booking recovery is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.noShowDetection === true,
+    "no-show detection is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.recoveryAuditTrail === true,
+    "recovery audit trail is prepared"
   );
   expect(
     status.json?.productionReadiness?.emergencyQueueUi === true,
@@ -1163,6 +1192,74 @@ try {
     typeof emergencyCommandResult.json?.snapshot?.panicCount === "number",
     "emergency command center returns panic queue count"
   );
+
+  const staleRecoveryBooking = {
+    ...buildSmokeBooking("-recovery"),
+    createdAt: Date.now() - 25 * 60 * 1000,
+    updatedAt: Date.now() - 25 * 60 * 1000,
+    scheduledFor: Date.now() + 30 * 60 * 1000,
+    sla: {
+      assignmentDueAt: Date.now() - 12 * 60 * 1000,
+      arrivalDueAt: Date.now() + 20 * 60 * 1000,
+      status: "breached",
+      breachReason: "Smoke stale assignment recovery"
+    }
+  };
+  await database.ref(`bookings/byId/${staleRecoveryBooking.id}`).set(staleRecoveryBooking);
+  createdPaths.push(staleRecoveryBooking);
+
+  const recoverySnapshotResult = await request("/api/ops/recovery", {}, adminCookie);
+  expect(
+    recoverySnapshotResult.response.ok,
+    "admin can read ops recovery queue",
+    recoverySnapshotResult.text
+  );
+  expect(
+    Array.isArray(recoverySnapshotResult.json?.snapshot?.signals),
+    "ops recovery returns recovery signals"
+  );
+  expect(
+    recoverySnapshotResult.json?.snapshot?.signals?.some(
+      (signal) => signal.bookingId === staleRecoveryBooking.id
+    ),
+    "ops recovery detects stale assignment"
+  );
+
+  const recoveryActionResult = await request(
+    "/api/ops/recovery",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: staleRecoveryBooking.id,
+        note: "Smoke stale booking recovery"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    recoveryActionResult.response.ok,
+    "admin can execute booking recovery",
+    recoveryActionResult.text
+  );
+  expect(
+    ["resolved", "escalated"].includes(recoveryActionResult.json?.action?.outcome),
+    "booking recovery returns resolved or escalated outcome"
+  );
+  if (recoveryActionResult.json?.action?.id) {
+    createdReliability.push({
+      kind: "recoveryAction",
+      id: recoveryActionResult.json.action.id,
+      bookingId: staleRecoveryBooking.id
+    });
+  }
+  if (recoveryActionResult.json?.action?.alertId) {
+    createdReliability.push({
+      kind: "opsAlert",
+      id: recoveryActionResult.json.action.alertId,
+      alertKind: "sla_breach",
+      severity: "critical"
+    });
+  }
 
   const reassuranceResult = await request(
     "/api/ai/reassurance",
@@ -2111,6 +2208,15 @@ try {
         .update({
           [`operations/commandCenter/actions/${item.id}`]: null,
           [`operations/commandCenter/acknowledged/${item.targetType}/${item.targetId}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "recoveryAction") {
+      await database
+        .ref()
+        .update({
+          [`operations/recoveryActions/${item.id}`]: null,
+          [`operations/recoveryQueue/byBooking/${item.bookingId}`]: null
         })
         .catch(() => undefined);
     }

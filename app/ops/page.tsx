@@ -7,6 +7,7 @@ import {
   BarChart3,
   BellRing,
   CalendarClock,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Users
@@ -183,6 +184,36 @@ type EmergencyCommandSnapshot = {
   nextAction: string;
 };
 
+type OpsRecoverySnapshot = {
+  generatedAt: number;
+  openSignals: number;
+  criticalSignals: number;
+  assignmentStuck: number;
+  arrivalDelayed: number;
+  visitStartDelayed: number;
+  emergencyUnresolved: number;
+  signals: RecoverySignal[];
+};
+
+type RecoverySignal = {
+  id: string;
+  bookingId: string;
+  kind: "assignment_stuck" | "arrival_delayed" | "visit_start_delayed" | "emergency_unresolved";
+  severity: "watch" | "breach" | "critical";
+  status: string;
+  serviceType: string;
+  customerName: string;
+  caretakerName: string;
+  delayMinutes: number;
+  recommendedAction:
+    | "assign_caregiver"
+    | "reassign_backup"
+    | "escalate_ops"
+    | "advance_emergency";
+  reason: string;
+  createdAt: number;
+};
+
 type AiOpsSummary = {
   id: string;
   generatedAt: number;
@@ -236,6 +267,7 @@ export default function OpsApp() {
     useState<CaregiverIntelligenceSnapshot | null>(null);
   const [emergencyCommand, setEmergencyCommand] =
     useState<EmergencyCommandSnapshot | null>(null);
+  const [opsRecovery, setOpsRecovery] = useState<OpsRecoverySnapshot | null>(null);
   const [aiOpsSummary, setAiOpsSummary] = useState<AiOpsSummary | null>(null);
   const [opsNow, setOpsNow] = useState(0);
 
@@ -285,6 +317,12 @@ export default function OpsApp() {
           setEmergencyCommand(payload?.snapshot || null)
         )
         .catch(() => setEmergencyCommand(null));
+      fetch("/api/ops/recovery")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { snapshot: OpsRecoverySnapshot } | null) =>
+          setOpsRecovery(payload?.snapshot || null)
+        )
+        .catch(() => setOpsRecovery(null));
     };
 
     refreshOps();
@@ -425,6 +463,7 @@ export default function OpsApp() {
   const panicQueue = emergencyCommand?.queues?.panic || [];
   const incidentQueue = emergencyCommand?.queues?.incidents || [];
   const delayedBookingQueue = emergencyCommand?.queues?.delayedBookings || [];
+  const recoverySignals = opsRecovery?.signals || [];
   const reassignBooking = async (recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number]) => {
     trackProductEvent("ops_reassignment_clicked", {
       bookingId: recommendation.bookingId,
@@ -467,6 +506,40 @@ export default function OpsApp() {
     const response = await fetch("/api/ops/emergency-command");
     if (response.ok) {
       const payload = (await response.json()) as { snapshot: EmergencyCommandSnapshot };
+      setEmergencyCommand(payload.snapshot);
+    }
+  };
+  const runRecoveryAction = async (signal: RecoverySignal) => {
+    trackProductEvent("ops_recovery_action_clicked", {
+      bookingId: signal.bookingId,
+      kind: signal.kind,
+      severity: signal.severity,
+      recommendedAction: signal.recommendedAction
+    });
+
+    await fetch("/api/ops/recovery", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        bookingId: signal.bookingId,
+        note: `Ops recovery: ${signal.reason}`
+      })
+    });
+
+    const [recoveryResponse, commandResponse] = await Promise.all([
+      fetch("/api/ops/recovery"),
+      fetch("/api/ops/emergency-command")
+    ]);
+
+    if (recoveryResponse.ok) {
+      const payload = (await recoveryResponse.json()) as { snapshot: OpsRecoverySnapshot };
+      setOpsRecovery(payload.snapshot);
+    }
+
+    if (commandResponse.ok) {
+      const payload = (await commandResponse.json()) as { snapshot: EmergencyCommandSnapshot };
       setEmergencyCommand(payload.snapshot);
     }
   };
@@ -575,6 +648,11 @@ export default function OpsApp() {
             label="Command"
             value={emergencyCommand?.commandLevel?.toUpperCase() || "GREEN"}
           />
+          <OpsMetric
+            icon={RotateCcw}
+            label="Recovery queue"
+            value={String(opsRecovery?.openSignals ?? 0)}
+          />
         </section>
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
@@ -662,6 +740,58 @@ export default function OpsApp() {
                 subtitle="Assignment or arrival SLA watch and breach queue."
               />
             </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] bg-white p-5 text-[#071018]">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+                <RotateCcw size={16} />
+                Recovery automation
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">
+                {recoverySignals.length
+                  ? `${recoverySignals.length} bookings need recovery`
+                  : "No stuck care flow detected"}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                Detects stale assignments, delayed arrivals, missed visit starts, and overdue
+                emergency stages, then assigns, reassigns, or escalates with an audit trail.
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                opsRecovery?.criticalSignals
+                  ? "bg-red-100 text-red-700"
+                  : recoverySignals.length
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-emerald-100 text-emerald-700"
+              }`}
+            >
+              {opsRecovery?.criticalSignals || 0} critical
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-4">
+            <FunnelTile label="Assignments" value={String(opsRecovery?.assignmentStuck ?? 0)} />
+            <FunnelTile label="Arrivals" value={String(opsRecovery?.arrivalDelayed ?? 0)} />
+            <FunnelTile label="Visit starts" value={String(opsRecovery?.visitStartDelayed ?? 0)} />
+            <FunnelTile label="Emergency" value={String(opsRecovery?.emergencyUnresolved ?? 0)} />
+          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {recoverySignals.slice(0, 4).map((signal) => (
+              <RecoverySignalCard
+                key={signal.id}
+                signal={signal}
+                onRecover={() => runRecoveryAction(signal)}
+              />
+            ))}
+            {recoverySignals.length === 0 && (
+              <div className="rounded-3xl bg-slate-100 p-4 text-sm text-slate-500 lg:col-span-2">
+                Care recovery stays quiet when assignments, arrivals, visits, and emergency stages
+                are moving within SLA.
+              </div>
+            )}
           </div>
         </section>
 
@@ -1381,6 +1511,56 @@ function CommandQueueCard({
           Resolve
         </button>
       </div>
+    </div>
+  );
+}
+
+function RecoverySignalCard({
+  signal,
+  onRecover
+}: {
+  signal: RecoverySignal;
+  onRecover: () => void;
+}) {
+  const severityClass =
+    signal.severity === "critical"
+      ? "bg-red-100 text-red-700"
+      : signal.severity === "breach"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-blue-100 text-blue-700";
+  const actionLabel =
+    signal.recommendedAction === "assign_caregiver"
+      ? "Assign caregiver"
+      : signal.recommendedAction === "reassign_backup"
+        ? "Reassign backup"
+        : signal.recommendedAction === "advance_emergency"
+          ? "Escalate emergency"
+          : "Escalate ops";
+
+  return (
+    <div className="rounded-3xl bg-slate-100 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold">{signal.serviceType}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {signal.customerName} - {signal.status} - {signal.delayMinutes}m delayed
+          </p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${severityClass}`}>
+          {signal.severity}
+        </span>
+      </div>
+      <div className="mt-4 rounded-2xl bg-white p-3 text-sm text-slate-600">
+        <p className="font-semibold text-[#071018]">{actionLabel}</p>
+        <p className="mt-1">{signal.reason}</p>
+        <p className="mt-2 text-xs text-slate-400">{signal.caretakerName}</p>
+      </div>
+      <button
+        onClick={onRecover}
+        className="mt-3 w-full rounded-full bg-[#071018] px-4 py-3 text-sm font-semibold text-white"
+      >
+        Run recovery
+      </button>
     </div>
   );
 }
