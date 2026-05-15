@@ -292,6 +292,7 @@ export default function OpsApp() {
   const [opsAudit, setOpsAudit] = useState<OpsAuditSnapshot | null>(null);
   const [aiOpsSummary, setAiOpsSummary] = useState<AiOpsSummary | null>(null);
   const [opsNow, setOpsNow] = useState(0);
+  const [opsActionMessage, setOpsActionMessage] = useState("");
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -494,6 +495,7 @@ export default function OpsApp() {
   const recoverySignals = opsRecovery?.signals || [];
   const auditEvents = opsAudit?.events || [];
   const reassignBooking = async (recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number]) => {
+    setOpsActionMessage("");
     trackProductEvent("ops_reassignment_clicked", {
       bookingId: recommendation.bookingId,
       service: recommendation.serviceType,
@@ -503,9 +505,14 @@ export default function OpsApp() {
       slaStatus: recommendation.slaStatus
     });
 
-    await fetch(`/api/bookings/${encodeURIComponent(recommendation.bookingId)}/reassign`, {
+    const response = await fetch(`/api/bookings/${encodeURIComponent(recommendation.bookingId)}/reassign`, {
       method: "POST"
     });
+    setOpsActionMessage(
+      response.ok
+        ? `Reassignment started for ${recommendation.customerName}.`
+        : "Reassignment could not be confirmed by the backend."
+    );
   };
   const runCommandAction = async (
     item: CommandQueueItem,
@@ -519,7 +526,7 @@ export default function OpsApp() {
       risk: item.risk
     });
 
-    await fetch("/api/ops/emergency-command", {
+    const actionResponse = await fetch("/api/ops/emergency-command", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -531,6 +538,11 @@ export default function OpsApp() {
         note: `${action} from Ops Command Center`
       })
     });
+    setOpsActionMessage(
+      actionResponse.ok
+        ? `${action.replaceAll("_", " ")} completed for ${item.title}.`
+        : `Could not complete ${action.replaceAll("_", " ")}.`
+    );
 
     const response = await fetch("/api/ops/emergency-command");
     if (response.ok) {
@@ -539,6 +551,7 @@ export default function OpsApp() {
     }
   };
   const runRecoveryAction = async (signal: RecoverySignal) => {
+    setOpsActionMessage("");
     trackProductEvent("ops_recovery_action_clicked", {
       bookingId: signal.bookingId,
       kind: signal.kind,
@@ -546,7 +559,7 @@ export default function OpsApp() {
       recommendedAction: signal.recommendedAction
     });
 
-    await fetch("/api/ops/recovery", {
+    const actionResponse = await fetch("/api/ops/recovery", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -556,6 +569,11 @@ export default function OpsApp() {
         note: `Ops recovery: ${signal.reason}`
       })
     });
+    setOpsActionMessage(
+      actionResponse.ok
+        ? `Recovery automation started for ${signal.customerName}.`
+        : "Recovery automation could not be confirmed."
+    );
 
     const [recoveryResponse, commandResponse] = await Promise.all([
       fetch("/api/ops/recovery"),
@@ -573,6 +591,7 @@ export default function OpsApp() {
     }
   };
   const generateAiOpsSummary = async () => {
+    setOpsActionMessage("");
     trackProductEvent("ops_ai_summary_requested", {
       commandLevel: emergencyCommand?.commandLevel || "green",
       activeBookings: opsKpis?.activeBookings ?? 0,
@@ -591,6 +610,9 @@ export default function OpsApp() {
     if (response.ok) {
       const payload = (await response.json()) as { summary: AiOpsSummary };
       setAiOpsSummary(payload.summary);
+      setOpsActionMessage("AI ops summary generated.");
+    } else {
+      setOpsActionMessage("AI ops summary could not be generated.");
     }
   };
 
@@ -625,6 +647,11 @@ export default function OpsApp() {
             </button>
           </div>
         </header>
+        {opsActionMessage && (
+          <div className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/70">
+            {opsActionMessage}
+          </div>
+        )}
 
         <section className="mt-6 grid gap-3 md:grid-cols-4">
           <OpsMetric
@@ -1180,7 +1207,16 @@ export default function OpsApp() {
                       source: "booking_queue",
                       sla: booking.sla?.status
                     });
-                    BookingService.assignCaretaker();
+                    setOpsActionMessage("");
+                    fetch(`/api/bookings/${encodeURIComponent(booking.id)}/assign`, {
+                      method: "POST"
+                    }).then((response) => {
+                      setOpsActionMessage(
+                        response.ok
+                          ? `Assignment started for ${booking.customerName}.`
+                          : "Assignment could not be confirmed by the backend."
+                      );
+                    });
                   }}
                   onSecondary={() => {
                     trackProductEvent("ops_booking_cancelled", {
@@ -1189,7 +1225,22 @@ export default function OpsApp() {
                       source: "booking_queue",
                       sla: booking.sla?.status
                     });
-                    BookingService.cancelBooking("Cancelled by operations", "admin");
+                    setOpsActionMessage("");
+                    fetch(`/api/bookings/${encodeURIComponent(booking.id)}/cancel`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json"
+                      },
+                      body: JSON.stringify({
+                        reason: "Cancelled by operations"
+                      })
+                    }).then((response) => {
+                      setOpsActionMessage(
+                        response.ok
+                          ? `Cancelled ${booking.serviceType} for ${booking.customerName}.`
+                          : "Cancellation could not be confirmed by the backend."
+                      );
+                    });
                   }}
                 />
               )}
@@ -1214,6 +1265,7 @@ export default function OpsApp() {
                   source: "caretaker_management"
                 });
                 CaretakerService.seedDefaults();
+                setOpsActionMessage("Caretaker profiles seeded locally and sent to Firebase when allowed.");
               }}
               className="w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#071018]"
             >
@@ -1315,7 +1367,8 @@ export default function OpsApp() {
               />
             </div>
             <button
-              onClick={() =>
+              onClick={() => {
+                setOpsActionMessage("");
                 fetch("/api/ops/alerts", {
                   method: "POST",
                   headers: {
@@ -1328,8 +1381,14 @@ export default function OpsApp() {
                     title: "Ops alert test",
                     message: "LDERLY ops alert route is ready for SLA and emergency escalation."
                   })
-                })
-              }
+                }).then((response) => {
+                  setOpsActionMessage(
+                    response.ok
+                      ? "Ops alert created and routed into the command center."
+                      : "Ops alert could not be created."
+                  );
+                });
+              }}
               className="w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#071018]"
             >
               Test ops alert route
@@ -1390,11 +1449,18 @@ export default function OpsApp() {
               </div>
             )}
             <button
-              onClick={() =>
+              onClick={() => {
+                setOpsActionMessage("");
                 fetch("/api/partners", {
                   method: "POST"
-                })
-              }
+                }).then((response) => {
+                  setOpsActionMessage(
+                    response.ok
+                      ? "Care partners seeded into the partner marketplace."
+                      : "Care partners could not be seeded."
+                  );
+                });
+              }}
               className="w-full rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#071018]"
             >
               Seed care partners

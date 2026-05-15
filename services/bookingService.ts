@@ -334,6 +334,10 @@ let localBooking = createDefaultBooking();
 const localSubscribers = new Set<(booking: CareBooking) => void>();
 
 const canUseStorage = () => typeof window !== "undefined";
+const allowLocalFallback = () =>
+  process.env.NODE_ENV !== "production" ||
+  (typeof window !== "undefined" &&
+    window.localStorage.getItem("lderly-enable-local-fallbacks") === "true");
 const clientDatabaseWritesEnabled = () =>
   typeof window === "undefined" ||
   window.localStorage.getItem("lderly-enable-client-db-writes") === "true";
@@ -958,6 +962,17 @@ export const BookingService = {
       return;
     }
 
+    if (!allowLocalFallback()) {
+      NotificationService.create({
+        userId: booking.customerId,
+        role: "admin",
+        title: "Assignment failed",
+        body: "The backend did not confirm the caregiver assignment.",
+        priority: "urgent"
+      });
+      return;
+    }
+
     const bestCaretaker = await findBestCaretaker(booking);
 
     patchBooking(
@@ -1002,16 +1017,28 @@ export const BookingService = {
     ).then((result) => {
       if (result?.booking) {
         writeLocalBooking(enrichBooking(result.booking));
+        return;
       }
-    });
 
-    patchBooking(
-      {
-        status
-      },
-      statusLabel[status],
-      actor
-    );
+      if (!allowLocalFallback()) {
+        NotificationService.create({
+          userId: currentBooking.customerId,
+          role: "admin",
+          title: "Status update failed",
+          body: "The backend did not confirm this care status change.",
+          priority: "urgent"
+        });
+        return;
+      }
+
+      patchBooking(
+        {
+          status
+        },
+        statusLabel[status],
+        actor
+      );
+    });
     NotificationService.create({
       userId: readLocalBooking().customerId,
       role: "all",
@@ -1032,23 +1059,35 @@ export const BookingService = {
     ).then((result) => {
       if (result?.booking) {
         writeLocalBooking(enrichBooking(result.booking));
+        return;
       }
-    });
 
-    patchBooking(
-      {
-        status: "cancelled",
-        cancellation: {
-          cancelledBy: actor,
-          reason,
-          refundEligible: booking.payment.status !== "paid",
-          penaltyApplies: actor === "caretaker",
-          cancelledAt: now()
-        }
-      },
-      "Booking cancelled",
-      actor
-    );
+      if (!allowLocalFallback()) {
+        NotificationService.create({
+          userId: booking.customerId,
+          role: "admin",
+          title: "Cancellation failed",
+          body: "The backend did not confirm this cancellation.",
+          priority: "urgent"
+        });
+        return;
+      }
+
+      patchBooking(
+        {
+          status: "cancelled",
+          cancellation: {
+            cancelledBy: actor,
+            reason,
+            refundEligible: booking.payment.status !== "paid",
+            penaltyApplies: actor === "caretaker",
+            cancelledAt: now()
+          }
+        },
+        "Booking cancelled",
+        actor
+      );
+    });
   },
 
   rateBooking(score: number, note = "Care completed well") {
@@ -1059,21 +1098,33 @@ export const BookingService = {
     ).then((result) => {
       if (result?.booking) {
         writeLocalBooking(enrichBooking(result.booking));
+        return;
       }
-    });
 
-    patchBooking(
-      {
-        rating: {
-          score,
-          note,
-          ratedBy: booking.customerId,
-          ratedAt: now()
-        }
-      },
-      `Family rated visit ${score}/5`,
-      "customer"
-    );
+      if (!allowLocalFallback()) {
+        NotificationService.create({
+          userId: booking.customerId,
+          role: "customer",
+          title: "Rating not saved",
+          body: "We could not confirm this rating with the backend.",
+          priority: "urgent"
+        });
+        return;
+      }
+
+      patchBooking(
+        {
+          rating: {
+            score,
+            note,
+            ratedBy: booking.customerId,
+            ratedAt: now()
+          }
+        },
+        `Family rated visit ${score}/5`,
+        "customer"
+      );
+    });
   },
 
   authorizePayment(method: BookingPayment["method"] = "upi") {

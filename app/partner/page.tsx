@@ -29,6 +29,7 @@ export default function PartnerApp() {
   const [caretakerUsername, setCaretakerUsername] = useState("");
   const [caretakerPassword, setCaretakerPassword] = useState("");
   const [caretakerError, setCaretakerError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -148,6 +149,18 @@ export default function PartnerApp() {
       bookingStatus: activeBooking?.status || activeJourney?.status || "idle",
       hasAssignment: isBookingAssignment || isJourneyAssignment
     });
+  };
+  const hasActiveAssignment = isBookingAssignment || isJourneyAssignment;
+  const runAssignmentAction = (label: string, action: () => void) => {
+    setActionMessage("");
+
+    if (!hasActiveAssignment) {
+      setActionMessage("No active assignment yet. New bookings will appear here when ops assigns care.");
+      return;
+    }
+
+    action();
+    setActionMessage(`${label} sent to LDERLY ops and family timeline.`);
   };
 
   if (!session || session.role !== "caretaker") {
@@ -312,41 +325,53 @@ export default function PartnerApp() {
           <ActionButton
             label="Accept"
             icon={CheckCircle2}
+            disabled={!hasActiveAssignment}
             onClick={() => {
-              trackCaretakerAction("accepted_booking");
-              return isJourneyAssignment
-                ? JourneyService.updateStatus("accepted")
-                : BookingService.updateStatus("accepted");
+              runAssignmentAction("Accepted", () => {
+                trackCaretakerAction("accepted_booking");
+                return isJourneyAssignment
+                  ? JourneyService.updateStatus("accepted")
+                  : BookingService.updateStatus("accepted", "caretaker");
+              });
             }}
           />
           <ActionButton
             label="En Route"
             icon={Navigation}
+            disabled={!hasActiveAssignment}
             onClick={() => {
-              trackCaretakerAction("marked_en_route");
-              return isJourneyAssignment
-                ? JourneyService.updateStatus("en_route")
-                : BookingService.updateStatus("en_route", "caretaker");
+              runAssignmentAction("En route", () => {
+                trackCaretakerAction("marked_en_route");
+                return isJourneyAssignment
+                  ? JourneyService.updateStatus("en_route")
+                  : BookingService.updateStatus("en_route", "caretaker");
+              });
             }}
           />
           <ActionButton
             label="Arrived"
             icon={MapPinned}
+            disabled={!hasActiveAssignment}
             onClick={() => {
-              trackCaretakerAction("marked_arrived");
-              return isJourneyAssignment
-                ? JourneyService.updateStatus("arrived")
-                : BookingService.updateStatus("arrived", "caretaker");
+              runAssignmentAction("Arrival", () => {
+                trackCaretakerAction("marked_arrived");
+                return isJourneyAssignment
+                  ? JourneyService.updateStatus("arrived")
+                  : BookingService.updateStatus("arrived", "caretaker");
+              });
             }}
           />
           <ActionButton
             label="Start Visit"
             icon={ShieldCheck}
+            disabled={!hasActiveAssignment}
             onClick={() => {
-              trackCaretakerAction("visit_started");
-              return isJourneyAssignment
-                ? JourneyService.updateStatus("arrived")
-                : BookingService.updateStatus("in_progress", "caretaker");
+              runAssignmentAction("Visit started", () => {
+                trackCaretakerAction("visit_started");
+                return isJourneyAssignment
+                  ? JourneyService.updateStatus("arrived")
+                  : BookingService.updateStatus("in_progress", "caretaker");
+              });
             }}
           />
           <ActionButton
@@ -360,17 +385,23 @@ export default function PartnerApp() {
           <ActionButton
             label="Update GPS"
             icon={Navigation}
+            disabled={!hasActiveAssignment}
             onClick={() => {
-              trackCaretakerAction("gps_updated");
-              CaretakerService.updateLocation(session.uid, activeBooking?.id);
+              runAssignmentAction("Location update", () => {
+                trackCaretakerAction("gps_updated");
+                CaretakerService.updateLocation(session.uid, activeBooking?.id);
+              });
             }}
           />
           <ActionButton
             label="Panic SOS"
             icon={AlertTriangle}
+            disabled={!hasActiveAssignment}
             onClick={() => {
-              trackCaretakerAction("panic_sos_triggered");
-              JourneyService.updateStatus("escalated");
+              runAssignmentAction("Panic SOS", () => {
+                trackCaretakerAction("panic_sos_triggered");
+                JourneyService.updateStatus("escalated");
+              });
             }}
           />
           <ActionButton
@@ -384,12 +415,18 @@ export default function PartnerApp() {
           />
           <button
             onClick={isJourneyAssignment ? completeJourney : completeBooking}
-            className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 py-4 font-semibold text-[#080b10]"
+            disabled={!hasActiveAssignment}
+            className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 py-4 font-semibold text-[#080b10] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
           >
             <FileText className="h-5 w-5" />
             Complete Session & Report
           </button>
         </section>
+        {actionMessage && (
+          <p className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/70">
+            {actionMessage}
+          </p>
+        )}
       </div>
     </main>
   );
@@ -416,16 +453,19 @@ function Metric({
 function ActionButton({
   icon: Icon,
   label,
-  onClick
+  onClick,
+  disabled = false
 }: {
   icon: typeof Clock;
   label: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-[1.5rem] bg-white/10 p-4 font-semibold"
+      disabled={disabled}
+      className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-[1.5rem] bg-white/10 p-4 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
     >
       <Icon className="h-6 w-6 text-emerald-200" />
       {label}

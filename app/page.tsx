@@ -1238,19 +1238,32 @@ export default function CustomerApp() {
     setBookingOpen(true);
   };
 
-  const requestImmediateCare = () => {
+  const requestImmediateCare = async () => {
     if (!session) {
       router.replace("/signin");
       return;
     }
 
+    const reason = `Immediate Assistance for ${recipient.name}`;
+    await fetch("/api/emergency/escalate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "create",
+        reason,
+        locationLabel: activeRecipientDetails?.address || "Care location",
+        severity: "critical"
+      })
+    }).catch(() => undefined);
     JourneyService.requestService(
       { ...session, role: "customer" },
-      `Immediate Assistance for ${recipient.name}`
+      reason
     );
     trackProductEvent("immediate_assistance_requested", {
       recipient: recipient.shortName,
-      service: `Immediate Assistance for ${recipient.name}`,
+      service: reason,
       activeCare: Boolean(activeCare)
     });
     window.localStorage.setItem(subscriptionKey, "true");
@@ -3491,10 +3504,30 @@ function JourneyExperience({
               Anita has visited {recipient.shortName} 12 times
             </p>
           </div>
-          <button className="rounded-full bg-white p-3">
+          <button
+            onClick={() => {
+              trackProductEvent("customer_caregiver_message_clicked", {
+                bookingId: booking?.id || journey?.id || "",
+                service: activeService
+              });
+              window.open("https://wa.me/?text=I%20need%20an%20update%20on%20my%20LDERLY%20care%20visit", "_blank");
+            }}
+            aria-label="Message caregiver"
+            className="rounded-full bg-white p-3"
+          >
             <MessageCircle className="h-5 w-5" />
           </button>
-          <button className="rounded-full bg-white p-3">
+          <button
+            onClick={() => {
+              trackProductEvent("customer_caregiver_call_clicked", {
+                bookingId: booking?.id || journey?.id || "",
+                service: activeService
+              });
+              window.location.href = "tel:+911800000000";
+            }}
+            aria-label="Call caregiver"
+            className="rounded-full bg-white p-3"
+          >
             <Phone className="h-5 w-5" />
           </button>
         </div>
