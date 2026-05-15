@@ -198,7 +198,25 @@ export async function GET() {
         ...(internalOpsReadiness.slackConfigured ? [] : ["Slack ops webhook for internal alerts"]),
         ...(hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY")
           ? []
-          : ["Firebase App Check reCAPTCHA Enterprise site key"])
+          : ["Firebase App Check reCAPTCHA Enterprise site key"]),
+        "Backend dependency: Firebase RTDB scheduled backups",
+        "Backend dependency: production audit-log retention policy",
+        "Backend dependency: FCM web push/VAPID production setup",
+        "Backend dependency: notification retry and delivery-status policy",
+        "Backend dependency: payment reconciliation job",
+        "Backend dependency: refund reconciliation workflow",
+        "Backend dependency: caregiver payout bank-transfer integration",
+        "Backend dependency: GST invoice PDF generation/storage",
+        "Backend dependency: WhatsApp template approval and delivery webhooks",
+        "Backend dependency: MSG91 OTP/SMS fallback",
+        "Backend dependency: Exotel emergency calling",
+        "Backend dependency: production route/ETA provider decision",
+        "Backend dependency: upload malware scanning process",
+        "Backend dependency: voice-note playback and retention policy",
+        "Backend dependency: uptime monitoring for customer/partner/ops APIs",
+        "Backend dependency: support-ticket provider decision",
+        "Backend dependency: staging environment and rollback runbook",
+        "Backend dependency: domain/DNS split for app, partner, and ops"
       ]
     }
   });

@@ -365,3 +365,66 @@ Startup-friendly platform optimization is now available:
    - `LiveMap` now uses `google.maps.marker.AdvancedMarkerElement`.
    - Add `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` before production so markers run on a production vector map configuration instead of the demo map ID.
    - This is not currently blocking local usage, but should be handled before production polish.
+
+## Pending Backend Dependencies
+
+These are the external backend/provider dependencies that still need production setup, validation, or operational ownership. The application code has scaffolding for most of these, but the real provider configuration is what makes the flows truly production-grade.
+
+1. Firebase production identity and security
+   - Firebase Admin service account in Vercel env vars.
+   - Firebase custom claims validation for customer, caretaker, admin, and future dispatcher/coordinator roles.
+   - Firebase App Check production enforcement for web clients.
+   - Realtime Database backup/export schedule.
+   - Production audit-log retention policy.
+
+2. Firebase Cloud Messaging
+   - Web push/VAPID setup for customer and ops browser notifications.
+   - Android FCM sender setup for future customer and caretaker apps.
+   - Notification delivery monitoring and retry queue policy.
+
+3. Razorpay production finance
+   - Razorpay webhook secret.
+   - Webhook URL configured in Razorpay dashboard.
+   - Payment reconciliation job.
+   - Refund reconciliation workflow.
+   - Caregiver payout bank-transfer or payout-provider integration.
+   - GST invoice PDF generation/storage.
+
+4. India communication providers
+   - WhatsApp Business provider setup.
+   - MSG91 SMS/OTP fallback setup.
+   - Exotel emergency calling setup.
+   - Template approval for WhatsApp messages.
+   - Delivery status webhook ingestion.
+
+5. Maps and location
+   - Production-restricted Google Maps API key.
+   - Production Google Maps Map ID.
+   - Places/autocomplete decision for address capture.
+   - ETA/route provider decision for production route accuracy.
+
+6. File and media storage
+   - Firebase Storage production bucket confirmation.
+   - Signed upload URL validation for Aadhaar, PAN, face placeholder, reports, and voice notes.
+   - Storage rules hardening.
+   - Virus/malware scanning provider or process for uploaded files.
+   - Voice-note playback and retention policy.
+
+7. Observability and product intelligence
+   - Sentry production DSN and alert routing.
+   - PostHog production project key.
+   - Microsoft Clarity production project ID.
+   - Error alert ownership and SLA.
+   - Uptime monitoring for customer, partner, ops, and critical APIs.
+
+8. Internal ops integrations
+   - Slack ops webhook for emergency, incident, late-check-in, and SLA breach channels.
+   - Support/ticketing provider decision for production customer support.
+   - Admin audit-review operating process.
+
+9. Deployment and environment operations
+   - Vercel production environment variables reviewed and rotated.
+   - Staging project/environment.
+   - GitHub CI branch protection.
+   - Rollback runbook.
+   - Domain/DNS split for `app.lderly.in`, `partner.lderly.in`, and `ops.lderly.in`.
