@@ -134,6 +134,8 @@ export async function GET() {
       staleBookingRecovery: true,
       noShowDetection: true,
       recoveryAuditTrail: true,
+      opsAuditViewerApi: true,
+      opsAuditViewerUi: true,
       emergencyQueueUi: true,
       incidentQueueUi: true,
       panicSosQueueUi: true,

@@ -195,6 +195,27 @@ type OpsRecoverySnapshot = {
   signals: RecoverySignal[];
 };
 
+type OpsAuditSnapshot = {
+  generatedAt: number;
+  totalEvents: number;
+  criticalEvents: number;
+  failedEvents: number;
+  automationEvents: number;
+  events: OpsAuditEvent[];
+};
+
+type OpsAuditEvent = {
+  id: string;
+  type: "api_audit" | "recovery" | "command" | "reassignment" | "alert";
+  title: string;
+  subtitle: string;
+  actor: string;
+  status: string;
+  severity: "low" | "medium" | "high" | "critical";
+  bookingId: string;
+  createdAt: number;
+};
+
 type RecoverySignal = {
   id: string;
   bookingId: string;
@@ -268,6 +289,7 @@ export default function OpsApp() {
   const [emergencyCommand, setEmergencyCommand] =
     useState<EmergencyCommandSnapshot | null>(null);
   const [opsRecovery, setOpsRecovery] = useState<OpsRecoverySnapshot | null>(null);
+  const [opsAudit, setOpsAudit] = useState<OpsAuditSnapshot | null>(null);
   const [aiOpsSummary, setAiOpsSummary] = useState<AiOpsSummary | null>(null);
   const [opsNow, setOpsNow] = useState(0);
 
@@ -323,6 +345,12 @@ export default function OpsApp() {
           setOpsRecovery(payload?.snapshot || null)
         )
         .catch(() => setOpsRecovery(null));
+      fetch("/api/ops/audit")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { snapshot: OpsAuditSnapshot } | null) =>
+          setOpsAudit(payload?.snapshot || null)
+        )
+        .catch(() => setOpsAudit(null));
     };
 
     refreshOps();
@@ -464,6 +492,7 @@ export default function OpsApp() {
   const incidentQueue = emergencyCommand?.queues?.incidents || [];
   const delayedBookingQueue = emergencyCommand?.queues?.delayedBookings || [];
   const recoverySignals = opsRecovery?.signals || [];
+  const auditEvents = opsAudit?.events || [];
   const reassignBooking = async (recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number]) => {
     trackProductEvent("ops_reassignment_clicked", {
       bookingId: recommendation.bookingId,
@@ -792,6 +821,49 @@ export default function OpsApp() {
                 are moving within SLA.
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-5 xl:grid-cols-[.85fr_1.15fr]">
+          <div className="rounded-[2rem] bg-white/10 p-5">
+            <p className="flex items-center gap-2 text-sm font-semibold text-blue-200">
+              <ShieldCheck size={16} />
+              Ops evidence ledger
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold">
+              {opsAudit?.totalEvents ?? 0} recent operational records
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-white/55">
+              Recovery, command center, reassignment, alert, and audited API actions are visible
+              here so ops decisions are traceable.
+            </p>
+            <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
+              <SlaTile label="Automation" value={String(opsAudit?.automationEvents ?? 0)} />
+              <SlaTile label="Critical" value={String(opsAudit?.criticalEvents ?? 0)} />
+              <SlaTile label="Failed" value={String(opsAudit?.failedEvents ?? 0)} />
+            </div>
+          </div>
+          <div className="rounded-[2rem] bg-white p-5 text-[#071018]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-700">Recent ops activity</p>
+                <h2 className="mt-2 text-2xl font-semibold">Audit trail</h2>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                live
+              </span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {auditEvents.slice(0, 6).map((event) => (
+                <OpsAuditRow key={`${event.type}-${event.id}`} event={event} now={opsNow} />
+              ))}
+              {auditEvents.length === 0 && (
+                <div className="rounded-3xl bg-slate-100 p-4 text-sm text-slate-500">
+                  Audit records will appear after ops actions, recoveries, alerts, and protected API
+                  mutations.
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
@@ -1561,6 +1633,40 @@ function RecoverySignalCard({
       >
         Run recovery
       </button>
+    </div>
+  );
+}
+
+function OpsAuditRow({ event, now }: { event: OpsAuditEvent; now: number }) {
+  const severityClass =
+    event.severity === "critical"
+      ? "bg-red-100 text-red-700"
+      : event.severity === "high"
+        ? "bg-amber-100 text-amber-700"
+        : event.severity === "medium"
+          ? "bg-blue-100 text-blue-700"
+          : "bg-emerald-100 text-emerald-700";
+  const minutesAgo = Math.max(0, Math.round(((now || event.createdAt) - event.createdAt) / 60000));
+
+  return (
+    <div className="rounded-3xl bg-slate-100 p-4 text-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold">{event.title}</p>
+          <p className="mt-1 text-slate-500">{event.subtitle}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${severityClass}`}>
+          {event.type}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+        <span className="rounded-full bg-white px-3 py-1">{event.actor}</span>
+        <span className="rounded-full bg-white px-3 py-1">{event.status}</span>
+        <span className="rounded-full bg-white px-3 py-1">{minutesAgo}m ago</span>
+        {event.bookingId && (
+          <span className="rounded-full bg-white px-3 py-1">{event.bookingId}</span>
+        )}
+      </div>
     </div>
   );
 }

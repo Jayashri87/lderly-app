@@ -499,6 +499,14 @@ try {
     "recovery audit trail is prepared"
   );
   expect(
+    status.json?.productionReadiness?.opsAuditViewerApi === true,
+    "ops audit viewer API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.opsAuditViewerUi === true,
+    "ops audit viewer UI is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.emergencyQueueUi === true,
     "emergency queue UI is prepared"
   );
@@ -1260,6 +1268,26 @@ try {
       severity: "critical"
     });
   }
+
+  const auditSnapshotResult = await request("/api/ops/audit", {}, adminCookie);
+  expect(
+    auditSnapshotResult.response.ok,
+    "admin can read ops audit ledger",
+    auditSnapshotResult.text
+  );
+  expect(
+    Array.isArray(auditSnapshotResult.json?.snapshot?.events),
+    "ops audit ledger returns events"
+  );
+  expect(
+    auditSnapshotResult.json?.snapshot?.events?.some(
+      (event) =>
+        event.type === "recovery" ||
+        event.title === "ops.recovery.execute" ||
+        event.bookingId === staleRecoveryBooking.id
+    ),
+    "ops audit ledger includes recovery evidence"
+  );
 
   const reassuranceResult = await request(
     "/api/ai/reassurance",
