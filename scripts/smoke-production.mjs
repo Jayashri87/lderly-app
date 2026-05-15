@@ -631,6 +631,18 @@ try {
     "visit proof API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.familyConfidenceScoreUi === true,
+    "family confidence score UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.visitProofTimelineUi === true,
+    "visit proof timeline UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.postVisitNextActionUi === true,
+    "post-visit next action UI is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.trustLedgerRatingUpdates === true,
     "trust ledger rating updates are prepared"
   );
@@ -1994,6 +2006,22 @@ try {
   expect(
     Array.isArray(visitProofResult.json?.proof?.proofSignals),
     "visit proof includes service proof signals"
+  );
+  expect(
+    visitProofResult.json?.proof?.confidenceScore >= 0,
+    "visit proof includes family confidence score"
+  );
+  expect(
+    Array.isArray(visitProofResult.json?.proof?.timeline),
+    "visit proof includes verification timeline"
+  );
+  expect(
+    Array.isArray(visitProofResult.json?.proof?.completedChecks),
+    "visit proof includes completed care checks"
+  );
+  expect(
+    Boolean(visitProofResult.json?.proof?.nextBestAction),
+    "visit proof includes next best action"
   );
 
   const familyAccessResult = await request(

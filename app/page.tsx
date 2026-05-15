@@ -168,6 +168,16 @@ type VisitProof = {
   familySummary: string;
   caregiverNote: string;
   proofSignals: string[];
+  completedChecks?: string[];
+  confidenceScore?: number;
+  nextBestAction?: string;
+  ratingPrompt?: string;
+  rebookPrompt?: string;
+  timeline?: Array<{
+    label: string;
+    at: number;
+    verified: boolean;
+  }>;
   attachments: VisitReport["attachments"];
 };
 
@@ -1618,6 +1628,7 @@ export default function CustomerApp() {
                     booking={visibleBooking}
                     journey={visibleJourney}
                     proof={visitProof}
+                    onRebook={rebookPreviousCare}
                   />
                   <NriMonthlyReportPreview
                     recipient={recipient}
@@ -2680,16 +2691,45 @@ function VisitProofSystem({
   reports,
   booking,
   journey,
-  proof
+  proof,
+  onRebook
 }: {
   recipient: Recipient;
   reports: VisitReport[];
   booking: CareBooking | null;
   journey: CareJourney | null;
   proof: VisitProof | null;
+  onRebook: () => void;
 }) {
   const latestReport = reports[0];
   const timestamp = latestReport?.completedAt || booking?.updatedAt || journey?.updatedAt || 0;
+  const confidenceScore =
+    proof?.confidenceScore ?? (latestReport ? 92 : booking?.status === "completed" ? 84 : 48);
+  const completedChecks =
+    proof?.completedChecks?.length
+      ? proof.completedChecks
+      : latestReport
+        ? [
+            latestReport.familySummary,
+            latestReport.vitalsSummary,
+            latestReport.medicineSummary
+          ]
+        : ["Care proof will unlock after the visit", "Family handover pending"];
+  const proofTimeline =
+    proof?.timeline?.length
+      ? proof.timeline
+      : [
+          {
+            label: booking ? "Request created" : "Request pending",
+            at: booking?.createdAt || timestamp,
+            verified: Boolean(booking)
+          },
+          {
+            label: latestReport ? "Visit completed" : "Completion pending",
+            at: latestReport?.completedAt || timestamp,
+            verified: Boolean(latestReport)
+          }
+        ];
   const proofItems = proof
     ? [
         { label: "Timestamp", value: proof.timestampLabel },
@@ -2733,6 +2773,47 @@ function VisitProofSystem({
           </div>
         ))}
       </div>
+      <div className="mt-4 rounded-3xl bg-white p-4 text-[#06130f]">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Family confidence</p>
+            <h4 className="mt-1 text-3xl font-semibold">{confidenceScore}%</h4>
+          </div>
+          <div className="h-16 w-16 rounded-full bg-emerald-100 p-2">
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
+              {confidenceScore >= 80 ? "Stable" : "Watch"}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {completedChecks.slice(0, 3).map((item) => (
+            <div key={item} className="flex items-start gap-2 rounded-2xl bg-slate-100 p-3 text-sm">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+              <span className="text-slate-600">{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        {proofTimeline.slice(0, 4).map((item) => (
+          <div key={`${item.label}-${item.at}`} className="flex items-center gap-3 rounded-2xl bg-white/10 p-3 text-sm">
+            <span
+              className={`h-3 w-3 rounded-full ${
+                item.verified ? "bg-emerald-300" : "bg-white/20"
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-white/80">{item.label}</p>
+              <p className="text-xs text-white/40">
+                {item.at ? new Date(item.at).toLocaleString() : "Pending"}
+              </p>
+            </div>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/55">
+              {item.verified ? "Verified" : "Pending"}
+            </span>
+          </div>
+        ))}
+      </div>
       {proof?.proofSignals?.length ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {proof.proofSignals.map((signal) => (
@@ -2757,6 +2838,25 @@ function VisitProofSystem({
             </span>
           </div>
         ))}
+      </div>
+      <div className="mt-4 rounded-3xl bg-emerald-200/10 p-4">
+        <p className="text-sm font-semibold text-emerald-100">Next best action</p>
+        <p className="mt-2 text-sm leading-6 text-white/65">
+          {proof?.nextBestAction ||
+            (latestReport
+              ? "Rate this visit and rebook the same caregiver if the experience felt familiar."
+              : "Care proof and next action will appear after completion.")}
+        </p>
+        <p className="mt-2 text-xs text-white/45">
+          {proof?.ratingPrompt || proof?.rebookPrompt || "Rating and rebooking unlock after visit proof is ready."}
+        </p>
+        <button
+          onClick={onRebook}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#06130f]"
+        >
+          <Repeat2 className="h-4 w-4" />
+          {proof?.rebookPrompt ? "Rebook familiar care" : "Plan next care"}
+        </button>
       </div>
     </section>
   );

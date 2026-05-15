@@ -37,6 +37,75 @@ const serviceProofSignals = (booking: CareBooking | null, report: VisitReport | 
   return ["Arrival proof", "Task note", "Caregiver summary", "Family update"];
 };
 
+const completedChecksFor = (booking: CareBooking | null, report: VisitReport | null) => {
+  const service = `${booking?.serviceType || report?.serviceType || ""}`.toLowerCase();
+
+  if (service.includes("doctor")) {
+    return ["Appointment supported", "Consultation notes captured", "Prescription follow-up ready"];
+  }
+
+  if (service.includes("lab") || service.includes("report")) {
+    return ["Lab details verified", "Report status tracked", "Family handover prepared"];
+  }
+
+  if (service.includes("hospital")) {
+    return ["Attender present", "Care desk update noted", "Family handover completed"];
+  }
+
+  if (service.includes("medicine") || service.includes("recovery")) {
+    return ["Prescription checked", "Medicine task updated", "Dosage note prepared"];
+  }
+
+  if (
+    service.includes("temple") ||
+    service.includes("birthday") ||
+    service.includes("festival") ||
+    service.includes("occasion") ||
+    service.includes("conversation") ||
+    service.includes("walk")
+  ) {
+    return ["Arrival confirmed", "Comfort and mood observed", "Family update prepared"];
+  }
+
+  if (service.includes("meal") || service.includes("errand")) {
+    return ["Task completed", "Home check-in noted", "Family update prepared"];
+  }
+
+  return ["Arrival confirmed", "Care task completed", "Family update prepared"];
+};
+
+const nextBestActionFor = (booking: CareBooking | null, report: VisitReport | null) => {
+  const service = `${booking?.serviceType || report?.serviceType || ""}`.toLowerCase();
+
+  if (service.includes("doctor") || service.includes("report")) {
+    return "Review the report summary and schedule follow-up if the doctor advised it.";
+  }
+
+  if (service.includes("medicine")) {
+    return "Keep the next medicine reminder active and rebook support if doses are changing.";
+  }
+
+  if (service.includes("hospital")) {
+    return "Keep family monitoring on until discharge or the next doctor round is confirmed.";
+  }
+
+  if (service.includes("walk") || service.includes("conversation") || service.includes("temple")) {
+    return "Rebook the same caregiver if the visit felt familiar and reassuring.";
+  }
+
+  return "Rate this visit and rebook the same caregiver when care is needed again.";
+};
+
+const confidenceScoreFor = (booking: CareBooking | null, report: VisitReport | null) =>
+  clamp(
+    (report ? 36 : 12) +
+      (booking?.tracking?.customerLocation ? 18 : 0) +
+      (booking?.tracking?.lastLocationAt ? 12 : 0) +
+      (booking?.caretakerId ? 12 : 0) +
+      (booking?.rating?.score ? 8 : 0) +
+      serviceProofSignals(booking, report).length * 4
+  );
+
 export const TrustProvider = {
   async caregiverProfile(caretakerId: string) {
     const database = getAdminDatabase();
@@ -108,6 +177,26 @@ export const TrustProvider = {
     const timestamp = report?.completedAt || booking?.updatedAt || Date.now();
     const locationLabel =
       booking?.tracking?.destinationLabel || booking?.requestDetails?.location?.label || "Care location";
+    const confidenceScore = confidenceScoreFor(booking, report);
+    const completedChecks = completedChecksFor(booking, report);
+    const proofSignals = serviceProofSignals(booking, report);
+    const timeline = [
+      {
+        label: "Request created",
+        at: booking?.createdAt || report?.completedAt || timestamp,
+        verified: Boolean(booking?.createdAt || report)
+      },
+      {
+        label: booking?.caretakerName || report?.caretakerName ? "Caregiver confirmed" : "Caregiver pending",
+        at: booking?.updatedAt || timestamp,
+        verified: Boolean(booking?.caretakerName || report?.caretakerName)
+      },
+      {
+        label: report ? "Visit completed" : "Visit completion pending",
+        at: report?.completedAt || timestamp,
+        verified: Boolean(report)
+      }
+    ];
 
     return {
       ok: true as const,
@@ -129,7 +218,19 @@ export const TrustProvider = {
         medicineSummary: report?.medicineSummary || "Medicine notes pending",
         familySummary: report?.familySummary || "Family handover will appear after completion",
         caregiverNote: report?.caregiverNote || "Caregiver note pending",
-        proofSignals: serviceProofSignals(booking, report),
+        proofSignals,
+        completedChecks,
+        confidenceScore,
+        nextBestAction: nextBestActionFor(booking, report),
+        ratingPrompt:
+          booking?.rating?.score
+            ? `Family rated this visit ${booking.rating.score}/5.`
+            : "Rate this visit so LDERLY can improve caregiver matching.",
+        rebookPrompt:
+          booking?.caretakerName || report?.caretakerName
+            ? `Rebook ${booking?.caretakerName || report?.caretakerName} for familiar care.`
+            : "Rebook similar care when needed.",
+        timeline,
         attachments:
           report?.attachments?.length
             ? report.attachments
