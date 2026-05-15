@@ -332,6 +332,18 @@ try {
     "KYC upload mocks fail closed in production"
   );
   expect(
+    status.json?.productionReadiness?.githubActionsCiPrepared === true,
+    "GitHub Actions CI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.groupedCiSmokeRunner === true,
+    "grouped CI smoke runner is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.featureFlags?.stagedRolloutReady === true,
+    "feature flags are staged-rollout ready"
+  );
+  expect(
     status.json?.productionReadiness?.razorpayConfigured === true,
     "Razorpay order keys configured"
   );

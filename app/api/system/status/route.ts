@@ -5,6 +5,7 @@ import {
   communicationReadiness,
   hasMessagingProviderConfig
 } from "../../../../server/communicationProvider";
+import { featureFlagReadiness } from "../../../../server/featureFlags";
 import { hasFirebaseAdminConfig } from "../../../../server/firebaseAdmin";
 import { internalOpsReadiness } from "../../../../server/internalOpsProvider";
 import { hasGeocodingConfig } from "../../../../server/locationProvider";
@@ -74,6 +75,9 @@ export async function GET() {
       opsCommandDispatchUi: true,
       liveCaregiverAvailabilityBoard: true,
       monitoringSnapshotApi: true,
+      githubActionsCiPrepared: true,
+      groupedCiSmokeRunner: true,
+      featureFlags: featureFlagReadiness,
       firebaseAppCheckPrepared: true,
       firebaseAppCheckConfigured: hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY"),
       pwaManifest: true,

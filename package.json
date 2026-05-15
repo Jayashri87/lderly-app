@@ -10,7 +10,9 @@
     "verify:env": "node scripts/verify-production-env.mjs",
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
-    "smoke:production": "node scripts/smoke-production.mjs"
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "ci:smoke": "node scripts/ci-smoke.mjs",
+    "ci:validate": "npm run lint && npm run build && npm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",

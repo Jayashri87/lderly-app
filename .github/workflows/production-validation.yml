@@ -1,0 +1,68 @@
+name: Production Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${{ secrets.NEXT_PUBLIC_FIREBASE_DATABASE_URL }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
+      FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+      FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+      FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+      FIREBASE_RULES_DEPLOYED: "true"
+      LDERLY_ADMIN_USERNAME: ${{ secrets.LDERLY_ADMIN_USERNAME }}
+      LDERLY_ADMIN_PASSWORD: ${{ secrets.LDERLY_ADMIN_PASSWORD }}
+      LDERLY_CARETAKER_USERNAME: ${{ secrets.LDERLY_CARETAKER_USERNAME }}
+      LDERLY_CARETAKER_PASSWORD: ${{ secrets.LDERLY_CARETAKER_PASSWORD }}
+      LDERLY_CUSTOMER_USERNAME: ${{ secrets.LDERLY_CUSTOMER_USERNAME }}
+      LDERLY_CUSTOMER_PASSWORD: ${{ secrets.LDERLY_CUSTOMER_PASSWORD }}
+      LDERLY_AUTH_SECRET: ${{ secrets.LDERLY_AUTH_SECRET }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+      NEXT_PUBLIC_MIXPANEL_TOKEN: ${{ secrets.NEXT_PUBLIC_MIXPANEL_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test
+        if: ${{ env.FIREBASE_ADMIN_PROJECT_ID != '' && env.LDERLY_AUTH_SECRET != '' && env.RAZORPAY_KEY_ID != '' }}
+        run: npm run ci:smoke
+
+      - name: Explain skipped smoke
+        if: ${{ env.FIREBASE_ADMIN_PROJECT_ID == '' || env.LDERLY_AUTH_SECRET == '' || env.RAZORPAY_KEY_ID == '' }}
+        run: |
+          echo "Smoke test skipped because required production secrets are not configured in GitHub Actions."
