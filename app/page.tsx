@@ -189,6 +189,29 @@ type CareRiskSummary = {
   generatedAt: number;
 };
 
+type RetentionSummary = {
+  id: string;
+  recipientName: string;
+  retentionScore: number;
+  recurringActive: boolean;
+  lastServiceType: string;
+  preferredCaregiverName: string;
+  completedVisits: number;
+  familyDigestReady: boolean;
+  headline: string;
+  reassuranceLine: string;
+  nextBestAction: string;
+  actions: Array<{
+    id: string;
+    title: string;
+    body: string;
+    cta: string;
+    kind: "rebook" | "recurring" | "family_digest" | "medical_followup";
+    serviceType: string;
+    priority: "normal" | "recommended" | "urgent";
+  }>;
+};
+
 type RecipientDetails = {
   fullName: string;
   age: string;
@@ -847,6 +870,7 @@ export default function CustomerApp() {
   const [caregiverTrust, setCaregiverTrust] = useState<CaregiverTrustProfile | null>(null);
   const [visitProof, setVisitProof] = useState<VisitProof | null>(null);
   const [careRisk, setCareRisk] = useState<CareRiskSummary | null>(null);
+  const [retentionSummary, setRetentionSummary] = useState<RetentionSummary | null>(null);
   const lastStatusEventRef = useRef("");
   const lastStepEventRef = useRef("");
   const lastAiInsightRef = useRef("");
@@ -1119,6 +1143,49 @@ export default function CustomerApp() {
     session,
     visibleBooking?.id,
     visibleBooking?.sla?.status
+  ]);
+
+  useEffect(() => {
+    if (!session || !recipientName || !hasCareSubscription) {
+      const timeout = window.setTimeout(() => setRetentionSummary(null), 0);
+      return () => window.clearTimeout(timeout);
+    }
+
+    let cancelled = false;
+
+    fetch("/api/retention/summary", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        recipientName: activeRecipientDetails?.fullName || recipient.displayName
+      })
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { summary?: RetentionSummary } | null) => {
+        if (!cancelled) {
+          setRetentionSummary(payload?.summary || null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRetentionSummary(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeRecipientDetails?.fullName,
+    hasCareSubscription,
+    recipient.displayName,
+    recipientName,
+    reports.length,
+    session,
+    visibleBooking?.id,
+    visibleBooking?.status
   ]);
 
   const selectTab = (tab: TabKey, source: string) => {
@@ -1521,6 +1588,12 @@ export default function CustomerApp() {
                     reports={reports}
                     experience={currentServiceExperience}
                     aiInsight={aiInsight}
+                  />
+                  <CareContinuitySystem
+                    summary={retentionSummary}
+                    recipient={recipient}
+                    onBook={openBooking}
+                    onRebook={rebookPreviousCare}
                   />
                   <TrustedCaregiverProfile
                     recipient={recipient}
@@ -2381,6 +2454,102 @@ function TrustVisibilityPanel({
         ))}
       </div>
     </Card>
+  );
+}
+
+function CareContinuitySystem({
+  summary,
+  recipient,
+  onBook,
+  onRebook
+}: {
+  summary: RetentionSummary | null;
+  recipient: Recipient;
+  onBook: () => void;
+  onRebook: () => void;
+}) {
+  const actions = summary?.actions?.length
+    ? summary.actions
+    : [
+        {
+          id: "fallback-weekly-care",
+          title: "Build a weekly care rhythm",
+          body: `Schedule familiar care for ${recipient.shortName} so family updates become predictable.`,
+          cta: "Book next visit",
+          kind: "recurring" as const,
+          serviceType: "Parent Wellness Plan",
+          priority: "recommended" as const
+        }
+      ];
+  const primaryAction = actions[0];
+
+  return (
+    <section className="mt-5 rounded-[1.5rem] bg-white p-4 text-[#06130f]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">Care continuity</p>
+          <h3 className="mt-1 text-2xl font-semibold">
+            {summary?.headline || `Keep ${recipient.shortName}'s care predictable`}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {summary?.reassuranceLine ||
+              "LDERLY will recommend the next best care action after every visit."}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-emerald-100 px-3 py-2 text-center">
+          <p className="text-xs font-semibold text-emerald-800">Continuity</p>
+          <p className="mt-1 text-xl font-semibold">{summary?.retentionScore ?? 72}%</p>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="rounded-2xl bg-slate-100 p-3">
+          <p className="text-slate-500">Visits</p>
+          <p className="mt-1 font-semibold">{summary?.completedVisits ?? 0}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-100 p-3">
+          <p className="text-slate-500">Plan</p>
+          <p className="mt-1 font-semibold">{summary?.recurringActive ? "Active" : "Suggested"}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-100 p-3">
+          <p className="text-slate-500">Digest</p>
+          <p className="mt-1 font-semibold">{summary?.familyDigestReady ? "Ready" : "Pending"}</p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        {actions.slice(0, 3).map((action) => (
+          <button
+            key={action.id}
+            onClick={action.kind === "rebook" ? onRebook : onBook}
+            className="w-full rounded-3xl bg-slate-100 p-4 text-left transition hover:bg-slate-200"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{action.title}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-500">{action.body}</p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                  action.priority === "urgent"
+                    ? "bg-red-100 text-red-700"
+                    : action.priority === "recommended"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-white text-slate-600"
+                }`}
+              >
+                {action.cta}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={primaryAction.kind === "rebook" ? onRebook : onBook}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-4 py-3 text-sm font-semibold text-white"
+      >
+        <Repeat2 className="h-4 w-4" />
+        {summary?.nextBestAction || primaryAction.cta}
+      </button>
+    </section>
   );
 }
 

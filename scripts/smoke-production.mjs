@@ -498,6 +498,22 @@ try {
     "AI daily care summary UI is prepared"
   );
   expect(
+    status.json?.productionReadiness?.customerRetentionEngineApi === true,
+    "customer retention engine API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.recurringCareNudgesUi === true,
+    "recurring care nudges UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.familyReassuranceDigestUi === true,
+    "family reassurance digest UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.continuityCareRecommendations === true,
+    "continuity care recommendations are prepared"
+  );
+  expect(
     status.json?.productionReadiness?.aiOpsSummaryApi === true,
     "AI ops summary API is prepared"
   );
@@ -1067,6 +1083,37 @@ try {
       id: reassuranceResult.json.insight.id,
       userId: booking.customerId,
       bookingId: booking.id
+    });
+  }
+
+  const retentionResult = await request(
+    "/api/retention/summary",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        recipientName: "Smoke Mom"
+      })
+    },
+    customerCookie
+  );
+  expect(
+    retentionResult.response.ok,
+    "customer can generate retention summary",
+    retentionResult.text
+  );
+  expect(
+    typeof retentionResult.json?.summary?.retentionScore === "number",
+    "retention summary includes continuity score"
+  );
+  expect(
+    Array.isArray(retentionResult.json?.summary?.actions),
+    "retention summary includes recommended actions"
+  );
+  if (retentionResult.json?.summary?.id) {
+    createdReliability.push({
+      kind: "retentionSummary",
+      id: retentionResult.json.summary.id,
+      userId: booking.customerId
     });
   }
 
@@ -2033,6 +2080,12 @@ try {
     }
     if (item.kind === "aiCaregiverNote") {
       await database.ref(`aiCaregiverNotes/byId/${item.id}`).remove().catch(() => undefined);
+    }
+    if (item.kind === "retentionSummary") {
+      await database
+        .ref(`retentionSummaries/byUser/${item.userId}/${item.id}`)
+        .remove()
+        .catch(() => undefined);
     }
     if (item.kind === "monthlyReport") {
       await database
