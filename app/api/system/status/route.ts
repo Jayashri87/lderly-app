@@ -10,9 +10,15 @@ import { internalOpsReadiness } from "../../../../server/internalOpsProvider";
 import { hasGeocodingConfig } from "../../../../server/locationProvider";
 import {
   hasRazorpayConfig,
-  hasRazorpayWebhookConfig
+  hasRazorpayWebhookConfig,
+  paymentMockFailClosed
 } from "../../../../server/paymentProvider";
-import { hasVoiceNoteStorageConfig } from "../../../../server/voiceNoteProvider";
+import { kycMockFailClosed } from "../../../../server/kycProvider";
+import { mockProvidersFailClosed } from "../../../../server/mockProviderPolicy";
+import {
+  hasVoiceNoteStorageConfig,
+  voiceNoteMockFailClosed
+} from "../../../../server/voiceNoteProvider";
 
 const hasEnv = (name: string) => Boolean(process.env[name]);
 const hasAnyEnv = (names: string[]) => names.some((name) => hasEnv(name));
@@ -81,6 +87,12 @@ export async function GET() {
       errorBoundaries: true,
       stricterRulesPrepared: true,
       stricterRulesDeployed: rulesDeployed,
+      caretakerScopedFirebaseRulesPrepared: true,
+      serverOwnedNotificationWrites: true,
+      productionMockProvidersDisabled: mockProvidersFailClosed,
+      paymentMockFailClosed,
+      voiceNoteMockFailClosed,
+      kycMockFailClosed,
       paymentCheckoutRoute: true,
       paymentConfirmRoute: true,
       razorpayConfigured: hasRazorpayConfig,

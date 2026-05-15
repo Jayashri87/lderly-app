@@ -143,14 +143,14 @@
     },
     "health": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
-        ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
         ".validate": "newData.hasChildren(['userId', 'medicineStatus', 'nextMedicine', 'vitals', 'wellness', 'updatedAt', 'activity'])"
       }
     },
     "profiles": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
         ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
         ".validate": "newData.hasChildren(['userId', 'elderName', 'age', 'primaryContact', 'emergencyContact', 'medicalNotes', 'allergies', 'subscriptionPlan', 'updatedAt'])",
         "familyMembers": {
@@ -177,20 +177,20 @@
       "byId": {
         "$notificationId": {
           ".read": "auth != null && (data.child('userId').val() === auth.uid || data.child('role').val() === auth.token.role || data.child('role').val() === 'all' || auth.token.role === 'admin')",
-          ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin')",
           ".validate": "newData.hasChildren(['id', 'userId', 'role', 'title', 'body', 'priority', 'channel', 'deliveryStatus', 'read', 'createdAt'])"
         }
       },
       "byUser": {
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
-          ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+          ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')"
         }
       },
       "byRole": {
         "$role": {
           ".read": "auth != null && (auth.token.role === $role || auth.token.role === 'admin')",
-          ".write": "auth != null && (auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+          ".write": "auth != null && auth.token.role === 'admin'"
         }
       }
     },
@@ -198,14 +198,14 @@
       "byId": {
         "$reportId": {
           ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
-          ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".write": "auth != null && (newData.child('userId').val() === auth.uid || auth.token.role === 'admin')",
           ".validate": "newData.hasChildren(['id', 'userId', 'caretakerName', 'serviceType', 'visitType', 'reportType', 'summary', 'vitalsSummary', 'medicineSummary', 'familySummary', 'caregiverNote', 'attachments', 'completedAt'])"
         }
       },
       "byUser": {
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
-          ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')"
+          ".write": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')"
         }
       },
       "familyVisible": {
@@ -360,13 +360,13 @@
     "medicationSchedules": {
       "byId": {
         "$scheduleId": {
-          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
           ".write": false
         }
       },
       "byUser": {
         "$uid": {
-          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": false
         }
       }
@@ -374,13 +374,13 @@
     "medicationAdherence": {
       "byId": {
         "$adherenceId": {
-          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.role === 'admin')",
           ".write": false
         }
       },
       "byUser": {
         "$uid": {
-          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin' || auth.token.role === 'caretaker')",
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": false
         }
       },

@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { CareBooking } from "../services/bookingService";
+import {
+  allowMockProviders,
+  assertMockProviderAllowed,
+  mockProvidersFailClosed
+} from "./mockProviderPolicy";
 
 export type CheckoutResult = {
   mode: "razorpay" | "mock";
@@ -19,6 +24,7 @@ const razorpayWebhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "";
 
 export const hasRazorpayConfig = Boolean(razorpayKeyId && razorpayKeySecret);
 export const hasRazorpayWebhookConfig = Boolean(razorpayWebhookSecret);
+export const paymentMockFailClosed = mockProvidersFailClosed || hasRazorpayConfig;
 
 const parseInrAmount = (value: string) => {
   const numeric = Number(value.replace(/[^0-9.]/g, ""));
@@ -41,6 +47,8 @@ export const createCheckout = async ({
   const currency = "INR" as const;
 
   if (!hasRazorpayConfig) {
+    assertMockProviderAllowed("Razorpay checkout");
+
     return {
       mode: "mock",
       provider: "razorpay",
@@ -93,6 +101,11 @@ export const createCheckout = async ({
     description: booking.serviceType
   };
 };
+
+export const isMockPaymentConfirmationAllowed = (orderId: string) =>
+  !hasRazorpayConfig &&
+  allowMockProviders &&
+  orderId.startsWith("mock-razorpay-order-");
 
 export const verifyRazorpayWebhook = (body: string, signature: string | null) => {
   if (!hasRazorpayWebhookConfig || !signature) {

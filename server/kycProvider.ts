@@ -1,4 +1,8 @@
 import { getAdminDatabase, getAdminStorageBucket } from "./firebaseAdmin";
+import {
+  assertMockProviderAllowed,
+  mockProvidersFailClosed
+} from "./mockProviderPolicy";
 
 export type KycDocumentType = "aadhaar" | "pan" | "face";
 
@@ -9,6 +13,8 @@ export type KycUploadRequest = {
 };
 
 const allowedDocumentTypes: KycDocumentType[] = ["aadhaar", "pan", "face"];
+export const kycMockFailClosed =
+  mockProvidersFailClosed || Boolean(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
 
 export const isKycDocumentType = (value: unknown): value is KycDocumentType =>
   typeof value === "string" && allowedDocumentTypes.includes(value as KycDocumentType);
@@ -46,6 +52,10 @@ export const createKycUpload = async ({
   const expiresAt = Date.now() + 15 * 60 * 1000;
   const bucket = getAdminStorageBucket();
   const database = getAdminDatabase();
+
+  if (!bucket) {
+    assertMockProviderAllowed("Caretaker KYC upload");
+  }
 
   const upload = {
     id,

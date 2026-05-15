@@ -308,6 +308,30 @@ try {
     "strict Firebase rules deployed"
   );
   expect(
+    status.json?.productionReadiness?.caretakerScopedFirebaseRulesPrepared === true,
+    "caretaker Firebase rules are scoped"
+  );
+  expect(
+    status.json?.productionReadiness?.serverOwnedNotificationWrites === true,
+    "notification writes are server-owned"
+  );
+  expect(
+    status.json?.productionReadiness?.productionMockProvidersDisabled === true,
+    "production mock providers fail closed"
+  );
+  expect(
+    status.json?.productionReadiness?.paymentMockFailClosed === true,
+    "payment mocks fail closed in production"
+  );
+  expect(
+    status.json?.productionReadiness?.voiceNoteMockFailClosed === true,
+    "voice-note mocks fail closed in production"
+  );
+  expect(
+    status.json?.productionReadiness?.kycMockFailClosed === true,
+    "KYC upload mocks fail closed in production"
+  );
+  expect(
     status.json?.productionReadiness?.razorpayConfigured === true,
     "Razorpay order keys configured"
   );

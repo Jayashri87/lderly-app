@@ -8,6 +8,7 @@ import {
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
 import {
   hasRazorpayConfig,
+  isMockPaymentConfirmationAllowed,
   verifyRazorpayPayment
 } from "../../../../server/paymentProvider";
 import { TrustedBooking } from "../../../../server/trustedBooking";
@@ -52,12 +53,13 @@ export async function POST(request: NextRequest) {
   }
 
   const signatureVerified =
-    !hasRazorpayConfig ||
-    verifyRazorpayPayment({
-      orderId: body.razorpay_order_id,
-      paymentId: body.razorpay_payment_id,
-      signature: body.razorpay_signature || ""
-    });
+    hasRazorpayConfig
+      ? verifyRazorpayPayment({
+          orderId: body.razorpay_order_id,
+          paymentId: body.razorpay_payment_id,
+          signature: body.razorpay_signature || ""
+        })
+      : isMockPaymentConfirmationAllowed(body.razorpay_order_id);
 
   if (!signatureVerified) {
     await withMutationAudit(

@@ -35,23 +35,35 @@ export async function POST(request: NextRequest) {
   }
 
   const documentType = body.documentType;
-  const upload = await withMutationAudit(
-    request,
-    {
-      action: "caretaker.kyc_upload_url",
-      resource: caretakerId,
-      status: "success",
-      details: {
-        documentType
-      }
-    },
-    () =>
-      createKycUpload({
-        caretakerId,
-        documentType,
-        contentType: body.contentType || "application/pdf"
-      })
-  );
+  let upload;
+
+  try {
+    upload = await withMutationAudit(
+      request,
+      {
+        action: "caretaker.kyc_upload_url",
+        resource: caretakerId,
+        status: "success",
+        details: {
+          documentType
+        }
+      },
+      () =>
+        createKycUpload({
+          caretakerId,
+          documentType,
+          contentType: body.contentType || "application/pdf"
+        })
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "KYC storage is not available"
+      },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({ upload });
 }

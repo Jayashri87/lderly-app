@@ -1,4 +1,8 @@
 import { getAdminDatabase, getAdminStorageBucket } from "./firebaseAdmin";
+import {
+  assertMockProviderAllowed,
+  mockProvidersFailClosed
+} from "./mockProviderPolicy";
 
 export type VoiceNoteRequest = {
   bookingId: string;
@@ -18,6 +22,8 @@ export type VoiceNoteUpload = {
 export const hasVoiceNoteStorageConfig = Boolean(
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
 );
+export const voiceNoteMockFailClosed =
+  mockProvidersFailClosed || hasVoiceNoteStorageConfig;
 
 const safeContentType = (contentType: string) =>
   contentType.startsWith("audio/") ? contentType : "audio/mpeg";
@@ -41,6 +47,8 @@ export const createVoiceNoteUpload = async ({
   const database = getAdminDatabase();
 
   if (!bucket) {
+    assertMockProviderAllowed("Voice note upload");
+
     return {
       id,
       mode: "mock",

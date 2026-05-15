@@ -43,10 +43,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const checkout = await createCheckout({
-    booking,
-    origin: request.nextUrl.origin
-  });
+  let checkout;
+
+  try {
+    checkout = await createCheckout({
+      booking,
+      origin: request.nextUrl.origin
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Payment provider is not available"
+      },
+      { status: 503 }
+    );
+  }
 
   await withMutationAudit(
     request,
