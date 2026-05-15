@@ -27,7 +27,12 @@ export async function POST(request: NextRequest) {
   const sessionId = createSessionId();
   const timestamp = Date.now();
   const response = attachRoleSession(
-    NextResponse.json({ ok: true, role: "customer" }),
+    NextResponse.json({
+      ok: true,
+      role: "customer",
+      uid: "demo-customer",
+      name: "Customer"
+    }),
     "customer",
     body.username,
     "demo-customer",

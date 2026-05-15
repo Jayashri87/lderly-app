@@ -334,6 +334,9 @@ let localBooking = createDefaultBooking();
 const localSubscribers = new Set<(booking: CareBooking) => void>();
 
 const canUseStorage = () => typeof window !== "undefined";
+const clientDatabaseWritesEnabled = () =>
+  typeof window === "undefined" ||
+  window.localStorage.getItem("lderly-enable-client-db-writes") === "true";
 const bookingRef = (database: Database, bookingId: string) =>
   ref(database, `bookings/byId/${bookingId}`);
 
@@ -611,7 +614,7 @@ const activePathFor = (session: SessionUser) => {
 };
 
 const writeBookingIndexes = async (booking: CareBooking) => {
-  if (!db) {
+  if (!db || !clientDatabaseWritesEnabled()) {
     return;
   }
 

@@ -186,6 +186,13 @@ export const AuthService = {
     return activeSession;
   },
 
+  storeSignedSession(session: SessionUser) {
+    activeRole = session.role;
+    activeSession = session;
+    storeSession(activeSession);
+    return activeSession;
+  },
+
   async signOut() {
     activeSession = null;
     storeSession(null);

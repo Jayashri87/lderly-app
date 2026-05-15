@@ -35,6 +35,9 @@ let localNotifications: CareNotification[] = [
 
 const localSubscribers = new Set<(notifications: CareNotification[]) => void>();
 const canUseStorage = () => typeof window !== "undefined";
+const clientDatabaseWritesEnabled = () =>
+  typeof window === "undefined" ||
+  window.localStorage.getItem("lderly-enable-client-db-writes") === "true";
 
 const readLocalNotifications = () => {
   if (!canUseStorage()) {
@@ -135,7 +138,7 @@ export const NotificationService = {
 
     writeLocalNotifications(nextNotifications);
 
-    if (!db) {
+    if (!db || !clientDatabaseWritesEnabled()) {
       return;
     }
 

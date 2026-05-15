@@ -308,6 +308,14 @@ try {
     "strict Firebase rules deployed"
   );
   expect(
+    status.json?.productionReadiness?.customerOtpSessionRoute === true,
+    "customer OTP creates signed backend session"
+  );
+  expect(
+    status.json?.productionReadiness?.serverOwnedClientWrites === true,
+    "browser booking writes are server-owned"
+  );
+  expect(
     status.json?.productionReadiness?.caretakerScopedFirebaseRulesPrepared === true,
     "caretaker Firebase rules are scoped"
   );
@@ -641,6 +649,19 @@ try {
   const customerCookie = await login("customer");
   const adminCookie = await login("admin");
   const caretakerCookie = await login("caretaker");
+  const otpLoginResult = await request("/api/auth/customer/otp", {
+    method: "POST",
+    body: JSON.stringify({
+      phone: "+91 98765 43210",
+      otp: "1234"
+    })
+  });
+  expect(otpLoginResult.response.ok, "OTP login returns 200", otpLoginResult.text);
+  expect(Boolean(otpLoginResult.cookie), "OTP login sets signed customer cookie");
+  expect(
+    otpLoginResult.json?.uid === "customer-9876543210",
+    "OTP login returns stable customer uid"
+  );
   const booking = buildSmokeBooking();
 
   const createResult = await request(

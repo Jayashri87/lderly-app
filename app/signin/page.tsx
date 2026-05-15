@@ -34,7 +34,29 @@ export default function SignInPage() {
       return;
     }
 
-    await AuthService.continueAs("customer");
+    const response = await fetch("/api/auth/customer/otp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone,
+        otp
+      })
+    });
+
+    if (!response.ok) {
+      setAuthError("Could not verify OTP. Please try again.");
+      return;
+    }
+
+    const session = (await response.json()) as { uid: string; name: string };
+    AuthService.storeSignedSession({
+      uid: session.uid,
+      name: session.name || "Customer",
+      role: "customer",
+      authMode: "demo"
+    });
     router.replace("/");
   };
 
@@ -68,7 +90,13 @@ export default function SignInPage() {
       return;
     }
 
-    await AuthService.continueAs("customer");
+    const session = (await response.json()) as { uid: string; name: string };
+    AuthService.storeSignedSession({
+      uid: session.uid || "demo-customer",
+      name: session.name || "Customer",
+      role: "customer",
+      authMode: "demo"
+    });
     router.replace("/");
   };
 

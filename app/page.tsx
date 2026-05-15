@@ -1278,7 +1278,7 @@ export default function CustomerApp() {
     }
 
     if (!checkoutResponse?.ok) {
-      setPaymentMessage("");
+      setPaymentMessage("Payment could not start. Please try again.");
       return false;
     }
 
@@ -1432,7 +1432,12 @@ export default function CustomerApp() {
       time: selectedTime.label,
       location: selectedLocation.label
     });
-    await openRazorpayCheckout(nextBooking);
+    const checkoutStarted = await openRazorpayCheckout(nextBooking);
+
+    if (!checkoutStarted) {
+      return;
+    }
+
     window.localStorage.setItem(subscriptionKey, "true");
     setCareSubscriptionStarted(true);
     setBookingOpen(false);

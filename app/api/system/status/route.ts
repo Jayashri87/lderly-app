@@ -45,6 +45,8 @@ export async function GET() {
     },
     productionReadiness: {
       trustedBookingRoutes: true,
+      customerOtpSessionRoute: true,
+      serverOwnedClientWrites: true,
       scopedNotificationReads: true,
       scopedReportReads: true,
       serverRoleSyncRoute: true,

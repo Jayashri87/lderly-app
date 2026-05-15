@@ -114,6 +114,9 @@ let localProfile = createDefaultProfile();
 const localSubscribers = new Set<(profile: CareProfile) => void>();
 
 const canUseStorage = () => typeof window !== "undefined";
+const clientDatabaseWritesEnabled = () =>
+  typeof window === "undefined" ||
+  window.localStorage.getItem("lderly-enable-client-db-writes") === "true";
 
 const readLocalProfile = (session?: SessionUser | null) => {
   if (!canUseStorage()) {
@@ -155,7 +158,7 @@ const saveProfile = (profile: CareProfile) => {
 
   writeLocalProfile(nextProfile);
 
-  if (!db) {
+  if (!db || !clientDatabaseWritesEnabled()) {
     return;
   }
 
