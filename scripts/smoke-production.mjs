@@ -856,6 +856,75 @@ try {
     "customer verification releases payment state"
   );
 
+  const expiredOfferBooking = buildSmokeBooking("-expired-offer");
+  const expiredOfferCreateResult = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      body: JSON.stringify({ booking: expiredOfferBooking })
+    },
+    customerCookie
+  );
+  createdPaths.push(expiredOfferBooking);
+  expect(expiredOfferCreateResult.response.ok, "customer can create expired-offer smoke booking", expiredOfferCreateResult.text);
+  await database.ref().update({
+    [`bookings/byId/${expiredOfferBooking.id}/dispatch/offerExpiresAt`]: Date.now() - 60_000,
+    [`bookings/byId/${expiredOfferBooking.id}/dispatch/offers/demo-caretaker/status`]: "sent",
+    [`caretakers/demo-caretaker/offers/${expiredOfferBooking.id}/expiresAt`]: Date.now() - 60_000,
+    [`caretakers/demo-caretaker/offers/${expiredOfferBooking.id}/status`]: "sent",
+    [`caretakers/demo-caretaker/activeBookingId`]: expiredOfferBooking.id
+  });
+  const expiredAcceptResult = await request(
+    `/api/bookings/${encodeURIComponent(expiredOfferBooking.id)}/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    caretakerCookie
+  );
+  expect(
+    expiredAcceptResult.response.status === 409,
+    "caretaker cannot accept expired dispatch offer",
+    expiredAcceptResult.text
+  );
+  const expiredOfferStatus = await database
+    .ref(`caretakers/demo-caretaker/offers/${expiredOfferBooking.id}/status`)
+    .get();
+  expect(expiredOfferStatus.val() === "expired", "expired dispatch offer is marked expired");
+
+  const cancelBroadcastBooking = buildSmokeBooking("-cancel-broadcast");
+  const cancelBroadcastCreateResult = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      body: JSON.stringify({ booking: cancelBroadcastBooking })
+    },
+    customerCookie
+  );
+  createdPaths.push(cancelBroadcastBooking);
+  expect(
+    cancelBroadcastCreateResult.response.ok,
+    "customer can create broadcast cancellation smoke booking",
+    cancelBroadcastCreateResult.text
+  );
+  const cancelBroadcastResult = await request(
+    `/api/bookings/${encodeURIComponent(cancelBroadcastBooking.id)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: "Smoke customer cancelled before acceptance" })
+    },
+    customerCookie
+  );
+  expect(cancelBroadcastResult.response.ok, "customer can cancel open broadcast booking", cancelBroadcastResult.text);
+  expect(
+    cancelBroadcastResult.json?.booking?.status === "cancelled",
+    "customer cancellation marks broadcast booking cancelled"
+  );
+  const cancelledOfferStatus = await database
+    .ref(`caretakers/demo-caretaker/offers/${cancelBroadcastBooking.id}/status`)
+    .get();
+  expect(cancelledOfferStatus.val() === "cancelled", "customer cancellation clears caregiver offer");
+
   const foreignBooking = {
     ...buildSmokeBooking("-foreign"),
     customerId: "other-customer",

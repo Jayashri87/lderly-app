@@ -389,6 +389,25 @@ export const TrustedBooking = {
       return { ok: false as const, status: 403, error: "No dispatch offer for caretaker" };
     }
 
+    const timestamp = Date.now();
+
+    if (
+      booking.dispatch?.mode === "area_broadcast" &&
+      (offer?.status !== "sent" || timestamp > booking.dispatch.offerExpiresAt)
+    ) {
+      await database.ref().update({
+        [`bookings/byId/${booking.id}/dispatch/status`]: "expired",
+        [`bookings/byId/${booking.id}/dispatch/offers/${actor.uid}/status`]: "expired",
+        [`bookings/byId/${booking.id}/sla/status`]: "breached",
+        [`bookings/byId/${booking.id}/sla/breachReason`]:
+          "Caregiver offer expired before acceptance",
+        [`caretakers/${actor.uid}/offers/${booking.id}/status`]: "expired",
+        [`caretakers/${actor.uid}/activeBookingId`]: null,
+        [`operations/dispatchOffers/${booking.id}/${actor.uid}/status`]: "expired"
+      });
+      return { ok: false as const, status: 409, error: "Dispatch offer expired" };
+    }
+
     const caretakerSnapshot = await database.ref(`caretakers/${actor.uid}`).get();
     const caretaker = caretakerSnapshot.val() as CaretakerMatchProfile | null;
 
@@ -396,7 +415,10 @@ export const TrustedBooking = {
       return { ok: false as const, status: 409, error: "Caretaker is unavailable" };
     }
 
-    const timestamp = Date.now();
+    if (caretaker.activeBookingId && caretaker.activeBookingId !== booking.id) {
+      return { ok: false as const, status: 409, error: "Caretaker already has an active request" };
+    }
+
     const nextOffers: Record<string, DispatchOffer> = Object.fromEntries(
       Object.entries(booking.dispatch?.offers || {}).map(([caretakerId, dispatchOffer]) => [
         caretakerId,
@@ -640,6 +662,21 @@ export const TrustedBooking = {
         status: "assigned",
         caretakerId: bestCaretaker.uid,
         caretakerName: bestCaretaker.name,
+        dispatch: booking.dispatch
+          ? {
+              ...booking.dispatch,
+              status: "accepted",
+              acceptedBy: bestCaretaker.uid,
+              acceptedAt: Date.now()
+            }
+          : {
+              mode: "manual_assignment",
+              status: "accepted",
+              offerExpiresAt: Date.now(),
+              candidateCount: 1,
+              acceptedBy: bestCaretaker.uid,
+              acceptedAt: Date.now()
+            },
         tracking: {
           ...(booking.tracking || {
             customerLocation: { lat: 12.9716, lng: 77.5946 },
@@ -1115,6 +1152,13 @@ export const TrustedBooking = {
       updates[`caretakers/${booking.caretakerId}/status`] = "available";
       updates[`caretakers/${booking.caretakerId}/activeBookingId`] = null;
     }
+    Object.keys(booking.dispatch?.offers || {}).forEach((caretakerId) => {
+      updates[`caretakers/${caretakerId}/offers/${booking.id}/status`] = "cancelled";
+      updates[`operations/dispatchOffers/${booking.id}/${caretakerId}/status`] = "cancelled";
+      if (!booking.caretakerId || caretakerId !== booking.caretakerId) {
+        updates[`caretakers/${caretakerId}/activeBookingId`] = null;
+      }
+    });
     await database.ref().update(updates);
     return { ok: true as const, booking: nextBooking };
   },

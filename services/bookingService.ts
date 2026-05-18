@@ -230,6 +230,7 @@ export type CaretakerMatchProfile = {
   familiarFamilies?: string[];
   currentLocation?: CareLocation;
   lastSeenAt?: number;
+  activeBookingId?: string | null;
 };
 
 const storageKey = "lderly-active-booking";
