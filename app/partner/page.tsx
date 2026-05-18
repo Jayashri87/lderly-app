@@ -20,6 +20,8 @@ import { JourneyService, CareJourney } from "../../services/journeyService";
 import { ReportService } from "../../services/reportService";
 import { trackProductEvent } from "../../services/productAnalytics";
 
+type GpsStatus = "idle" | "requesting" | "tracking" | "simulated" | "blocked" | "unsupported" | "error";
+
 export default function PartnerApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -30,6 +32,10 @@ export default function PartnerApp() {
   const [caretakerPassword, setCaretakerPassword] = useState("");
   const [caretakerError, setCaretakerError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>("idle");
+  const [gpsMessage, setGpsMessage] = useState("Live GPS has not started.");
+  const [gpsWatchId, setGpsWatchId] = useState<number | null>(null);
+  const [lastGpsAt, setLastGpsAt] = useState<number | null>(null);
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -151,6 +157,7 @@ export default function PartnerApp() {
     });
   };
   const hasActiveAssignment = isBookingAssignment || isJourneyAssignment;
+  const activeTrackingBookingId = activeBooking?.id;
   const runAssignmentAction = (label: string, action: () => void) => {
     setActionMessage("");
 
@@ -162,6 +169,133 @@ export default function PartnerApp() {
     action();
     setActionMessage(`${label} sent to LDERLY ops and family timeline.`);
   };
+
+  const stopGpsWatch = () => {
+    if (gpsWatchId === null || typeof navigator === "undefined" || !navigator.geolocation) {
+      return;
+    }
+
+    navigator.geolocation.clearWatch(gpsWatchId);
+    setGpsWatchId(null);
+    setGpsStatus("idle");
+    setGpsMessage("Live GPS stopped. Tap Start live GPS before leaving for the next visit.");
+  };
+
+  const sendDevicePosition = async (position: GeolocationPosition) => {
+    if (!session) {
+      return;
+    }
+
+    try {
+      await CaretakerService.sendLocation(session.uid, activeTrackingBookingId, {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracyMeters: Math.round(position.coords.accuracy),
+        capturedAt: position.timestamp,
+        source: "device"
+      });
+      setLastGpsAt(Date.now());
+      setGpsStatus("tracking");
+      setGpsMessage(
+        `Live GPS updated with ${Math.round(position.coords.accuracy)}m accuracy.`
+      );
+      trackCaretakerAction("device_gps_updated");
+    } catch {
+      setGpsStatus("error");
+      setGpsMessage("GPS was captured, but LDERLY could not save it. Please try again.");
+    }
+  };
+
+  const sendSimulatedLocationFallback = async () => {
+    if (!session) {
+      return;
+    }
+
+    try {
+      await CaretakerService.updateLocation(session.uid, activeTrackingBookingId);
+      setLastGpsAt(Date.now());
+      setGpsStatus("simulated");
+      setGpsMessage("Device GPS was not available, so a demo movement update was sent.");
+      trackCaretakerAction("simulated_gps_updated");
+    } catch {
+      setGpsStatus("error");
+      setGpsMessage("Location update could not be sent. Check network and try again.");
+    }
+  };
+
+  const updateGpsOnce = () => {
+    if (!session || !hasActiveAssignment) {
+      setGpsMessage("No active assignment yet. GPS starts after care is assigned.");
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGpsStatus("unsupported");
+      setGpsMessage("This browser does not support device GPS. Sending a demo fallback.");
+      sendSimulatedLocationFallback();
+      return;
+    }
+
+    setGpsStatus("requesting");
+    setGpsMessage("Requesting location permission from this device.");
+    navigator.geolocation.getCurrentPosition(
+      sendDevicePosition,
+      () => {
+        setGpsStatus("blocked");
+        setGpsMessage("GPS permission was blocked. Sending a demo fallback for testing.");
+        sendSimulatedLocationFallback();
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 15000
+      }
+    );
+  };
+
+  const startGpsWatch = () => {
+    if (!session || !hasActiveAssignment) {
+      setGpsMessage("No active assignment yet. Live GPS starts after care is assigned.");
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGpsStatus("unsupported");
+      setGpsMessage("This browser does not support live GPS. Sending a demo fallback.");
+      sendSimulatedLocationFallback();
+      return;
+    }
+
+    if (gpsWatchId !== null) {
+      setGpsMessage("Live GPS is already running.");
+      return;
+    }
+
+    setGpsStatus("requesting");
+    setGpsMessage("Starting live GPS. Keep this page open while travelling.");
+    const watchId = navigator.geolocation.watchPosition(
+      sendDevicePosition,
+      () => {
+        setGpsStatus("blocked");
+        setGpsMessage("Live GPS permission was blocked. Sending a demo fallback.");
+        sendSimulatedLocationFallback();
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 15000
+      }
+    );
+    setGpsWatchId(watchId);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (gpsWatchId !== null && typeof navigator !== "undefined") {
+        navigator.geolocation?.clearWatch(gpsWatchId);
+      }
+    };
+  }, [gpsWatchId]);
 
   if (!session || session.role !== "caretaker") {
     return (
@@ -303,6 +437,53 @@ export default function PartnerApp() {
           <LiveMap journey={bookingMapJourney} />
         </div>
 
+        <section className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-emerald-100">Live GPS</p>
+              <h2 className="mt-1 text-xl font-semibold">
+                {gpsStatus === "tracking"
+                  ? "Sharing real location"
+                  : gpsStatus === "requesting"
+                    ? "Waiting for device permission"
+                    : gpsStatus === "simulated"
+                      ? "Demo movement active"
+                      : "Ready before travel"}
+              </h2>
+              <p className="mt-1 text-sm text-white/55">{gpsMessage}</p>
+            </div>
+            <span className="rounded-full bg-emerald-300 px-3 py-1 text-xs font-semibold capitalize text-[#080b10]">
+              {gpsStatus}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <button
+              onClick={gpsWatchId === null ? startGpsWatch : stopGpsWatch}
+              disabled={!hasActiveAssignment}
+              className="rounded-full bg-emerald-300 px-4 py-2 font-semibold text-[#080b10] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
+            >
+              {gpsWatchId === null ? "Start live GPS" : "Stop live GPS"}
+            </button>
+            <button
+              onClick={updateGpsOnce}
+              disabled={!hasActiveAssignment}
+              className="rounded-full bg-white/10 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Send current location
+            </button>
+            <button
+              onClick={sendSimulatedLocationFallback}
+              disabled={!hasActiveAssignment}
+              className="rounded-full bg-white/10 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Demo fallback
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-white/40">
+            Last update: {lastGpsAt ? new Date(lastGpsAt).toLocaleTimeString() : "Not sent yet"}
+          </p>
+        </section>
+
         <section className="mt-6 grid grid-cols-2 gap-3">
           <ActionButton
             label="Check In"
@@ -342,6 +523,7 @@ export default function PartnerApp() {
             onClick={() => {
               runAssignmentAction("En route", () => {
                 trackCaretakerAction("marked_en_route");
+                startGpsWatch();
                 return isJourneyAssignment
                   ? JourneyService.updateStatus("en_route")
                   : BookingService.updateStatus("en_route", "caretaker");
@@ -383,13 +565,26 @@ export default function PartnerApp() {
             }}
           />
           <ActionButton
-            label="Update GPS"
+            label="GPS Once"
             icon={Navigation}
             disabled={!hasActiveAssignment}
             onClick={() => {
               runAssignmentAction("Location update", () => {
-                trackCaretakerAction("gps_updated");
-                CaretakerService.updateLocation(session.uid, activeBooking?.id);
+                updateGpsOnce();
+              });
+            }}
+          />
+          <ActionButton
+            label={gpsWatchId === null ? "Live GPS" : "Stop GPS"}
+            icon={Navigation}
+            disabled={!hasActiveAssignment}
+            onClick={() => {
+              runAssignmentAction(gpsWatchId === null ? "Live GPS" : "GPS stopped", () => {
+                if (gpsWatchId === null) {
+                  startGpsWatch();
+                } else {
+                  stopGpsWatch();
+                }
               });
             }}
           />

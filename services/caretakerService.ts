@@ -1,6 +1,6 @@
 import { onValue, ref, set } from "firebase/database";
 import { db } from "../firebase";
-import { CaretakerMatchProfile } from "./bookingService";
+import { CareLocation, CaretakerMatchProfile } from "./bookingService";
 
 const storageKey = "lderly-caretaker-seed-profiles";
 const now = () => Date.now();
@@ -12,6 +12,10 @@ export type CaretakerProfile = CaretakerMatchProfile & {
   familiarFamilies: string[];
   serviceZones: string[];
   lastSeenAt: number;
+};
+
+export type CaretakerLocationPayload = CareLocation & {
+  source?: "device" | "simulated";
 };
 
 export const seedCaretakers: CaretakerProfile[] = [
@@ -143,6 +147,49 @@ const writeLocalCaretakers = (caretakers: CaretakerProfile[]) => {
   localSubscribers.forEach((callback) => callback(caretakers));
 };
 
+const persistLocalCaretakerLocation = (
+  caretakerId: string,
+  nextLocation: CareLocation
+) => {
+  writeLocalCaretakers(
+    readLocalCaretakers().map((caretaker) =>
+      caretaker.uid === caretakerId
+        ? {
+            ...caretaker,
+            currentLocation: nextLocation,
+            lastSeenAt: now()
+          }
+        : caretaker
+    )
+  );
+};
+
+const postCaretakerLocation = async (
+  caretakerId: string,
+  bookingId: string | undefined,
+  nextLocation: CareLocation
+) => {
+  const response = await fetch("/api/caretaker/location", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      caretakerId,
+      bookingId,
+      lat: nextLocation.lat,
+      lng: nextLocation.lng,
+      accuracyMeters: nextLocation.accuracyMeters
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Location update failed");
+  }
+
+  return response.json();
+};
+
 const seedRemoteCaretakers = async (caretakers: CaretakerProfile[]) => {
   if (!db) {
     return;
@@ -238,7 +285,24 @@ export const CaretakerService = {
     }).catch(() => undefined);
   },
 
-  updateLocation(caretakerId: string, bookingId?: string) {
+  async sendLocation(
+    caretakerId: string,
+    bookingId: string | undefined,
+    location: CaretakerLocationPayload
+  ) {
+    const nextLocation = {
+      lat: Number(location.lat.toFixed(6)),
+      lng: Number(location.lng.toFixed(6)),
+      accuracyMeters: location.accuracyMeters,
+      capturedAt: location.capturedAt || now()
+    };
+
+    persistLocalCaretakerLocation(caretakerId, nextLocation);
+
+    return postCaretakerLocation(caretakerId, bookingId, nextLocation);
+  },
+
+  async updateLocation(caretakerId: string, bookingId?: string) {
     const caretakers = readLocalCaretakers();
     const caretaker = caretakers.find((item) => item.uid === caretakerId) || seedCaretakers[0];
     const current = caretaker.currentLocation || {
@@ -252,29 +316,9 @@ export const CaretakerService = {
       capturedAt: now()
     };
 
-    writeLocalCaretakers(
-      caretakers.map((item) =>
-        item.uid === caretakerId
-          ? {
-              ...item,
-              currentLocation: nextLocation,
-              lastSeenAt: now()
-            }
-          : item
-      )
-    );
-    fetch("/api/caretaker/location", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        caretakerId,
-        bookingId,
-        lat: nextLocation.lat,
-        lng: nextLocation.lng,
-        accuracyMeters: nextLocation.accuracyMeters
-      })
-    }).catch(() => undefined);
+    return this.sendLocation(caretakerId, bookingId, {
+      ...nextLocation,
+      source: "simulated"
+    });
   }
 };
