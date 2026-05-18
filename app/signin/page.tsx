@@ -1,264 +1,93 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, Mail, Phone, ShieldCheck } from "lucide-react";
-import {
-  ConfirmationResult,
-  RecaptchaVerifier,
-  signInWithPhoneNumber
-} from "firebase/auth";
-import { auth } from "../../firebase";
+import { ArrowRight, Mail, Phone, UserRound } from "lucide-react";
 import { AuthService } from "../../services/authService";
-
-const firebasePhoneAuthMessage = (error: unknown) => {
-  const code =
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof error.code === "string"
-      ? error.code
-      : "";
-
-  const messageByCode: Record<string, string> = {
-    "auth/operation-not-allowed":
-      "Firebase Phone Authentication is not enabled for this project.",
-    "auth/unauthorized-domain":
-      "This domain is not authorized in Firebase Authentication settings.",
-    "auth/invalid-phone-number": "Enter the phone number in international format.",
-    "auth/quota-exceeded": "Firebase SMS quota is exhausted for now.",
-    "auth/captcha-check-failed":
-      "Firebase reCAPTCHA verification failed. Refresh and try again.",
-    "auth/app-not-authorized":
-      "This Firebase app is not authorized for phone authentication.",
-    "auth/too-many-requests": "Too many OTP requests. Please wait before trying again."
-  };
-
-  return code
-    ? `${messageByCode[code] || "Firebase could not send OTP."} (${code})`
-    : "Firebase could not send OTP. Check Phone Auth, authorized domains, and SMS region settings.";
-};
 
 export default function SignInPage() {
   const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
   const [authError, setAuthError] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
-  const [customerUsername, setCustomerUsername] = useState("");
-  const [customerPassword, setCustomerPassword] = useState("");
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
 
-  useEffect(() => {
-    return () => {
-      recaptchaVerifier.current?.clear();
-      recaptchaVerifier.current = null;
-    };
-  }, []);
-
-  const normalizePhoneForFirebase = (value: string) => {
-    const trimmed = value.trim();
-
-    if (trimmed.startsWith("+")) {
-      return trimmed.replace(/\s/g, "");
-    }
-
-    const digits = trimmed.replace(/[^\d]/g, "");
-    return digits.length === 10 ? `+91${digits}` : `+${digits}`;
-  };
-
-  const getRecaptchaVerifier = () => {
-    if (!auth) {
-      return null;
-    }
-
-    if (!recaptchaVerifier.current) {
-      recaptchaVerifier.current = new RecaptchaVerifier(
-        auth,
-        "lderly-phone-recaptcha",
-        {
-          size: "invisible",
-          callback: () => undefined
-        }
-      );
-    }
-
-    return recaptchaVerifier.current;
-  };
-
-  const sendOtp = async () => {
+  const continueWithProfile = async () => {
     setAuthError("");
-    setAuthMessage("");
 
-    if (phone.trim().length < 8) {
-      setAuthError("Enter a valid phone number to continue.");
+    if (name.trim().length < 2) {
+      setAuthError("Enter your name to continue.");
       return;
     }
 
-    if (!auth) {
-      setAuthMessage("Local fallback OTP is active because Firebase Auth is not configured.");
-      setOtpSent(true);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setAuthError("Enter a valid email address.");
+      return;
+    }
+
+    const digits = phone.replace(/[^\d]/g, "");
+    if (digits.length < 8) {
+      setAuthError("Enter a valid phone number.");
       return;
     }
 
     setAuthBusy(true);
 
     try {
-      const verifier = getRecaptchaVerifier();
+      const response = await fetch("/api/auth/customer/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim()
+        })
+      });
 
-      if (!verifier) {
-        throw new Error("Firebase Auth is not ready.");
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setAuthError(result?.error || "Could not open your customer account.");
+        return;
       }
 
-      const result = await signInWithPhoneNumber(
-        auth,
-        normalizePhoneForFirebase(phone),
-        verifier
-      );
+      const session = (await response.json()) as {
+        uid: string;
+        name: string;
+        email?: string;
+        phone?: string;
+      };
 
-      setConfirmation(result);
-      setOtpSent(true);
-      setAuthMessage("OTP sent securely with Firebase.");
-    } catch (error) {
-      console.error("Firebase phone OTP send failed", error);
-      recaptchaVerifier.current?.clear();
-      recaptchaVerifier.current = null;
-      setAuthError(firebasePhoneAuthMessage(error));
+      AuthService.storeSignedSession({
+        uid: session.uid,
+        name: session.name || name.trim(),
+        role: "customer",
+        authMode: "demo"
+      });
+      router.replace("/");
+    } catch {
+      setAuthError("Could not connect right now. Please try again.");
     } finally {
       setAuthBusy(false);
     }
   };
 
-  const verifyOtp = async () => {
-    setAuthError("");
-    setAuthMessage("");
-
-    if (otp.trim().length < 4) {
-      setAuthError("Enter the OTP sent to your phone.");
-      return;
-    }
-
-    if (confirmation) {
-      setAuthBusy(true);
-
-      try {
-        const credential = await confirmation.confirm(otp.trim());
-        const idToken = await credential.user.getIdToken();
-        const response = await fetch("/api/auth/firebase-role", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            idToken,
-            role: "customer",
-            name: credential.user.phoneNumber || "Customer"
-          })
-        });
-
-        if (!response.ok || response.status === 202) {
-          setAuthError("Firebase sign-in succeeded, but backend session creation failed.");
-          return;
-        }
-
-        AuthService.storeSignedSession({
-          uid: credential.user.uid,
-          name: credential.user.phoneNumber || "Customer",
-          role: "customer",
-          authMode: "firebase"
-        });
-        router.replace("/");
-        return;
-      } catch {
-        setAuthError("Could not verify the Firebase OTP. Please try again.");
-      } finally {
-        setAuthBusy(false);
-      }
-
-      return;
-    }
-
-    const response = await fetch("/api/auth/customer/otp", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        phone,
-        otp
-      })
-    });
-
-    if (!response.ok) {
-      setAuthError("Could not verify OTP. Please try again.");
-      return;
-    }
-
-    const session = (await response.json()) as { uid: string; name: string };
-    AuthService.storeSignedSession({
-      uid: session.uid,
-      name: session.name || "Customer",
-      role: "customer",
-      authMode: "demo"
-    });
-    router.replace("/");
-  };
-
-  const continueWithGoogle = async () => {
-    setAuthError("");
-
-    try {
-      await AuthService.continueWithGoogle("customer");
-      router.replace("/");
-    } catch {
-      setAuthError("Google sign-in is not enabled yet. Please use phone OTP.");
-    }
-  };
-
-  const continueWithCustomerCredentials = async () => {
-    setAuthError("");
-
-    const response = await fetch("/api/auth/customer", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username: customerUsername,
-        password: customerPassword
-      })
-    });
-
-    if (!response.ok) {
-      setAuthError("Check the customer username and password.");
-      return;
-    }
-
-    const session = (await response.json()) as { uid: string; name: string };
-    AuthService.storeSignedSession({
-      uid: session.uid || "demo-customer",
-      name: session.name || "Customer",
-      role: "customer",
-      authMode: "demo"
-    });
-    router.replace("/");
-  };
-
   return (
     <main className="min-h-screen overflow-hidden bg-[#06130f] px-4 py-6 text-white">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] max-w-md flex-col justify-between">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] max-w-md flex-col justify-between gap-8">
         <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
           <p className="text-xs uppercase tracking-[0.28em] text-emerald-200">LDERLY</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">
             Care arrives on demand.
           </h1>
           <p className="mt-3 text-base leading-7 text-white/60">
-            Sign in with phone OTP or Google to book care, track visits, and receive family updates.
+            Tell us who you are so we can personalize care booking and family updates.
           </p>
         </motion.div>
 
@@ -268,116 +97,69 @@ export default function SignInPage() {
           className="rounded-[2rem] bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-            {otpSent ? (
-              <ShieldCheck className="h-6 w-6 text-emerald-700" />
-            ) : (
-              <Phone className="h-6 w-6 text-emerald-700" />
-            )}
+            <UserRound className="h-6 w-6 text-emerald-700" />
           </div>
-          <h2 className="mt-5 text-2xl font-semibold">
-            {otpSent ? "Verify OTP" : "Phone number login"}
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            {otpSent
-              ? "Enter the verification code sent to your phone."
-              : "Phone OTP is the primary way to access the customer Home app."}
+          <h2 className="mt-5 text-2xl font-semibold">Create your care profile</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            No OTP required. We will use these details for booking, updates, and care
+            coordination.
           </p>
 
-          {!otpSent ? (
-            <>
-              <label className="mt-5 block text-sm font-medium text-slate-600">
-                Phone number
-              </label>
+          <div className="mt-5 space-y-4">
+            <label className="block">
+              <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <UserRound className="h-4 w-4" />
+                Your name
+              </span>
               <input
+                autoComplete="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Jayashri"
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+              />
+            </label>
+
+            <label className="block">
+              <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <Mail className="h-4 w-4" />
+                Email address
+              </span>
+              <input
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+              />
+            </label>
+
+            <label className="block">
+              <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <Phone className="h-4 w-4" />
+                Phone number
+              </span>
+              <input
+                autoComplete="tel"
+                inputMode="tel"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
-                placeholder="+91 98765 43210"
+                placeholder="+91 99169 60524"
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
               />
-              <button
-                onClick={sendOtp}
-                disabled={authBusy}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {authBusy ? "Sending..." : "Send OTP"}
-                <ArrowRight className="h-5 w-5" />
-              </button>
-              <div className="my-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs font-medium text-slate-400">or</span>
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
-              <button
-                onClick={continueWithGoogle}
-                className="flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-4 font-semibold text-[#06130f]"
-              >
-                <Mail className="h-5 w-5" />
-                Continue with Google
-              </button>
-              <div className="my-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs font-medium text-slate-400">test login</span>
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
-              <div className="space-y-3">
-                <input
-                  autoComplete="username"
-                  value={customerUsername}
-                  onChange={(event) => setCustomerUsername(event.target.value)}
-                  placeholder="Customer username"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
-                />
-                <input
-                  autoComplete="current-password"
-                  type="password"
-                  value={customerPassword}
-                  onChange={(event) => setCustomerPassword(event.target.value)}
-                  placeholder="Password"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
-                />
-              </div>
-              <button
-                onClick={continueWithCustomerCredentials}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-emerald-100 px-5 py-4 font-semibold text-[#06130f]"
-              >
-                Continue as Customer
-                <ArrowRight className="h-5 w-5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <label className="mt-5 block text-sm font-medium text-slate-600">OTP</label>
-              <input
-                value={otp}
-                onChange={(event) => setOtp(event.target.value)}
-                placeholder="1234"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
-              />
-              <button
-                onClick={verifyOtp}
-                disabled={authBusy}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {authBusy ? "Verifying..." : "Open Home"}
-                <ArrowRight className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => {
-                  setOtpSent(false);
-                  setOtp("");
-                  setAuthError("");
-                  setAuthMessage("");
-                  setConfirmation(null);
-                }}
-                className="mt-3 w-full rounded-full bg-slate-100 px-5 py-4 font-semibold text-[#06130f]"
-              >
-                Change phone number
-              </button>
-            </>
-          )}
+            </label>
+          </div>
 
-          <div id="lderly-phone-recaptcha" />
-          {authMessage && <p className="mt-4 text-sm text-emerald-700">{authMessage}</p>}
+          <button
+            onClick={continueWithProfile}
+            disabled={authBusy}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {authBusy ? "Opening..." : "Continue"}
+            <ArrowRight className="h-5 w-5" />
+          </button>
+
           {authError && <p className="mt-4 text-sm text-amber-700">{authError}</p>}
         </motion.section>
       </div>
