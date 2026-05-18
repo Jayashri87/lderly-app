@@ -3525,7 +3525,7 @@ function JourneyExperience({
                 bookingId: booking?.id || journey?.id || "",
                 service: activeService
               });
-              window.open("https://wa.me/?text=I%20need%20an%20update%20on%20my%20LDERLY%20care%20visit", "_blank");
+              window.open("https://wa.me/919916960524?text=I%20need%20an%20update%20on%20my%20LDERLY%20care%20visit", "_blank");
             }}
             aria-label="Message caregiver"
             className="rounded-full bg-white p-3"
@@ -3538,7 +3538,7 @@ function JourneyExperience({
                 bookingId: booking?.id || journey?.id || "",
                 service: activeService
               });
-              window.location.href = "tel:+911800000000";
+              window.location.href = "tel:+919916960524";
             }}
             aria-label="Call caregiver"
             className="rounded-full bg-white p-3"
@@ -3557,7 +3557,7 @@ function JourneyExperience({
 
       <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-white p-4 text-[#06130f]">
         <p className="text-sm font-semibold text-emerald-700">Care security</p>
-        {booking?.status === "arrived" || booking?.status === "accepted" || booking?.status === "en_route" ? (
+        {booking?.status === "arrived" ? (
           <>
             <h3 className="mt-1 text-2xl font-semibold">Share OTP after caregiver arrives</h3>
             <div className="mt-3 rounded-3xl bg-slate-100 px-5 py-4 text-center text-3xl font-semibold tracking-[0.35em]">

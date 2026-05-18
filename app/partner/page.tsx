@@ -159,6 +159,20 @@ export default function PartnerApp() {
   };
   const hasActiveAssignment = isBookingAssignment || isJourneyAssignment;
   const activeTrackingBookingId = activeBooking?.id;
+  const bookingStatus = activeBooking?.status || "none";
+  const journeyStatus = activeJourney?.status || "idle";
+  const canAcceptCare =
+    isJourneyAssignment || bookingStatus === "searching" || bookingStatus === "assigned";
+  const canGoEnRoute =
+    isJourneyAssignment || bookingStatus === "accepted";
+  const canMarkArrived =
+    isJourneyAssignment || bookingStatus === "en_route";
+  const canStartVisit =
+    isJourneyAssignment || (bookingStatus === "arrived" && customerStartOtp.trim().length >= 4);
+  const canCompleteVisit =
+    isJourneyAssignment
+      ? journeyStatus === "arrived"
+      : bookingStatus === "in_progress";
   const runAssignmentAction = (label: string, action: () => void) => {
     setActionMessage("");
 
@@ -532,7 +546,7 @@ export default function PartnerApp() {
           <ActionButton
             label="Accept"
             icon={CheckCircle2}
-            disabled={!hasActiveAssignment}
+            disabled={!hasActiveAssignment || !canAcceptCare}
             onClick={() => {
               runAssignmentAction("Accepted", () => {
                 trackCaretakerAction("accepted_booking");
@@ -545,7 +559,7 @@ export default function PartnerApp() {
           <ActionButton
             label="En Route"
             icon={Navigation}
-            disabled={!hasActiveAssignment}
+            disabled={!hasActiveAssignment || !canGoEnRoute}
             onClick={() => {
               runAssignmentAction("En route", () => {
                 trackCaretakerAction("marked_en_route");
@@ -559,7 +573,7 @@ export default function PartnerApp() {
           <ActionButton
             label="Arrived"
             icon={MapPinned}
-            disabled={!hasActiveAssignment}
+            disabled={!hasActiveAssignment || !canMarkArrived}
             onClick={() => {
               runAssignmentAction("Arrival", () => {
                 trackCaretakerAction("marked_arrived");
@@ -572,7 +586,7 @@ export default function PartnerApp() {
           <ActionButton
             label="Start with OTP"
             icon={ShieldCheck}
-            disabled={!hasActiveAssignment}
+            disabled={!hasActiveAssignment || !canStartVisit}
             onClick={() => {
               runAssignmentAction("Visit started", () => {
                 trackCaretakerAction("visit_started");
@@ -640,7 +654,7 @@ export default function PartnerApp() {
           />
           <button
             onClick={isJourneyAssignment ? completeJourney : completeBooking}
-            disabled={!hasActiveAssignment}
+            disabled={!hasActiveAssignment || !canCompleteVisit}
             className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 py-4 font-semibold text-[#080b10] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
           >
             <FileText className="h-5 w-5" />

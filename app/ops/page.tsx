@@ -1357,9 +1357,13 @@ export default function OpsApp() {
               {activeBooking && (
                 <QueueRow
                   title={booking.serviceType}
-                  subtitle={`${booking.customerName} - ${booking.status}`}
+                  subtitle={`${booking.customerName} - ${
+                    booking.status === "searching"
+                      ? `${booking.dispatch?.candidateCount || 0} caregivers notified`
+                      : booking.status
+                  }`}
                   priority="normal"
-                  primary="Assign Anita"
+                  primary={booking.status === "searching" ? "Manual override" : "Assign backup"}
                   secondary="Cancel"
                   onPrimary={() => {
                     trackProductEvent("ops_caregiver_assigned", {

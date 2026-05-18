@@ -746,7 +746,7 @@ export const TrustedBooking = {
       return { ok: false as const, status: 403, error: "Forbidden" };
     }
 
-    if (!["arrived", "accepted", "en_route"].includes(booking.status)) {
+    if (booking.status !== "arrived") {
       return { ok: false as const, status: 409, error: "Caregiver must arrive before start" };
     }
 
