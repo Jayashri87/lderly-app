@@ -234,6 +234,50 @@ export const withIdempotency = async <T>(
   return { value, replayed: false };
 };
 
+export const withBookingMutationLock = async <T>(
+  bookingId: string,
+  owner: string,
+  handler: () => Promise<T>
+): Promise<T | { ok: false; status: 409; error: string }> => {
+  const database = getAdminDatabase();
+
+  if (!database) {
+    return handler();
+  }
+
+  const now = Date.now();
+  const lockOwner = `${owner}:${Math.random().toString(36).slice(2, 8)}`;
+  const lockRef = database.ref(`operations/locks/bookings/${safeFirebaseKey(bookingId)}`);
+  const transaction = await lockRef.transaction((current) => {
+    if (current?.expiresAt && current.expiresAt > now && current.owner !== lockOwner) {
+      return undefined;
+    }
+
+    return {
+      owner: lockOwner,
+      acquiredAt: now,
+      expiresAt: now + 15_000
+    };
+  });
+
+  if (!transaction.committed) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Booking action already in progress. Please refresh in a moment."
+    };
+  }
+
+  try {
+    return await handler();
+  } finally {
+    const snapshot = await lockRef.get().catch(() => null);
+    if (snapshot?.val()?.owner === lockOwner) {
+      await lockRef.remove().catch(() => undefined);
+    }
+  }
+};
+
 export const withMutationAudit = async <T>(
   request: NextRequest,
   event: AuditEvent,

@@ -3,6 +3,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withBookingMutationLock,
   withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
@@ -33,25 +34,30 @@ export async function POST(
     "booking.cancel",
     `${bookingId}:${body.reason.trim()}`,
     () =>
-      withMutationAudit(
-        request,
-        {
-          action: "booking.cancel",
-          resource: bookingId,
-          status: "success",
-          details: {
-            actor: auth.session.role,
-            reason: body.reason
-          }
-        },
+      withBookingMutationLock(
+        bookingId,
+        `${auth.session.role}:${auth.session.uid || auth.session.username}`,
         () =>
-          TrustedBooking.cancel(
-            bookingId,
+          withMutationAudit(
+            request,
             {
-              cancelledBy: auth.session.role,
-              reason: body.reason!.trim()
+              action: "booking.cancel",
+              resource: bookingId,
+              status: "success",
+              details: {
+                actor: auth.session.role,
+                reason: body.reason
+              }
             },
-            auth.session
+            () =>
+              TrustedBooking.cancel(
+                bookingId,
+                {
+                  cancelledBy: auth.session.role,
+                  reason: body.reason!.trim()
+                },
+                auth.session
+              )
           )
       )
   );

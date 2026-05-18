@@ -4,6 +4,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withBookingMutationLock,
   withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
@@ -46,18 +47,23 @@ export async function POST(
     "booking.status",
     `${bookingId}:${body.status}`,
     () =>
-      withMutationAudit(
-        request,
-        {
-          action: "booking.status",
-          resource: bookingId,
-          status: "success",
-          details: {
-            actor: auth.session.role,
-            nextStatus: body.status
-          }
-        },
-        () => TrustedBooking.updateStatus(bookingId, body.status as BookingStatus, auth.session)
+      withBookingMutationLock(
+        bookingId,
+        `${auth.session.role}:${auth.session.uid || auth.session.username}`,
+        () =>
+          withMutationAudit(
+            request,
+            {
+              action: "booking.status",
+              resource: bookingId,
+              status: "success",
+              details: {
+                actor: auth.session.role,
+                nextStatus: body.status
+              }
+            },
+            () => TrustedBooking.updateStatus(bookingId, body.status as BookingStatus, auth.session)
+          )
       )
   );
   const result = idempotent.value;

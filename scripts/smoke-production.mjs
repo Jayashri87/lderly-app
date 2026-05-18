@@ -994,6 +994,25 @@ try {
     "customer can create broadcast cancellation smoke booking",
     cancelBroadcastCreateResult.text
   );
+  await database.ref(`operations/locks/bookings/${cancelBroadcastBooking.id}`).set({
+    owner: "smoke:concurrent",
+    acquiredAt: Date.now(),
+    expiresAt: Date.now() + 30_000
+  });
+  const lockedCancelResult = await request(
+    `/api/bookings/${encodeURIComponent(cancelBroadcastBooking.id)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: "Smoke locked cancellation should wait" })
+    },
+    customerCookie
+  );
+  expect(
+    lockedCancelResult.response.status === 409,
+    "booking mutation lock blocks concurrent customer action",
+    lockedCancelResult.text
+  );
+  await database.ref(`operations/locks/bookings/${cancelBroadcastBooking.id}`).remove();
   const cancelBroadcastResult = await request(
     `/api/bookings/${encodeURIComponent(cancelBroadcastBooking.id)}/cancel`,
     {

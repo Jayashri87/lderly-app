@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   parseJsonBody,
   requireApiSession,
+  withBookingMutationLock,
   withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
@@ -27,25 +28,30 @@ export async function POST(
     "booking.completion.verify",
     `${bookingId}:${approved}:${body?.note?.trim() || ""}`,
     () =>
-      withMutationAudit(
-        request,
-        {
-          action: "booking.completion.verify",
-          resource: bookingId,
-          status: "success",
-          details: {
-            actor: auth.session.role,
-            approved
-          }
-        },
+      withBookingMutationLock(
+        bookingId,
+        `${auth.session.role}:${auth.session.uid || auth.session.username}`,
         () =>
-          TrustedBooking.verifyCompletion(
-            bookingId,
+          withMutationAudit(
+            request,
             {
-              approved,
-              note: body?.note
+              action: "booking.completion.verify",
+              resource: bookingId,
+              status: "success",
+              details: {
+                actor: auth.session.role,
+                approved
+              }
             },
-            auth.session
+            () =>
+              TrustedBooking.verifyCompletion(
+                bookingId,
+                {
+                  approved,
+                  note: body?.note
+                },
+                auth.session
+              )
           )
       )
   );

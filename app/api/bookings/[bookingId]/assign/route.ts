@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import {
   requireApiSession,
+  withBookingMutationLock,
   withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
@@ -23,17 +24,22 @@ export async function POST(
     "booking.assign",
     bookingId,
     () =>
-      withMutationAudit(
-        _request,
-        {
-          action: "booking.assign",
-          resource: bookingId,
-          status: "success",
-          details: {
-            actor: auth.session.username
-          }
-        },
-        () => TrustedBooking.assign(bookingId)
+      withBookingMutationLock(
+        bookingId,
+        `${auth.session.role}:${auth.session.uid || auth.session.username}`,
+        () =>
+          withMutationAudit(
+            _request,
+            {
+              action: "booking.assign",
+              resource: bookingId,
+              status: "success",
+              details: {
+                actor: auth.session.username
+              }
+            },
+            () => TrustedBooking.assign(bookingId)
+          )
       )
   );
   const result = idempotent.value;

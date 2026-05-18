@@ -3,6 +3,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withBookingMutationLock,
   withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
@@ -31,17 +32,22 @@ export async function POST(
     "booking.service_start.verify_otp",
     `${bookingId}:${body.otp.trim()}`,
     () =>
-      withMutationAudit(
-        request,
-        {
-          action: "booking.service_start.verify_otp",
-          resource: bookingId,
-          status: "success",
-          details: {
-            caretakerId: auth.session.uid
-          }
-        },
-        () => TrustedBooking.startWithOtp(bookingId, body.otp || "", auth.session)
+      withBookingMutationLock(
+        bookingId,
+        `${auth.session.role}:${auth.session.uid || auth.session.username}`,
+        () =>
+          withMutationAudit(
+            request,
+            {
+              action: "booking.service_start.verify_otp",
+              resource: bookingId,
+              status: "success",
+              details: {
+                caretakerId: auth.session.uid
+              }
+            },
+            () => TrustedBooking.startWithOtp(bookingId, body.otp || "", auth.session)
+          )
       )
   );
   const result = idempotent.value;
