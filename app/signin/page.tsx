@@ -12,6 +12,34 @@ import {
 import { auth } from "../../firebase";
 import { AuthService } from "../../services/authService";
 
+const firebasePhoneAuthMessage = (error: unknown) => {
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : "";
+
+  const messageByCode: Record<string, string> = {
+    "auth/operation-not-allowed":
+      "Firebase Phone Authentication is not enabled for this project.",
+    "auth/unauthorized-domain":
+      "This domain is not authorized in Firebase Authentication settings.",
+    "auth/invalid-phone-number": "Enter the phone number in international format.",
+    "auth/quota-exceeded": "Firebase SMS quota is exhausted for now.",
+    "auth/captcha-check-failed":
+      "Firebase reCAPTCHA verification failed. Refresh and try again.",
+    "auth/app-not-authorized":
+      "This Firebase app is not authorized for phone authentication.",
+    "auth/too-many-requests": "Too many OTP requests. Please wait before trying again."
+  };
+
+  return code
+    ? `${messageByCode[code] || "Firebase could not send OTP."} (${code})`
+    : "Firebase could not send OTP. Check Phone Auth, authorized domains, and SMS region settings.";
+};
+
 export default function SignInPage() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -95,12 +123,11 @@ export default function SignInPage() {
       setConfirmation(result);
       setOtpSent(true);
       setAuthMessage("OTP sent securely with Firebase.");
-    } catch {
+    } catch (error) {
+      console.error("Firebase phone OTP send failed", error);
       recaptchaVerifier.current?.clear();
       recaptchaVerifier.current = null;
-      setAuthError(
-        "Could not send Firebase OTP. Check Firebase Phone Auth and authorized domains."
-      );
+      setAuthError(firebasePhoneAuthMessage(error));
     } finally {
       setAuthBusy(false);
     }

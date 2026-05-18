@@ -95,6 +95,28 @@ The smoke test validates:
 
 After Firebase Admin is configured, sign in with a Firebase customer account once and confirm `/api/auth/firebase-role` returns `trusted-role-sync`. This activates server-owned `users/{uid}` role writes and Firebase custom claims.
 
+## Firebase Phone Auth
+
+Customer phone login uses Firebase Authentication in the browser, then exchanges the verified Firebase ID token through `/api/auth/firebase-role` for the signed backend session cookie.
+
+Firebase Console setup required:
+
+- Go to Authentication > Sign-in method.
+- Enable Phone.
+- Add authorized domains:
+  - `localhost`
+  - `lderly-app.vercel.app`
+  - final production custom domains such as `app.lderly.in`
+- In Authentication > Settings, confirm the SMS region policy allows the countries you want to test.
+- Keep Firebase App Check configured separately; App Check does not replace Phone Auth provider setup.
+
+If OTP sending fails, `/signin` now shows the Firebase error code, for example:
+
+- `auth/operation-not-allowed`: enable Phone Authentication.
+- `auth/unauthorized-domain`: add the current domain to authorized domains.
+- `auth/quota-exceeded`: wait for quota reset or increase quota.
+- `auth/captcha-check-failed`: refresh and retry reCAPTCHA.
+
 ## Firebase Rules
 
 Deploy `firebase.rules.json` after reviewing the project target.
