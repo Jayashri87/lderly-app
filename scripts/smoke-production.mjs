@@ -504,6 +504,10 @@ try {
     "ops maintenance API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.opsMaintenanceCronPrepared === true,
+    "ops maintenance cron is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.expiredLockCleanup === true,
     "expired lock cleanup is prepared"
   );

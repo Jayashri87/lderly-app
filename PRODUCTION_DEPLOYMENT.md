@@ -28,6 +28,7 @@ Server-only app credentials:
 - `LDERLY_CUSTOMER_USERNAME`
 - `LDERLY_CUSTOMER_PASSWORD`
 - `LDERLY_AUTH_SECRET`
+- `CRON_SECRET`
 
 Firebase Admin service account:
 
@@ -92,6 +93,30 @@ The smoke test validates:
 - Razorpay order creation returns a checkout payload
 - voice-note upload URL generation works
 - signed geocoding works
+- ops maintenance cleanup removes expired locks, old replay records, and old recovery signals
+
+## Automated Maintenance
+
+`vercel.json` schedules `/api/ops/maintenance` daily at 20:15 UTC, which is 01:45 India time.
+
+The endpoint performs production hygiene:
+
+- removes expired booking mutation locks
+- removes expired idempotency/replay records
+- removes old recovery queue signals
+- writes a maintenance run into the ops audit ledger
+
+Before enabling the cron in production, set `CRON_SECRET` in Vercel. Vercel Cron sends it as:
+
+```text
+Authorization: Bearer <CRON_SECRET>
+```
+
+Ops admins can also run the cleanup manually with a signed admin session:
+
+```bash
+POST /api/ops/maintenance
+```
 
 After Firebase Admin is configured, sign in with a Firebase customer account once and confirm `/api/auth/firebase-role` returns `trusted-role-sync`. This activates server-owned `users/{uid}` role writes and Firebase custom claims.
 

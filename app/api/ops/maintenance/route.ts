@@ -5,6 +5,8 @@ import {
 } from "../../../../server/apiSecurity";
 import { OpsMaintenanceProvider } from "../../../../server/opsMaintenanceProvider";
 
+export const dynamic = "force-dynamic";
+
 const cronSecretConfigured = () => Boolean(process.env.CRON_SECRET);
 
 const isAuthorizedCron = (request: NextRequest) => {
