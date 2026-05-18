@@ -6,9 +6,13 @@ import {
   ArrowRight,
   CalendarCheck,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Mail,
+  Pause,
   Phone,
+  Play,
   ShieldCheck,
   Sparkles,
   UserRound
@@ -52,22 +56,31 @@ export default function SignInPage() {
   const [leadSubmitted, setLeadSubmitted] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
+  const [adPaused, setAdPaused] = useState(false);
 
   useEffect(() => {
-    if (showLeadForm) {
+    if (showLeadForm || adPaused) {
       return;
     }
 
     const slideTimer = window.setInterval(() => {
-      setAdIndex((current) => Math.min(current + 1, adSlides.length - 1));
-    }, 4000);
-    const revealTimer = window.setTimeout(() => setShowLeadForm(true), 16000);
+      setAdIndex((current) => (current + 1) % adSlides.length);
+    }, 9000);
 
     return () => {
       window.clearInterval(slideTimer);
-      window.clearTimeout(revealTimer);
     };
-  }, [showLeadForm]);
+  }, [adPaused, showLeadForm]);
+
+  const showPreviousAd = () => {
+    setAdPaused(true);
+    setAdIndex((current) => (current === 0 ? adSlides.length - 1 : current - 1));
+  };
+
+  const showNextAd = () => {
+    setAdPaused(true);
+    setAdIndex((current) => (current + 1) % adSlides.length);
+  };
 
   const submitLead = async () => {
     setLeadError("");
@@ -130,9 +143,18 @@ export default function SignInPage() {
           className="flex items-center justify-between"
         >
           <p className="text-xs uppercase tracking-[0.32em] text-emerald-200">LDERLY</p>
-          <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur">
-            Family care
-          </span>
+          {!showLeadForm && !leadSubmitted ? (
+            <button
+              onClick={() => setShowLeadForm(true)}
+              className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur"
+            >
+              Skip
+            </button>
+          ) : (
+            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur">
+              Family care
+            </span>
+          )}
         </motion.header>
 
         {!showLeadForm && !leadSubmitted ? (
@@ -140,7 +162,12 @@ export default function SignInPage() {
             initial={{ opacity: 0, scale: 0.98, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative flex min-h-[72vh] flex-col justify-between overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
+            className="relative flex min-h-[68vh] flex-col justify-between overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setAdPaused((paused) => !paused);
+              }
+            }}
           >
             <motion.div
               aria-hidden
@@ -162,9 +189,18 @@ export default function SignInPage() {
             </motion.div>
 
             <div className="relative">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-2 text-xs font-semibold text-emerald-100">
-                <Sparkles className="h-4 w-4" />
-                20 sec care story
+              <div className="flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-2 text-xs font-semibold text-emerald-100">
+                  <Sparkles className="h-4 w-4" />
+                  LDERLY
+                </div>
+                <button
+                  onClick={() => setAdPaused((paused) => !paused)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white/75"
+                >
+                  {adPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                  {adPaused ? "Play" : "Pause"}
+                </button>
               </div>
 
               <motion.div
@@ -192,17 +228,56 @@ export default function SignInPage() {
             </div>
 
             <div className="relative">
+              <p className="mb-3 text-center text-xs font-medium text-white/55">
+                Use previous / next to read at your pace.
+              </p>
               <div className="mb-4 grid grid-cols-4 gap-2">
                 {adSlides.map((slide, index) => (
-                  <div key={slide.title} className="h-1.5 overflow-hidden rounded-full bg-white/15">
+                  <button
+                    key={slide.title}
+                    onClick={() => {
+                      setAdPaused(true);
+                      setAdIndex(index);
+                    }}
+                    className="h-2 overflow-hidden rounded-full bg-white/15"
+                    aria-label={`Show message ${index + 1}`}
+                  >
                     <motion.div
                       className="h-full rounded-full bg-emerald-200"
                       initial={{ width: "0%" }}
-                      animate={{ width: index < adIndex ? "100%" : index === adIndex ? "100%" : "0%" }}
-                      transition={{ duration: index === adIndex ? 4 : 0.2, ease: "linear" }}
+                      animate={{
+                        width:
+                          index < adIndex || index === adIndex
+                            ? "100%"
+                            : "0%"
+                      }}
+                      transition={{ duration: 0.2, ease: "linear" }}
                     />
-                  </div>
+                  </button>
                 ))}
+              </div>
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                <button
+                  onClick={showPreviousAd}
+                  className="flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </button>
+                <button
+                  onClick={() => setAdPaused((paused) => !paused)}
+                  className="flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
+                >
+                  {adPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                  {adPaused ? "Play" : "Pause"}
+                </button>
+                <button
+                  onClick={showNextAd}
+                  className="flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
 
               <button
