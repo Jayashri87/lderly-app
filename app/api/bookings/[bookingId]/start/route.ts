@@ -3,6 +3,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
 import { TrustedBooking } from "../../../../../server/trustedBooking";
@@ -24,22 +25,33 @@ export async function POST(
     return jsonError("Customer start OTP is required", 400);
   }
 
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     request,
-    {
-      action: "booking.service_start.verify_otp",
-      resource: bookingId,
-      status: "success",
-      details: {
-        caretakerId: auth.session.uid
-      }
-    },
-    () => TrustedBooking.startWithOtp(bookingId, body.otp || "", auth.session)
+    auth.session,
+    "booking.service_start.verify_otp",
+    `${bookingId}:${body.otp.trim()}`,
+    () =>
+      withMutationAudit(
+        request,
+        {
+          action: "booking.service_start.verify_otp",
+          resource: bookingId,
+          status: "success",
+          details: {
+            caretakerId: auth.session.uid
+          }
+        },
+        () => TrustedBooking.startWithOtp(bookingId, body.otp || "", auth.session)
+      )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ booking: result.booking });
+  return NextResponse.json(
+    { booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }

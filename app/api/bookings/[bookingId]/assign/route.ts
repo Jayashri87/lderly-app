@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import {
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
 import { TrustedBooking } from "../../../../../server/trustedBooking";
@@ -16,23 +17,33 @@ export async function POST(
   }
 
   const { bookingId } = await context.params;
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     _request,
-    {
-      action: "booking.assign",
-      resource: bookingId,
-      status: "success",
-      details: {
-        actor: auth.session.username
-      }
-    },
-    () => TrustedBooking.assign(bookingId)
+    auth.session,
+    "booking.assign",
+    bookingId,
+    () =>
+      withMutationAudit(
+        _request,
+        {
+          action: "booking.assign",
+          resource: bookingId,
+          status: "success",
+          details: {
+            actor: auth.session.username
+          }
+        },
+        () => TrustedBooking.assign(bookingId)
+      )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ booking: result.booking });
+  return NextResponse.json(
+    { booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }
-

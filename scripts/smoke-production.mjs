@@ -829,14 +829,41 @@ try {
       uberAcceptResult.json?.booking?.caretakerId === "demo-caretaker",
     "first accepted dispatch locks caregiver assignment"
   );
+  const uberAcceptReplayResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    caretakerCookie
+  );
+  expect(
+    uberAcceptReplayResult.response.headers.get("x-idempotent-replay") === "true" ||
+      uberAcceptReplayResult.json?.replayed === true,
+    "dispatch accept double tap replays safely"
+  );
 
-  await request(
+  const uberEnRouteResult = await request(
     `/api/bookings/${encodeURIComponent(uberBooking.id)}/status`,
     {
       method: "POST",
       body: JSON.stringify({ status: "en_route" })
     },
     caretakerCookie
+  );
+  expect(uberEnRouteResult.response.ok, "caretaker can mark en route", uberEnRouteResult.text);
+  const uberEnRouteReplayResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "en_route" })
+    },
+    caretakerCookie
+  );
+  expect(
+    uberEnRouteReplayResult.response.headers.get("x-idempotent-replay") === "true" ||
+      uberEnRouteReplayResult.json?.replayed === true,
+    "status double tap replays safely"
   );
   await request(
     `/api/bookings/${encodeURIComponent(uberBooking.id)}/status`,
@@ -859,6 +886,19 @@ try {
   expect(
     Boolean(uberStartResult.json?.booking?.serviceStart?.verifiedAt),
     "customer OTP verification is persisted"
+  );
+  const uberStartReplayResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/start`,
+    {
+      method: "POST",
+      body: JSON.stringify({ otp: startOtp })
+    },
+    caretakerCookie
+  );
+  expect(
+    uberStartReplayResult.response.headers.get("x-idempotent-replay") === "true" ||
+      uberStartReplayResult.json?.replayed === true,
+    "service start OTP retry replays safely"
   );
 
   const uberDoneResult = await request(
@@ -888,6 +928,19 @@ try {
     uberVerifyResult.json?.booking?.status === "payment_settled" &&
       uberVerifyResult.json?.booking?.completion?.paymentReleaseStatus === "released",
     "customer verification releases payment state"
+  );
+  const uberVerifyReplayResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/verify-completion`,
+    {
+      method: "POST",
+      body: JSON.stringify({ approved: true })
+    },
+    customerCookie
+  );
+  expect(
+    uberVerifyReplayResult.response.headers.get("x-idempotent-replay") === "true" ||
+      uberVerifyReplayResult.json?.replayed === true,
+    "completion verification retry replays safely"
   );
 
   const expiredOfferBooking = buildSmokeBooking("-expired-offer");
@@ -953,6 +1006,19 @@ try {
   expect(
     cancelBroadcastResult.json?.booking?.status === "cancelled",
     "customer cancellation marks broadcast booking cancelled"
+  );
+  const cancelBroadcastReplayResult = await request(
+    `/api/bookings/${encodeURIComponent(cancelBroadcastBooking.id)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: "Smoke customer cancelled before acceptance" })
+    },
+    customerCookie
+  );
+  expect(
+    cancelBroadcastReplayResult.response.headers.get("x-idempotent-replay") === "true" ||
+      cancelBroadcastReplayResult.json?.replayed === true,
+    "customer cancellation retry replays safely"
   );
   const cancelledOfferStatus = await database
     .ref(`caretakers/demo-caretaker/offers/${cancelBroadcastBooking.id}/status`)

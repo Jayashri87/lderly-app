@@ -3,6 +3,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
 import { TrustedBooking } from "../../../../../server/trustedBooking";
@@ -24,32 +25,43 @@ export async function POST(
     return jsonError("Rating score must be between 1 and 5", 400);
   }
 
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     request,
-    {
-      action: "booking.rating",
-      resource: bookingId,
-      status: "success",
-      details: {
-        actor: auth.session.role,
-        score: body.score
-      }
-    },
+    auth.session,
+    "booking.rating",
+    `${bookingId}:${body.score}:${body.note?.trim() || ""}`,
     () =>
-      TrustedBooking.rate(
-        bookingId,
+      withMutationAudit(
+        request,
         {
-          score: body.score!,
-          note: body.note?.trim() || "Care completed well",
-          ratedBy: auth.session.uid || auth.session.username
+          action: "booking.rating",
+          resource: bookingId,
+          status: "success",
+          details: {
+            actor: auth.session.role,
+            score: body.score
+          }
         },
-        auth.session
+        () =>
+          TrustedBooking.rate(
+            bookingId,
+            {
+              score: body.score!,
+              note: body.note?.trim() || "Care completed well",
+              ratedBy: auth.session.uid || auth.session.username
+            },
+            auth.session
+          )
       )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ booking: result.booking });
+  return NextResponse.json(
+    { booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }

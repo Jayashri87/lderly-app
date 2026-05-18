@@ -79,6 +79,14 @@ export const isNonEmptyString = (value: unknown): value is string =>
 const safeFirebaseKey = (value: string) =>
   value.replace(/[.#$/[\]]/g, "_").slice(0, 420);
 
+const isFailedOperationResult = (value: unknown) =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      "ok" in value &&
+      (value as { ok?: unknown }).ok === false
+  );
+
 export const checkRateLimit = (
   request: NextRequest,
   key: string,
@@ -204,6 +212,11 @@ export const withIdempotency = async <T>(
   }
 
   const value = await handler();
+
+  if (isFailedOperationResult(value)) {
+    return { value, replayed: false };
+  }
+
   await ref
     .set({
       operation,

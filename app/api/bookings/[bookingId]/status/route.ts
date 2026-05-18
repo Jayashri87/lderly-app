@@ -4,6 +4,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../../../server/apiSecurity";
 import { TrustedBooking } from "../../../../../server/trustedBooking";
@@ -39,24 +40,34 @@ export async function POST(
     return jsonError("Valid booking status is required", 400);
   }
 
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     request,
-    {
-      action: "booking.status",
-      resource: bookingId,
-      status: "success",
-      details: {
-        actor: auth.session.role,
-        nextStatus: body.status
-      }
-    },
-    () => TrustedBooking.updateStatus(bookingId, body.status as BookingStatus, auth.session)
+    auth.session,
+    "booking.status",
+    `${bookingId}:${body.status}`,
+    () =>
+      withMutationAudit(
+        request,
+        {
+          action: "booking.status",
+          resource: bookingId,
+          status: "success",
+          details: {
+            actor: auth.session.role,
+            nextStatus: body.status
+          }
+        },
+        () => TrustedBooking.updateStatus(bookingId, body.status as BookingStatus, auth.session)
+      )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ booking: result.booking });
+  return NextResponse.json(
+    { booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }
-

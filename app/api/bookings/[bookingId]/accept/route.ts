@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiSession, withMutationAudit } from "../../../../../server/apiSecurity";
+import {
+  requireApiSession,
+  withIdempotency,
+  withMutationAudit
+} from "../../../../../server/apiSecurity";
 import { TrustedBooking } from "../../../../../server/trustedBooking";
 
 export async function POST(
@@ -13,22 +17,33 @@ export async function POST(
   }
 
   const { bookingId } = await context.params;
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     request,
-    {
-      action: "booking.dispatch.accept",
-      resource: bookingId,
-      status: "success",
-      details: {
-        caretakerId: auth.session.uid
-      }
-    },
-    () => TrustedBooking.acceptOffer(bookingId, auth.session)
+    auth.session,
+    "booking.dispatch.accept",
+    bookingId,
+    () =>
+      withMutationAudit(
+        request,
+        {
+          action: "booking.dispatch.accept",
+          resource: bookingId,
+          status: "success",
+          details: {
+            caretakerId: auth.session.uid
+          }
+        },
+        () => TrustedBooking.acceptOffer(bookingId, auth.session)
+      )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ booking: result.booking });
+  return NextResponse.json(
+    { booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }
