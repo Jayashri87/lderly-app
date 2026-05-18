@@ -284,6 +284,13 @@ export const TrustedBooking = {
       return { ok: false as const, status: 400, error: "Invalid initial booking status" };
     }
 
+    const existingByIdSnapshot = await database.ref(`bookings/byId/${booking.id}`).get();
+    const existingById = existingByIdSnapshot.val() as CareBooking | null;
+
+    if (existingById) {
+      return { ok: true as const, booking: existingById };
+    }
+
     const locationReadyBooking = await enrichBookingLocation({
       ...booking,
       status: booking.status === "requested" ? "searching" : booking.status

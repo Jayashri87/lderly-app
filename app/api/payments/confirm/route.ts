@@ -3,6 +3,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../../server/apiSecurity";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
@@ -86,33 +87,44 @@ export async function POST(request: NextRequest) {
     return jsonError("Invalid Razorpay signature", 400);
   }
 
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     request,
-    {
-      action: "payment.confirm",
-      resource: booking.id,
-      status: "success",
-      details: {
-        orderId: body.razorpay_order_id,
-        paymentId: body.razorpay_payment_id
-      }
-    },
+    auth.session,
+    "payment.confirm",
+    `${booking.id}:${body.razorpay_order_id}:${body.razorpay_payment_id}`,
     () =>
-      TrustedBooking.updatePayment(
-        booking.id,
+      withMutationAudit(
+        request,
         {
-          method: "upi",
-          status: "paid",
-          invoiceId: body.razorpay_payment_id
+          action: "payment.confirm",
+          resource: booking.id,
+          status: "success",
+          details: {
+            orderId: body.razorpay_order_id,
+            paymentId: body.razorpay_payment_id
+          }
         },
-        "Razorpay payment confirmed"
+        () =>
+          TrustedBooking.updatePayment(
+            booking.id,
+            {
+              method: "upi",
+              status: "paid",
+              invoiceId: body.razorpay_payment_id
+            },
+            "Razorpay payment confirmed"
+          )
       )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ ok: true, booking: result.booking });
+  return NextResponse.json(
+    { ok: true, booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }
 

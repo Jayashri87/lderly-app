@@ -18,6 +18,12 @@ type AuditEvent = {
   details?: Record<string, unknown>;
 };
 
+type IdempotencySession = {
+  uid?: string;
+  username?: string;
+  role?: string;
+};
+
 const buckets = new Map<string, RateBucket>();
 const rateWindowMs = 60 * 1000;
 
@@ -69,6 +75,9 @@ export const parseJsonBody = async <T>(request: NextRequest): Promise<T | null> 
 
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
+
+const safeFirebaseKey = (value: string) =>
+  value.replace(/[.#$/[\]]/g, "_").slice(0, 420);
 
 export const checkRateLimit = (
   request: NextRequest,
@@ -161,6 +170,55 @@ export const writeAuditLog = async (request: NextRequest, event: AuditEvent) => 
       createdAt: Date.now()
     })
     .catch(() => undefined);
+};
+
+export const withIdempotency = async <T>(
+  request: NextRequest,
+  session: IdempotencySession,
+  operation: string,
+  fallbackKey: string,
+  handler: () => Promise<T>
+): Promise<{ value: T; replayed: boolean }> => {
+  const database = getAdminDatabase();
+  const headerKey = request.headers.get("idempotency-key")?.trim();
+  const rawKey = headerKey || fallbackKey;
+
+  if (!database || !rawKey) {
+    return { value: await handler(), replayed: false };
+  }
+
+  const owner = session.uid || session.username || "anonymous";
+  const key = safeFirebaseKey(`${operation}:${session.role || "role"}:${owner}:${rawKey}`);
+  const ref = database.ref(`operations/idempotency/${key}`);
+  const existingSnapshot = await ref.get();
+  const existing = existingSnapshot.val() as
+    | {
+        value?: T;
+        operation?: string;
+        path?: string;
+      }
+    | null;
+
+  if (existing?.value && existing.operation === operation && existing.path === request.nextUrl.pathname) {
+    return { value: existing.value, replayed: true };
+  }
+
+  const value = await handler();
+  await ref
+    .set({
+      operation,
+      path: request.nextUrl.pathname,
+      method: request.method,
+      owner,
+      role: session.role || "",
+      idempotencyKey: rawKey.slice(0, 180),
+      value,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000
+    })
+    .catch(() => undefined);
+
+  return { value, replayed: false };
 };
 
 export const withMutationAudit = async <T>(

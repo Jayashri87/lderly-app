@@ -761,6 +761,40 @@ try {
   const customerRead = await database.ref(`bookings/byId/${booking.id}`).get();
   expect(customerRead.exists(), "booking persisted in Firebase");
 
+  const idempotentBookingKey = `smoke-booking-idempotency-${Date.now()}`;
+  const duplicateCreateFirst = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      headers: { "idempotency-key": idempotentBookingKey },
+      body: JSON.stringify({ booking })
+    },
+    customerCookie
+  );
+  expect(
+    duplicateCreateFirst.response.ok,
+    "booking create duplicate returns existing booking",
+    duplicateCreateFirst.text
+  );
+  expect(
+    duplicateCreateFirst.json?.booking?.id === booking.id,
+    "duplicate booking create does not create a new booking id"
+  );
+  const duplicateCreateReplay = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      headers: { "idempotency-key": idempotentBookingKey },
+      body: JSON.stringify({ booking })
+    },
+    customerCookie
+  );
+  expect(
+    duplicateCreateReplay.response.headers.get("x-idempotent-replay") === "true" ||
+      duplicateCreateReplay.json?.replayed === true,
+    "booking create idempotency replays stored result"
+  );
+
   const uberBooking = buildSmokeBooking("-uber-dispatch");
   const uberCreateResult = await request(
     "/api/bookings",
@@ -989,6 +1023,35 @@ try {
   expect(
     ["razorpay", "mock"].includes(checkoutResult.json?.mode),
     "checkout returns Razorpay-compatible payload"
+  );
+  const checkoutReplayKey = `smoke-checkout-idempotency-${Date.now()}`;
+  const checkoutReplayFirst = await request(
+    "/api/payments/checkout",
+    {
+      method: "POST",
+      headers: { "idempotency-key": checkoutReplayKey },
+      body: JSON.stringify({ bookingId: booking.id })
+    },
+    customerCookie
+  );
+  const checkoutReplaySecond = await request(
+    "/api/payments/checkout",
+    {
+      method: "POST",
+      headers: { "idempotency-key": checkoutReplayKey },
+      body: JSON.stringify({ bookingId: booking.id })
+    },
+    customerCookie
+  );
+  expect(checkoutReplayFirst.response.ok, "idempotent checkout first attempt succeeds", checkoutReplayFirst.text);
+  expect(
+    checkoutReplaySecond.response.headers.get("x-idempotent-replay") === "true" ||
+      checkoutReplaySecond.json?.replayed === true,
+    "checkout idempotency replays stored order"
+  );
+  expect(
+    checkoutReplayFirst.json?.orderId === checkoutReplaySecond.json?.orderId,
+    "checkout replay returns same order id"
   );
 
   const supportResult = await request(

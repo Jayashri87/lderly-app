@@ -3,6 +3,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../../server/apiSecurity";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
@@ -43,51 +44,70 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let checkout;
+  const idempotent = await withIdempotency(
+    request,
+    auth.session,
+    "payment.checkout",
+    body.bookingId,
+    async () => {
+      let checkout;
 
-  try {
-    checkout = await createCheckout({
-      booking,
-      origin: request.nextUrl.origin
-    });
-  } catch (error) {
+      try {
+        checkout = await createCheckout({
+          booking,
+          origin: request.nextUrl.origin
+        });
+      } catch (error) {
+        return {
+          ok: false as const,
+          status: 503,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Payment provider is not available"
+        };
+      }
+
+      await withMutationAudit(
+        request,
+        {
+          action: "payment.checkout",
+          resource: booking.id,
+          status: "success",
+          details: {
+            provider: checkout.provider,
+            mode: checkout.mode,
+            orderId: checkout.orderId
+          }
+        },
+        () =>
+          TrustedBooking.updatePayment(
+            booking.id,
+            {
+              method: "upi",
+              status: "authorized",
+              invoiceId: checkout.orderId
+            },
+            checkout.mode === "razorpay"
+              ? "Razorpay order created"
+              : "Mock payment authorized"
+          )
+      )
+
+      return { ok: true as const, checkout };
+    }
+  );
+
+  if (!idempotent.value.ok) {
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Payment provider is not available"
-      },
-      { status: 503 }
+      { error: idempotent.value.error },
+      { status: idempotent.value.status }
     );
   }
 
-  await withMutationAudit(
-    request,
-    {
-      action: "payment.checkout",
-      resource: booking.id,
-      status: "success",
-      details: {
-        provider: checkout.provider,
-        mode: checkout.mode,
-        orderId: checkout.orderId
-      }
-    },
-    () =>
-      TrustedBooking.updatePayment(
-        booking.id,
-        {
-          method: "upi",
-          status: "authorized",
-          invoiceId: checkout.orderId
-        },
-        checkout.mode === "razorpay"
-          ? "Razorpay order created"
-          : "Mock payment authorized"
-      )
+  return NextResponse.json(
+    { ...idempotent.value.checkout, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
   );
-
-  return NextResponse.json(checkout);
 }
 

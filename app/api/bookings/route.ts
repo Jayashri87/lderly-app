@@ -4,6 +4,7 @@ import {
   jsonError,
   parseJsonBody,
   requireApiSession,
+  withIdempotency,
   withMutationAudit
 } from "../../../server/apiSecurity";
 import { TrustedBooking } from "../../../server/trustedBooking";
@@ -21,25 +22,36 @@ export async function POST(request: NextRequest) {
     return jsonError("Booking payload is required", 400);
   }
 
-  const result = await withMutationAudit(
+  const idempotent = await withIdempotency(
     request,
-    {
-      action: "booking.create",
-      resource: body.booking.id,
-      status: "success",
-      details: {
-        actor: auth.session.role,
-        customerId: body.booking.customerId,
-        serviceType: body.booking.serviceType
-      }
-    },
-    () => TrustedBooking.create(body.booking as CareBooking)
+    auth.session,
+    "booking.create",
+    body.booking.id,
+    () =>
+      withMutationAudit(
+        request,
+        {
+          action: "booking.create",
+          resource: body.booking!.id,
+          status: "success",
+          details: {
+            actor: auth.session.role,
+            customerId: body.booking!.customerId,
+            serviceType: body.booking!.serviceType
+          }
+        },
+        () => TrustedBooking.create(body.booking as CareBooking)
+      )
   );
+  const result = idempotent.value;
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ booking: result.booking });
+  return NextResponse.json(
+    { booking: result.booking, replayed: idempotent.replayed },
+    { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
+  );
 }
 
