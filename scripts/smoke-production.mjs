@@ -516,6 +516,10 @@ try {
     "ops backup manifest API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.opsGoLiveReadinessApi === true,
+    "ops go-live readiness API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.opsMaintenanceCronPrepared === true,
     "ops maintenance cron is prepared"
   );
@@ -1955,6 +1959,23 @@ try {
   expect(
     latestBackupManifestResult.json?.manifest?.id === backupManifestResult.json?.manifest?.id,
     "latest backup manifest is persisted"
+  );
+  const goLiveReadinessResult = await request("/api/ops/readiness", {}, adminCookie);
+  expect(goLiveReadinessResult.response.ok, "admin can read go-live readiness snapshot");
+  expect(
+    Array.isArray(goLiveReadinessResult.json?.snapshot?.checks),
+    "go-live readiness returns launch checks"
+  );
+  expect(
+    goLiveReadinessResult.json?.snapshot?.checks?.some(
+      (check) => check.id === "firebase-admin" && check.ready === true
+    ),
+    "go-live readiness verifies Firebase Admin"
+  );
+  expect(
+    goLiveReadinessResult.json?.snapshot?.latestBackupId ===
+      backupManifestResult.json?.manifest?.id,
+    "go-live readiness includes latest backup manifest"
   );
 
   const reassuranceResult = await request(

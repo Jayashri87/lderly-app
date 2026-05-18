@@ -135,6 +135,7 @@ export async function GET() {
       opsRecoveryApi: true,
       opsMaintenanceApi: true,
       opsBackupManifestApi: true,
+      opsGoLiveReadinessApi: true,
       opsMaintenanceCronPrepared: existsSync(join(process.cwd(), "vercel.json")),
       opsMaintenanceCronConfigured: hasEnv("CRON_SECRET"),
       expiredLockCleanup: true,

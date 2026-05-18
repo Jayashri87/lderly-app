@@ -141,6 +141,27 @@ The manifest does not replace a real Firebase export. It records the critical RT
 
 Production still needs an external export destination, such as scheduled Firebase export to Google Cloud Storage or a managed backup process.
 
+## Go-Live Readiness Gate
+
+Ops can verify launch readiness with:
+
+```bash
+GET /api/ops/readiness
+```
+
+The snapshot checks:
+
+- Firebase Admin trusted backend
+- strict Firebase rules marker
+- signed session secret
+- latest ops maintenance run
+- latest backup manifest
+- cron secret
+- Google Maps production config
+- Sentry/PostHog observability
+
+`goLiveReady` becomes true only when blocker checks are clear. Warning checks should still be resolved before paid launch.
+
 ## Notification Retry Policy
 
 Notification dispatch now records:
