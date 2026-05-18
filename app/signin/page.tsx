@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -16,6 +16,32 @@ import {
 
 const lderlyContactNumber = "+91 99169 60524";
 const lderlyContactHref = "tel:+919916960524";
+const adSlides = [
+  {
+    eyebrow: "For families away from home",
+    title: "Is Mom okay right now?",
+    body: "LDERLY helps families arrange trusted care and stay reassured throughout the visit.",
+    stat: "Live family updates"
+  },
+  {
+    eyebrow: "Verified care support",
+    title: "A trained caregiver, not just a booking.",
+    body: "We understand the care need first, then help create the right care plan for your parent.",
+    stat: "Human-led onboarding"
+  },
+  {
+    eyebrow: "Care with visibility",
+    title: "You know what happened, when it happened.",
+    body: "Visits, medicine support, doctor help, companionship, and updates become easier to follow.",
+    stat: "Trust-first coordination"
+  },
+  {
+    eyebrow: "Start with a call",
+    title: "Share your details. We will guide the rest.",
+    body: "Our team will call, verify the requirement, create your ID, and help with the first booking.",
+    stat: "No OTP. No confusion."
+  }
+];
 
 export default function SignInPage() {
   const [name, setName] = useState("");
@@ -24,6 +50,24 @@ export default function SignInPage() {
   const [leadError, setLeadError] = useState("");
   const [leadBusy, setLeadBusy] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [adIndex, setAdIndex] = useState(0);
+
+  useEffect(() => {
+    if (showLeadForm) {
+      return;
+    }
+
+    const slideTimer = window.setInterval(() => {
+      setAdIndex((current) => Math.min(current + 1, adSlides.length - 1));
+    }, 4000);
+    const revealTimer = window.setTimeout(() => setShowLeadForm(true), 16000);
+
+    return () => {
+      window.clearInterval(slideTimer);
+      window.clearTimeout(revealTimer);
+    };
+  }, [showLeadForm]);
 
   const submitLead = async () => {
     setLeadError("");
@@ -91,72 +135,122 @@ export default function SignInPage() {
           </span>
         </motion.header>
 
-        <motion.section
-          initial={{ opacity: 0, scale: 0.98, y: 18 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
-        >
-          <motion.div
-            aria-hidden
-            animate={{ x: ["-20%", "24%", "-20%"], opacity: [0.15, 0.35, 0.15] }}
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-16 left-8 h-36 w-36 rounded-full bg-emerald-300/40 blur-3xl"
-          />
-          <motion.div
-            aria-hidden
-            animate={{ y: [0, -14, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute right-5 top-6 rounded-3xl border border-white/10 bg-white/10 p-3 backdrop-blur"
+        {!showLeadForm && !leadSubmitted ? (
+          <motion.section
+            initial={{ opacity: 0, scale: 0.98, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative flex min-h-[72vh] flex-col justify-between overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
           >
-            <ShieldCheck className="h-6 w-6 text-emerald-200" />
-          </motion.div>
-
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-2 text-xs font-semibold text-emerald-100">
-              <Sparkles className="h-4 w-4" />
-              Premium elderly care coordination
-            </div>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight">
-              Care for your parents, arranged with trust.
-            </h1>
-            <p className="mt-4 text-base leading-7 text-white/68">
-              Share your contact details. Our care team will call you, understand your
-              family needs, and create your LDERLY account.
-            </p>
-
-            <a
-              href={lderlyContactHref}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-4 text-sm font-semibold text-[#06130f] shadow-xl shadow-black/20"
+            <motion.div
+              aria-hidden
+              animate={{
+                x: ["-16%", "28%", "-16%"],
+                y: [0, 22, 0],
+                opacity: [0.18, 0.38, 0.18]
+              }}
+              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -top-20 left-6 h-48 w-48 rounded-full bg-emerald-300/40 blur-3xl"
+            />
+            <motion.div
+              aria-hidden
+              animate={{ rotate: [0, 4, 0], y: [0, -16, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute right-5 top-16 rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur"
             >
-              <Phone className="h-5 w-5 text-emerald-700" />
-              Call LDERLY now
-            </a>
-            <p className="mt-2 text-center text-xs text-white/55">
-              Immediate care enquiry: {lderlyContactNumber}
-            </p>
+              <ShieldCheck className="h-8 w-8 text-emerald-200" />
+            </motion.div>
 
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              {[
-                ["Verified", "caregivers"],
-                ["Live", "updates"],
-                ["Family", "support"]
-              ].map(([title, subtitle]) => (
-                <motion.div
-                  key={title}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl bg-white/10 p-3 text-center"
-                >
-                  <p className="text-sm font-semibold">{title}</p>
-                  <p className="mt-1 text-[11px] text-white/55">{subtitle}</p>
-                </motion.div>
-              ))}
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-2 text-xs font-semibold text-emerald-100">
+                <Sparkles className="h-4 w-4" />
+                20 sec care story
+              </div>
+
+              <motion.div
+                key={adIndex}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                transition={{ duration: 0.55 }}
+                className="mt-12"
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-100/80">
+                  {adSlides[adIndex].eyebrow}
+                </p>
+                <h1 className="mt-4 text-5xl font-semibold leading-[1.02] tracking-tight">
+                  {adSlides[adIndex].title}
+                </h1>
+                <p className="mt-5 text-base leading-7 text-white/68">
+                  {adSlides[adIndex].body}
+                </p>
+                <div className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold text-white">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-200" />
+                  {adSlides[adIndex].stat}
+                </div>
+              </motion.div>
             </div>
-          </div>
-        </motion.section>
 
-        <motion.section
+            <div className="relative">
+              <div className="mb-4 grid grid-cols-4 gap-2">
+                {adSlides.map((slide, index) => (
+                  <div key={slide.title} className="h-1.5 overflow-hidden rounded-full bg-white/15">
+                    <motion.div
+                      className="h-full rounded-full bg-emerald-200"
+                      initial={{ width: "0%" }}
+                      animate={{ width: index < adIndex ? "100%" : index === adIndex ? "100%" : "0%" }}
+                      transition={{ duration: index === adIndex ? 4 : 0.2, ease: "linear" }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowLeadForm(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-4 text-sm font-semibold text-[#06130f] shadow-xl shadow-black/20"
+              >
+                Request care callback
+                <ArrowRight className="h-5 w-5" />
+              </button>
+              <a
+                href={lderlyContactHref}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-4 text-sm font-semibold text-white"
+              >
+                <Phone className="h-5 w-5 text-emerald-200" />
+                Call now: {lderlyContactNumber}
+              </a>
+            </div>
+          </motion.section>
+        ) : (
+          <motion.section
+            initial={{ opacity: 0, scale: 0.98, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
+          >
+            <motion.div
+              aria-hidden
+              animate={{ x: ["-20%", "24%", "-20%"], opacity: [0.15, 0.35, 0.15] }}
+              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -top-16 left-8 h-36 w-36 rounded-full bg-emerald-300/40 blur-3xl"
+            />
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-2 text-xs font-semibold text-emerald-100">
+                <Sparkles className="h-4 w-4" />
+                Premium elderly care coordination
+              </div>
+              <h1 className="mt-5 text-4xl font-semibold tracking-tight">
+                Care for your parents, arranged with trust.
+              </h1>
+              <p className="mt-4 text-base leading-7 text-white/68">
+                Share your contact details. Our care team will call you, understand your
+                family needs, and create your LDERLY account.
+              </p>
+            </div>
+          </motion.section>
+        )}
+
+        {(showLeadForm || leadSubmitted) && <motion.section
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -282,7 +376,7 @@ export default function SignInPage() {
               {leadError && <p className="mt-4 text-sm text-amber-700">{leadError}</p>}
             </>
           )}
-        </motion.section>
+        </motion.section>}
       </div>
     </main>
   );
