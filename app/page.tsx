@@ -1484,6 +1484,41 @@ export default function CustomerApp() {
     await BookingService.verifyCompletion(true, "Family verified service completion");
   };
 
+  const cancelActiveCare = () => {
+    if (
+      !visibleBooking ||
+      !["searching", "assigned", "accepted"].includes(visibleBooking.status)
+    ) {
+      return;
+    }
+
+    trackProductEvent("customer_cancel_request_clicked", {
+      bookingId: visibleBooking.id,
+      service: visibleBooking.serviceType,
+      status: visibleBooking.status
+    });
+    BookingService.cancelBooking("Family cancelled before service started", "customer");
+    setPaymentMessage("Care request cancelled. We will keep the family updated.");
+  };
+
+  const rateLatestCare = () => {
+    if (
+      !visibleBooking ||
+      !["payment_settled", "report_generated"].includes(visibleBooking.status) ||
+      visibleBooking.rating?.score
+    ) {
+      return;
+    }
+
+    trackProductEvent("customer_quick_rating_clicked", {
+      bookingId: visibleBooking.id,
+      service: visibleBooking.serviceType,
+      score: 5
+    });
+    BookingService.rateBooking(5, "Family felt reassured after this visit");
+    setPaymentMessage("Thank you. Your rating helps keep caregiver quality high.");
+  };
+
   const navItems = useMemo(
     () => [
       { key: "home" as const, label: "Home", icon: Home },
@@ -1616,6 +1651,7 @@ export default function CustomerApp() {
                     activeCare={Boolean(activeCare)}
                     experience={currentServiceExperience}
                     onTrack={() => selectTab("journey", "quick_action_track")}
+                    onBook={openBooking}
                     onRebook={rebookPreviousCare}
                   />
                   <CareConfidence recipient={recipient} health={health} />
@@ -1680,6 +1716,8 @@ export default function CustomerApp() {
                 booking={visibleBooking}
                 onImmediate={requestImmediateCare}
                 onVerifyCompletion={verifyCareCompletion}
+                onCancelCare={cancelActiveCare}
+                onRateCare={rateLatestCare}
               />
             </Screen>
           )}
@@ -2204,23 +2242,31 @@ function QuickActions({
   activeCare,
   experience,
   onTrack,
+  onBook,
   onRebook
 }: {
   activeCare: boolean;
   experience: ReturnType<typeof serviceExperienceFor>;
   onTrack: () => void;
+  onBook: () => void;
   onRebook: () => void;
 }) {
   return (
     <section className="mt-5 grid grid-cols-2 gap-3">
       <button
-        onClick={onTrack}
+        onClick={activeCare ? onTrack : onBook}
         className="rounded-[1.5rem] bg-white/10 p-4 text-left"
       >
-        <MapPinned className="h-5 w-5 text-emerald-200" />
-        <p className="mt-3 font-semibold">{experience.trackLabel}</p>
+        {activeCare ? (
+          <MapPinned className="h-5 w-5 text-emerald-200" />
+        ) : (
+          <HeartPulse className="h-5 w-5 text-emerald-200" />
+        )}
+        <p className="mt-3 font-semibold">
+          {activeCare ? experience.trackLabel : "Book care now"}
+        </p>
         <p className="mt-1 text-sm text-white/45">
-          {activeCare ? "Live updates ready" : "No active care yet"}
+          {activeCare ? "Live updates ready" : "Start a guided request"}
         </p>
       </button>
       <button
@@ -3403,13 +3449,17 @@ function JourneyExperience({
   journey,
   booking,
   onImmediate,
-  onVerifyCompletion
+  onVerifyCompletion,
+  onCancelCare,
+  onRateCare
 }: {
   recipient: Recipient;
   journey: CareJourney | null;
   booking: CareBooking | null;
   onImmediate: () => void;
   onVerifyCompletion: () => void;
+  onCancelCare: () => void;
+  onRateCare: () => void;
 }) {
   const bookingStatus = booking?.status ?? "none";
   const status =
@@ -3475,6 +3525,9 @@ function JourneyExperience({
             : 0;
   const currentStep = journeySteps[activeIndex];
   const nextStep = journeySteps[Math.min(activeIndex + 1, journeySteps.length - 1)];
+  const canCancelRequest = ["searching", "assigned", "accepted"].includes(bookingStatus);
+  const canRateCare =
+    ["payment_settled", "report_generated"].includes(bookingStatus) && !booking?.rating?.score;
 
   return (
     <section>
@@ -3586,6 +3639,14 @@ function JourneyExperience({
             <p className="mt-2 text-sm text-slate-500">
               The family verified the visit and caregiver payout is ready for ops processing.
             </p>
+            {canRateCare ? (
+              <button
+                onClick={onRateCare}
+                className="mt-4 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+              >
+                Rate this care 5/5
+              </button>
+            ) : null}
           </>
         ) : (
           <p className="mt-2 text-sm text-slate-500">
@@ -3593,6 +3654,15 @@ function JourneyExperience({
           </p>
         )}
       </section>
+
+      {canCancelRequest ? (
+        <button
+          onClick={onCancelCare}
+          className="mt-4 w-full rounded-full border border-white/15 bg-white/10 px-5 py-4 text-sm font-semibold text-white"
+        >
+          Cancel this care request
+        </button>
+      ) : null}
 
       <div className="mt-5">
         <LiveMap journey={activeMapJourney} />
