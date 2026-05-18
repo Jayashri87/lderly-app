@@ -32,6 +32,7 @@ export default function PartnerApp() {
   const [caretakerPassword, setCaretakerPassword] = useState("");
   const [caretakerError, setCaretakerError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [customerStartOtp, setCustomerStartOtp] = useState("");
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>("idle");
   const [gpsMessage, setGpsMessage] = useState("Live GPS has not started.");
   const [gpsWatchId, setGpsWatchId] = useState<number | null>(null);
@@ -433,6 +434,31 @@ export default function PartnerApp() {
           </div>
         </section>
 
+        <section className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+          <p className="text-sm font-semibold text-emerald-100">Uber-style job flow</p>
+          <h2 className="mt-1 text-xl font-semibold">
+            Accept request, travel, verify OTP, complete visit
+          </h2>
+          <p className="mt-1 text-sm text-white/55">
+            The customer shares the start OTP only after you reach the care location.
+          </p>
+          <div className="mt-3 grid grid-cols-4 gap-1 text-[11px] text-white/60">
+            {["Offer", "Accept", "OTP Start", "Family Verify"].map((step) => (
+              <div key={step} className="rounded-full bg-white/10 px-2 py-2 text-center">
+                {step}
+              </div>
+            ))}
+          </div>
+          <input
+            value={customerStartOtp}
+            onChange={(event) => setCustomerStartOtp(event.target.value)}
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="Enter customer start OTP"
+            className="mt-4 w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-center text-lg font-semibold tracking-[0.28em] text-[#080b10] outline-none"
+          />
+        </section>
+
         <div className="mt-5">
           <LiveMap journey={bookingMapJourney} />
         </div>
@@ -512,7 +538,7 @@ export default function PartnerApp() {
                 trackCaretakerAction("accepted_booking");
                 return isJourneyAssignment
                   ? JourneyService.updateStatus("accepted")
-                  : BookingService.updateStatus("accepted", "caretaker");
+                  : BookingService.acceptDispatchOffer();
               });
             }}
           />
@@ -544,15 +570,19 @@ export default function PartnerApp() {
             }}
           />
           <ActionButton
-            label="Start Visit"
+            label="Start with OTP"
             icon={ShieldCheck}
             disabled={!hasActiveAssignment}
             onClick={() => {
               runAssignmentAction("Visit started", () => {
                 trackCaretakerAction("visit_started");
+                if (isBookingAssignment) {
+                  BookingService.startWithCustomerOtp(customerStartOtp);
+                  return;
+                }
                 return isJourneyAssignment
                   ? JourneyService.updateStatus("arrived")
-                  : BookingService.updateStatus("in_progress", "caretaker");
+                  : undefined;
               });
             }}
           />

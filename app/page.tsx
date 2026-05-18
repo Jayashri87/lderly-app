@@ -1472,6 +1472,18 @@ export default function CustomerApp() {
     }, 1600);
   };
 
+  const verifyCareCompletion = async () => {
+    if (!visibleBooking || visibleBooking.status !== "completed") {
+      return;
+    }
+
+    trackProductEvent("customer_completion_verified", {
+      bookingId: visibleBooking.id,
+      service: visibleBooking.serviceType
+    });
+    await BookingService.verifyCompletion(true, "Family verified service completion");
+  };
+
   const navItems = useMemo(
     () => [
       { key: "home" as const, label: "Home", icon: Home },
@@ -1667,6 +1679,7 @@ export default function CustomerApp() {
                 journey={visibleJourney}
                 booking={visibleBooking}
                 onImmediate={requestImmediateCare}
+                onVerifyCompletion={verifyCareCompletion}
               />
             </Screen>
           )}
@@ -3389,12 +3402,14 @@ function JourneyExperience({
   recipient,
   journey,
   booking,
-  onImmediate
+  onImmediate,
+  onVerifyCompletion
 }: {
   recipient: Recipient;
   journey: CareJourney | null;
   booking: CareBooking | null;
   onImmediate: () => void;
+  onVerifyCompletion: () => void;
 }) {
   const bookingStatus = booking?.status ?? "none";
   const status =
@@ -3539,6 +3554,45 @@ function JourneyExperience({
         nextStep={nextStep}
         activeIndex={activeIndex}
       />
+
+      <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-white p-4 text-[#06130f]">
+        <p className="text-sm font-semibold text-emerald-700">Care security</p>
+        {booking?.status === "arrived" || booking?.status === "accepted" || booking?.status === "en_route" ? (
+          <>
+            <h3 className="mt-1 text-2xl font-semibold">Share OTP after caregiver arrives</h3>
+            <div className="mt-3 rounded-3xl bg-slate-100 px-5 py-4 text-center text-3xl font-semibold tracking-[0.35em]">
+              {booking?.serviceStart?.otp || "------"}
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              This OTP starts the service. Do not share it before the caregiver is at the care location.
+            </p>
+          </>
+        ) : booking?.status === "completed" && booking?.completion?.paymentReleaseStatus === "awaiting_customer" ? (
+          <>
+            <h3 className="mt-1 text-2xl font-semibold">Verify completion to release payment</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Confirm only after the visit notes, medicine/vitals, and family handover look correct.
+            </p>
+            <button
+              onClick={onVerifyCompletion}
+              className="mt-4 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+            >
+              Verify care & release payment
+            </button>
+          </>
+        ) : booking?.status === "payment_settled" ? (
+          <>
+            <h3 className="mt-1 text-2xl font-semibold">Payment released</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              The family verified the visit and caregiver payout is ready for ops processing.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-slate-500">
+            OTP and payment release controls appear at the right moment in the care journey.
+          </p>
+        )}
+      </section>
 
       <div className="mt-5">
         <LiveMap journey={activeMapJourney} />

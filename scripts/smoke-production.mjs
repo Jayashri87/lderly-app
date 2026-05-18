@@ -291,6 +291,10 @@ const cleanupBooking = async (booking) => {
     "caretakers/smoke-backup-caretaker/activeAssignments": 0,
     [`operations/bookingsByCaretaker/demo-caretaker/${booking.id}`]: null,
     [`operations/bookingsByCaretaker/smoke-backup-caretaker/${booking.id}`]: null,
+    [`operations/dispatchOffers/${booking.id}`]: null,
+    [`caretakers/demo-caretaker/offers/${booking.id}`]: null,
+    [`caretakers/smoke-backup-caretaker/offers/${booking.id}`]: null,
+    [`payouts/releaseQueue/${booking.id}`]: null,
     [`operations/reassignmentQueue/completed/${booking.id}`]: null,
     [`operations/recoveryQueue/byBooking/${booking.id}`]: null,
     [`operations/recoveryQueue/byId/recovery-${booking.id}-assignment`]: null,
@@ -747,6 +751,101 @@ try {
 
   const customerRead = await database.ref(`bookings/byId/${booking.id}`).get();
   expect(customerRead.exists(), "booking persisted in Firebase");
+
+  const uberBooking = buildSmokeBooking("-uber-dispatch");
+  const uberCreateResult = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      body: JSON.stringify({ booking: uberBooking })
+    },
+    customerCookie
+  );
+  createdPaths.push(uberBooking);
+  expect(uberCreateResult.response.ok, "customer can broadcast booking to nearby caregivers", uberCreateResult.text);
+  expect(
+    uberCreateResult.json?.booking?.status === "searching",
+    "broadcast booking enters searching state"
+  );
+  expect(
+    uberCreateResult.json?.booking?.dispatch?.candidateCount >= 1,
+    "broadcast booking creates nearby caregiver offers"
+  );
+
+  const uberAcceptResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    caretakerCookie
+  );
+  expect(uberAcceptResult.response.ok, "nearby caretaker can accept dispatch offer", uberAcceptResult.text);
+  expect(
+    uberAcceptResult.json?.booking?.status === "accepted" &&
+      uberAcceptResult.json?.booking?.caretakerId === "demo-caretaker",
+    "first accepted dispatch locks caregiver assignment"
+  );
+
+  await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "en_route" })
+    },
+    caretakerCookie
+  );
+  await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "arrived" })
+    },
+    caretakerCookie
+  );
+  const startOtp = uberAcceptResult.json?.booking?.serviceStart?.otp;
+  const uberStartResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/start`,
+    {
+      method: "POST",
+      body: JSON.stringify({ otp: startOtp })
+    },
+    caretakerCookie
+  );
+  expect(uberStartResult.response.ok, "caretaker can start service with customer OTP", uberStartResult.text);
+  expect(
+    Boolean(uberStartResult.json?.booking?.serviceStart?.verifiedAt),
+    "customer OTP verification is persisted"
+  );
+
+  const uberDoneResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status: "completed" })
+    },
+    caretakerCookie
+  );
+  expect(uberDoneResult.response.ok, "caretaker can mark Uber-style job done", uberDoneResult.text);
+  expect(
+    uberDoneResult.json?.booking?.completion?.paymentReleaseStatus === "awaiting_customer",
+    "completed job waits for customer payment release verification"
+  );
+
+  const uberVerifyResult = await request(
+    `/api/bookings/${encodeURIComponent(uberBooking.id)}/verify-completion`,
+    {
+      method: "POST",
+      body: JSON.stringify({ approved: true })
+    },
+    customerCookie
+  );
+  expect(uberVerifyResult.response.ok, "customer can verify completion and release payment", uberVerifyResult.text);
+  expect(
+    uberVerifyResult.json?.booking?.status === "payment_settled" &&
+      uberVerifyResult.json?.booking?.completion?.paymentReleaseStatus === "released",
+    "customer verification releases payment state"
+  );
 
   const foreignBooking = {
     ...buildSmokeBooking("-foreign"),

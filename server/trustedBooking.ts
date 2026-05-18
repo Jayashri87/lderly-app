@@ -3,7 +3,8 @@ import type {
   BookingStatus,
   CareBooking,
   CareLocation,
-  CaretakerMatchProfile
+  CaretakerMatchProfile,
+  DispatchOffer
 } from "../services/bookingService";
 import type { UserRole } from "../services/authService";
 import { getAdminDatabase } from "./firebaseAdmin";
@@ -16,7 +17,7 @@ type BookingActor = {
 };
 
 const transitionMap: Record<BookingStatus, BookingStatus[]> = {
-  none: ["requested"],
+  none: ["requested", "searching"],
   requested: ["searching", "assigned", "cancelled"],
   searching: ["assigned", "cancelled"],
   assigned: ["accepted", "cancelled"],
@@ -191,6 +192,8 @@ const scoreCaretaker = (booking: CareBooking, caretaker: CaretakerMatchProfile) 
 
 const etaFromDistance = (km: number) => Math.max(3, Math.round(km * 4 + 2));
 
+const serviceOtpFor = () => String(Math.floor(100000 + Math.random() * 900000));
+
 const distanceKm = (from: CareLocation, to: CareLocation) => {
   const toRad = (value: number) => (value * Math.PI) / 180;
   const earthKm = 6371;
@@ -227,6 +230,24 @@ const bestCaretakerFor = (
     (a, b) => scoreCaretaker(booking, b) - scoreCaretaker(booking, a)
   )[0] || null;
 
+const dispatchCandidatesFor = (booking: CareBooking, caretakers: CaretakerMatchProfile[]) =>
+  availableCaretakersFor(caretakers)
+    .map((caretaker) => {
+      const caretakerLocation =
+        caretaker.currentLocation || booking.tracking?.caretakerLocation || { lat: 12.985, lng: 77.61 };
+      const customerLocation = booking.tracking?.customerLocation || { lat: 12.9716, lng: 77.5946 };
+      const distance = distanceKm(caretakerLocation, customerLocation);
+
+      return {
+        caretaker,
+        score: scoreCaretaker(booking, caretaker) - distance,
+        distanceKm: distance,
+        etaMinutes: etaFromDistance(distance)
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
 const canAccessBooking = (
   booking: CareBooking,
   actor: BookingActor | undefined,
@@ -259,10 +280,193 @@ export const TrustedBooking = {
       return { ok: false as const, status: 400, error: "Invalid initial booking status" };
     }
 
-    const locationReadyBooking = await enrichBookingLocation(booking);
-    const safeBooking = enrichBooking(locationReadyBooking, "system");
-    await database.ref().update(bookingIndexes(safeBooking));
+    const locationReadyBooking = await enrichBookingLocation({
+      ...booking,
+      status: booking.status === "requested" ? "searching" : booking.status
+    });
+    const caretakerSnapshot = await database.ref("caretakers").get();
+    const caretakers = Object.values(
+      (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
+    );
+    const candidates = dispatchCandidatesFor(locationReadyBooking, caretakers);
+    const timestamp = Date.now();
+    const offers: Record<string, DispatchOffer> = Object.fromEntries(
+      candidates.map(({ caretaker, score, distanceKm: distance, etaMinutes }) => [
+        caretaker.uid,
+        {
+          bookingId: locationReadyBooking.id,
+          caretakerId: caretaker.uid,
+          caretakerName: caretaker.name,
+          score: Number(score.toFixed(2)),
+          distanceKm: distance,
+          etaMinutes,
+          status: "sent" as const,
+          notifiedAt: timestamp
+        }
+      ])
+    );
+    const safeBooking = enrichBooking(
+      {
+        ...locationReadyBooking,
+        caretakerId: "",
+        caretakerName: "Nearby caregivers notified",
+        dispatch: {
+          mode: "area_broadcast",
+          status: candidates.length ? "broadcasting" : "manual_review",
+          offerExpiresAt: timestamp + 90 * 1000,
+          candidateCount: candidates.length,
+          offers
+        },
+        serviceStart: {
+          otp: serviceOtpFor(),
+          sharedWithCustomerAt: timestamp
+        },
+        completion: {
+          paymentReleaseStatus: "not_ready"
+        },
+        timeline: [
+          ...locationReadyBooking.timeline,
+          {
+            label: candidates.length
+              ? `Request sent to ${candidates.length} nearby caregivers`
+              : "No nearby caregivers available - ops review needed",
+            at: timestamp
+          }
+        ]
+      },
+      "system"
+    );
+    const updates = bookingIndexes(safeBooking);
+    candidates.forEach(({ caretaker, distanceKm: distance, etaMinutes }) => {
+      updates[`caretakers/${caretaker.uid}/offers/${safeBooking.id}`] = {
+        bookingId: safeBooking.id,
+        serviceType: safeBooking.serviceType,
+        customerName: safeBooking.customerName,
+        destinationLabel: safeBooking.tracking?.destinationLabel || "Care location",
+        distanceKm: distance,
+        etaMinutes,
+        status: "sent",
+        notifiedAt: timestamp,
+        expiresAt: timestamp + 90 * 1000
+      };
+      updates[`caretakers/${caretaker.uid}/activeBookingId`] = safeBooking.id;
+      updates[`operations/dispatchOffers/${safeBooking.id}/${caretaker.uid}`] =
+        safeBooking.dispatch?.offers?.[caretaker.uid];
+    });
+    await database.ref().update(updates);
     return { ok: true as const, booking: safeBooking };
+  },
+
+  async acceptOffer(bookingId: string, actor?: BookingActor) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    if (!actor?.uid || actor.role !== "caretaker") {
+      return { ok: false as const, status: 403, error: "Caretaker session required" };
+    }
+
+    const bookingSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
+    const booking = bookingSnapshot.val() as CareBooking | null;
+
+    if (!booking) {
+      return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (!["searching", "assigned"].includes(booking.status)) {
+      return { ok: false as const, status: 409, error: "Booking is no longer open" };
+    }
+
+    const offer = booking.dispatch?.offers?.[actor.uid];
+
+    if (booking.dispatch?.mode === "area_broadcast" && !offer) {
+      return { ok: false as const, status: 403, error: "No dispatch offer for caretaker" };
+    }
+
+    const caretakerSnapshot = await database.ref(`caretakers/${actor.uid}`).get();
+    const caretaker = caretakerSnapshot.val() as CaretakerMatchProfile | null;
+
+    if (!caretaker || caretaker.status === "offline" || caretaker.status === "on_visit") {
+      return { ok: false as const, status: 409, error: "Caretaker is unavailable" };
+    }
+
+    const timestamp = Date.now();
+    const nextOffers: Record<string, DispatchOffer> = Object.fromEntries(
+      Object.entries(booking.dispatch?.offers || {}).map(([caretakerId, dispatchOffer]) => [
+        caretakerId,
+        {
+          ...dispatchOffer,
+          status: caretakerId === actor.uid ? "accepted" as const : "expired" as const,
+          respondedAt: timestamp
+        }
+      ])
+    );
+    const caretakerLocation =
+      caretaker.currentLocation || booking.tracking?.caretakerLocation || { lat: 12.985, lng: 77.61 };
+    const customerLocation = booking.tracking?.customerLocation || { lat: 12.9716, lng: 77.5946 };
+    const distance = distanceKm(caretakerLocation, customerLocation);
+    const nextBooking = enrichBooking(
+      {
+        ...booking,
+        status: "accepted",
+        caretakerId: caretaker.uid,
+        caretakerName: caretaker.name,
+        dispatch: {
+          ...(booking.dispatch || {
+            mode: "area_broadcast" as const,
+            offerExpiresAt: timestamp,
+            candidateCount: 1
+          }),
+          status: "accepted",
+          acceptedBy: caretaker.uid,
+          acceptedAt: timestamp,
+          offers: nextOffers
+        },
+        matching: {
+          ...booking.matching,
+          preferredCaretakerId: caretaker.uid
+        },
+        tracking: {
+          ...(booking.tracking || {
+            customerLocation,
+            caretakerLocation,
+            destinationLabel: "Care location",
+            distanceKm: distance,
+            etaMinutes: etaFromDistance(distance),
+            lastLocationAt: timestamp,
+            routeStatus: "pending" as const
+          }),
+          caretakerLocation,
+          distanceKm: distance,
+          etaMinutes: etaFromDistance(distance),
+          lastLocationAt: timestamp,
+          routeStatus: "pending"
+        },
+        timeline: [
+          ...booking.timeline,
+          { label: `${caretaker.name} accepted the care request`, at: timestamp }
+        ]
+      },
+      "caretaker"
+    );
+    const updates = bookingIndexes(nextBooking, booking);
+    updates[`caretakers/${caretaker.uid}/activeAssignments`] =
+      (caretaker.activeAssignments || 0) + 1;
+    updates[`caretakers/${caretaker.uid}/status`] = "standby";
+    Object.keys(booking.dispatch?.offers || {}).forEach((caretakerId) => {
+      updates[`caretakers/${caretakerId}/offers/${booking.id}/status`] =
+        caretakerId === actor.uid ? "accepted" : "expired";
+      updates[`operations/dispatchOffers/${booking.id}/${caretakerId}/status`] =
+        caretakerId === actor.uid ? "accepted" : "expired";
+      if (caretakerId !== actor.uid) {
+        updates[`caretakers/${caretakerId}/activeBookingId`] = null;
+      }
+    });
+
+    await database.ref().update(updates);
+    return { ok: true as const, booking: nextBooking };
   },
 
   async assign(bookingId: string) {
@@ -488,11 +692,20 @@ export const TrustedBooking = {
               : booking.tracking?.routeStatus || "pending",
       lastLocationAt: Date.now()
     } as CareBooking["tracking"];
+    const completion =
+      status === "completed" && actor?.role === "caretaker"
+        ? {
+            ...(booking.completion || { paymentReleaseStatus: "not_ready" as const }),
+            caretakerMarkedDoneAt: Date.now(),
+            paymentReleaseStatus: "awaiting_customer" as const
+          }
+        : booking.completion;
     const nextBooking = enrichBooking(
       {
         ...booking,
         status,
         tracking: nextTracking,
+        completion,
         timeline: [...booking.timeline, { label: stepLabels[status], at: Date.now() }]
       },
       actor?.role || "admin"
@@ -510,6 +723,125 @@ export const TrustedBooking = {
           1) - 1
       );
       updates[`caretakers/${nextBooking.caretakerId}/activeBookingId`] = null;
+    }
+    await database.ref().update(updates);
+    return { ok: true as const, booking: nextBooking };
+  },
+
+  async startWithOtp(bookingId: string, otp: string, actor?: BookingActor) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const bookingSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
+    const booking = bookingSnapshot.val() as CareBooking | null;
+
+    if (!booking) {
+      return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (!canAccessBooking(booking, actor, "status")) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
+    }
+
+    if (!["arrived", "accepted", "en_route"].includes(booking.status)) {
+      return { ok: false as const, status: 409, error: "Caregiver must arrive before start" };
+    }
+
+    if (!booking.serviceStart?.otp || booking.serviceStart.otp !== otp.trim()) {
+      return { ok: false as const, status: 400, error: "Invalid customer OTP" };
+    }
+
+    const timestamp = Date.now();
+    const nextBooking = enrichBooking(
+      {
+        ...booking,
+        status: "in_progress",
+        serviceStart: {
+          ...booking.serviceStart,
+          verifiedAt: timestamp,
+          verifiedBy: actor?.uid || actor?.username || "caretaker"
+        },
+        completion: {
+          ...(booking.completion || { paymentReleaseStatus: "not_ready" as const }),
+          paymentReleaseStatus: "not_ready"
+        },
+        timeline: [
+          ...booking.timeline,
+          { label: "Customer OTP verified - service started", at: timestamp }
+        ]
+      },
+      "caretaker"
+    );
+    const updates = bookingIndexes(nextBooking, booking);
+    if (nextBooking.caretakerId) {
+      updates[`caretakers/${nextBooking.caretakerId}/status`] = "on_visit";
+    }
+    await database.ref().update(updates);
+    return { ok: true as const, booking: nextBooking };
+  },
+
+  async verifyCompletion(
+    bookingId: string,
+    verification: { approved: boolean; note?: string },
+    actor?: BookingActor
+  ) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const bookingSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
+    const booking = bookingSnapshot.val() as CareBooking | null;
+
+    if (!booking) {
+      return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    if (actor?.role !== "admin" && (actor?.role !== "customer" || actor.uid !== booking.customerId)) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
+    }
+
+    if (booking.status !== "completed") {
+      return { ok: false as const, status: 409, error: "Booking is not awaiting completion verification" };
+    }
+
+    const timestamp = Date.now();
+    const nextStatus: BookingStatus = verification.approved ? "payment_settled" : "completed";
+    const nextBooking = enrichBooking(
+      {
+        ...booking,
+        status: nextStatus,
+        completion: {
+          ...(booking.completion || { paymentReleaseStatus: "awaiting_customer" as const }),
+          customerVerifiedAt: verification.approved ? timestamp : undefined,
+          verifiedBy: verification.approved ? actor?.uid || actor?.username || "customer" : undefined,
+          paymentReleaseStatus: verification.approved ? "released" : "awaiting_customer"
+        },
+        timeline: [
+          ...booking.timeline,
+          {
+            label: verification.approved
+              ? "Family verified completion - payment released"
+              : `Family requested review${verification.note ? `: ${verification.note}` : ""}`,
+            at: timestamp
+          }
+        ]
+      },
+      actor?.role || "customer"
+    );
+    const updates = bookingIndexes(nextBooking, booking);
+    if (nextBooking.caretakerId && verification.approved) {
+      updates[`payouts/releaseQueue/${booking.id}`] = {
+        bookingId: booking.id,
+        caretakerId: nextBooking.caretakerId,
+        customerId: booking.customerId,
+        status: "ready_for_payout",
+        releasedAt: timestamp
+      };
     }
     await database.ref().update(updates);
     return { ok: true as const, booking: nextBooking };

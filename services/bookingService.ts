@@ -37,6 +37,9 @@ export type CareBooking = {
   payment: BookingPayment;
   familyUpdates: FamilyUpdateSettings;
   serviceReport: ServiceReportPlan;
+  dispatch?: BookingDispatch;
+  serviceStart?: ServiceStartVerification;
+  completion?: CompletionVerification;
   tracking?: BookingTracking;
   sla?: BookingSla;
   cancellation?: BookingCancellation;
@@ -45,6 +48,42 @@ export type CareBooking = {
     label: string;
     at: number;
   }>;
+};
+
+export type DispatchOffer = {
+  bookingId: string;
+  caretakerId: string;
+  caretakerName: string;
+  score: number;
+  distanceKm: number;
+  etaMinutes: number;
+  status: "sent" | "accepted" | "expired" | "cancelled";
+  notifiedAt: number;
+  respondedAt?: number;
+};
+
+export type BookingDispatch = {
+  mode: "area_broadcast" | "manual_assignment";
+  status: "broadcasting" | "accepted" | "expired" | "manual_review";
+  offerExpiresAt: number;
+  candidateCount: number;
+  acceptedBy?: string;
+  acceptedAt?: number;
+  offers?: Record<string, DispatchOffer>;
+};
+
+export type ServiceStartVerification = {
+  otp: string;
+  sharedWithCustomerAt: number;
+  verifiedAt?: number;
+  verifiedBy?: string;
+};
+
+export type CompletionVerification = {
+  caretakerMarkedDoneAt?: number;
+  customerVerifiedAt?: number;
+  verifiedBy?: string;
+  paymentReleaseStatus: "not_ready" | "awaiting_customer" | "released";
 };
 
 export type CareLocation = {
@@ -219,7 +258,7 @@ const demoCaretakerProfile: CaretakerMatchProfile = {
 };
 
 const transitionMap: Record<BookingStatus, BookingStatus[]> = {
-  none: ["requested"],
+  none: ["requested", "searching"],
   requested: ["searching", "assigned", "cancelled"],
   searching: ["assigned", "cancelled"],
   assigned: ["accepted", "cancelled"],
@@ -841,7 +880,7 @@ export const BookingService = {
     const booking: CareBooking = {
       id: `booking-${timestamp}`,
       serviceType,
-      status: "requested",
+      status: "searching",
       customerId: session.uid,
       customerName: session.name,
       caretakerId: "",
@@ -851,7 +890,7 @@ export const BookingService = {
       createdAt: timestamp,
       updatedAt: timestamp,
       requestDetails,
-      lifecycle: lifecycleFor("requested", "customer"),
+      lifecycle: lifecycleFor("searching", "customer"),
       matching: {
         requiredSkills: skillsFor(serviceType),
         preferredLanguages: ["English", "Hindi"],
@@ -864,7 +903,7 @@ export const BookingService = {
       scheduleIndex: {
         dateKey: dateKeyFor(scheduledFor),
         hourKey: hourKeyFor(scheduledFor),
-        statusKey: "requested",
+        statusKey: "searching",
         city: "Bengaluru",
         zone: zoneFromLocation(requestDetails?.location.detail)
       },
@@ -884,6 +923,16 @@ export const BookingService = {
         recipients: [session.uid]
       },
       serviceReport: reportPlanFor(serviceType),
+      dispatch: {
+        mode: "area_broadcast",
+        status: "broadcasting",
+        offerExpiresAt: timestamp + 90 * 1000,
+        candidateCount: 0,
+        offers: {}
+      },
+      completion: {
+        paymentReleaseStatus: "not_ready"
+      },
       tracking: {
         etaMinutes: 12,
         distanceKm: 3.2,
@@ -899,7 +948,7 @@ export const BookingService = {
         status: "healthy",
         breachReason: ""
       },
-      timeline: [{ label: `${serviceType} requested`, at: timestamp }]
+      timeline: [{ label: `${serviceType} sent to nearby caregivers`, at: timestamp }]
     };
 
     saveBooking(booking);
@@ -994,6 +1043,47 @@ export const BookingService = {
       title: "Booking assigned",
       body: `You have a new ${booking.serviceType} booking.`,
       priority: "normal"
+    });
+  },
+
+  acceptDispatchOffer() {
+    const booking = readLocalBooking();
+
+    postTrustedBookingAction(
+      `/api/bookings/${encodeURIComponent(booking.id)}/accept`,
+      {}
+    ).then((result) => {
+      if (result?.booking) {
+        writeLocalBooking(enrichBooking(result.booking));
+      }
+    });
+  },
+
+  startWithCustomerOtp(otp: string) {
+    const booking = readLocalBooking();
+
+    return postTrustedBookingAction(
+      `/api/bookings/${encodeURIComponent(booking.id)}/start`,
+      { otp }
+    ).then((result) => {
+      if (result?.booking) {
+        writeLocalBooking(enrichBooking(result.booking));
+      }
+      return result;
+    });
+  },
+
+  verifyCompletion(approved = true, note = "") {
+    const booking = readLocalBooking();
+
+    return postTrustedBookingAction(
+      `/api/bookings/${encodeURIComponent(booking.id)}/verify-completion`,
+      { approved, note }
+    ).then((result) => {
+      if (result?.booking) {
+        writeLocalBooking(enrichBooking(result.booking));
+      }
+      return result;
     });
   },
 
