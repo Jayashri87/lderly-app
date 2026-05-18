@@ -14,6 +14,9 @@ import {
   UserRound
 } from "lucide-react";
 
+const lderlyContactNumber = "+91 99169 60524";
+const lderlyContactHref = "tel:+919916960524";
+
 export default function SignInPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -122,6 +125,17 @@ export default function SignInPage() {
               family needs, and create your LDERLY account.
             </p>
 
+            <a
+              href={lderlyContactHref}
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-4 text-sm font-semibold text-[#06130f] shadow-xl shadow-black/20"
+            >
+              <Phone className="h-5 w-5 text-emerald-700" />
+              Call LDERLY now
+            </a>
+            <p className="mt-2 text-center text-xs text-white/55">
+              Immediate care enquiry: {lderlyContactNumber}
+            </p>
+
             <div className="mt-5 grid grid-cols-3 gap-2">
               {[
                 ["Verified", "caregivers"],
@@ -178,6 +192,13 @@ export default function SignInPage() {
                     </p>
                   </div>
                 </div>
+                <a
+                  href={lderlyContactHref}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-[#06130f] px-5 py-4 text-sm font-semibold text-white"
+                >
+                  <Phone className="h-5 w-5" />
+                  Call now: {lderlyContactNumber}
+                </a>
               </div>
             </div>
           ) : (
@@ -245,6 +266,14 @@ export default function SignInPage() {
                 {leadBusy ? "Submitting..." : "Request callback"}
                 <ArrowRight className="h-5 w-5" />
               </button>
+
+              <a
+                href={lderlyContactHref}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-4 font-semibold text-[#06130f]"
+              >
+                <Phone className="h-5 w-5 text-emerald-700" />
+                Call us immediately
+              </a>
 
               <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500">
                 <Clock3 className="h-4 w-4" />
