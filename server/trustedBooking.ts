@@ -674,6 +674,18 @@ export const TrustedBooking = {
       return { ok: false as const, status: 409, error: "Invalid booking transition" };
     }
 
+    if (
+      status === "in_progress" &&
+      actor?.role === "caretaker" &&
+      !booking.serviceStart?.verifiedAt
+    ) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: "Customer OTP verification is required before starting service"
+      };
+    }
+
     const nextTracking = {
       ...booking.tracking,
       etaMinutes:

@@ -33,6 +33,10 @@ export default function PartnerApp() {
   const [caretakerError, setCaretakerError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [customerStartOtp, setCustomerStartOtp] = useState("");
+  const [heartRate, setHeartRate] = useState("78");
+  const [bloodPressure, setBloodPressure] = useState("124/82");
+  const [oxygen, setOxygen] = useState("98");
+  const [vitalsNote, setVitalsNote] = useState("Routine visit vitals check");
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>("idle");
   const [gpsMessage, setGpsMessage] = useState("Live GPS has not started.");
   const [gpsWatchId, setGpsWatchId] = useState<number | null>(null);
@@ -304,6 +308,38 @@ export default function PartnerApp() {
     setGpsWatchId(watchId);
   };
 
+  const recordStructuredVitals = async () => {
+    if (!session || !activeBooking) {
+      setActionMessage("Vitals need an active booking before they can be recorded.");
+      return;
+    }
+
+    const response = await fetch("/api/care-quality/vitals", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId: activeBooking.customerId,
+        caretakerId: session.uid,
+        bookingId: activeBooking.id,
+        heartRate: Number(heartRate),
+        bloodPressure,
+        oxygen: Number(oxygen),
+        mood: "calm",
+        note: vitalsNote
+      })
+    });
+
+    if (response.ok) {
+      trackCaretakerAction("structured_vitals_recorded");
+      setActionMessage("Vitals recorded to the family health timeline and ops risk layer.");
+      return;
+    }
+
+    setActionMessage("Vitals could not be recorded. Check values and try again.");
+  };
+
   useEffect(() => {
     return () => {
       if (gpsWatchId !== null && typeof navigator !== "undefined") {
@@ -473,6 +509,40 @@ export default function PartnerApp() {
           />
         </section>
 
+        <section className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+          <p className="text-sm font-semibold text-emerald-100">Visit vitals</p>
+          <h2 className="mt-1 text-xl font-semibold">Record real health observations</h2>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <input
+              value={heartRate}
+              onChange={(event) => setHeartRate(event.target.value)}
+              inputMode="numeric"
+              aria-label="Heart rate"
+              className="rounded-2xl border border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
+            />
+            <input
+              value={bloodPressure}
+              onChange={(event) => setBloodPressure(event.target.value)}
+              aria-label="Blood pressure"
+              className="rounded-2xl border border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
+            />
+            <input
+              value={oxygen}
+              onChange={(event) => setOxygen(event.target.value)}
+              inputMode="numeric"
+              aria-label="Oxygen saturation"
+              className="rounded-2xl border border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
+            />
+          </div>
+          <input
+            value={vitalsNote}
+            onChange={(event) => setVitalsNote(event.target.value)}
+            aria-label="Vitals note"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-[#080b10]"
+          />
+          <p className="mt-2 text-xs text-white/45">HR / BP / SpO2 are written to Firebase and risk alerts.</p>
+        </section>
+
         <div className="mt-5">
           <LiveMap journey={bookingMapJourney} />
         </div>
@@ -604,8 +674,7 @@ export default function PartnerApp() {
             label="Record Vitals"
             icon={ShieldCheck}
             onClick={() => {
-              trackCaretakerAction("vitals_recorded");
-              HealthService.simulateVitalsCheck();
+              recordStructuredVitals();
             }}
           />
           <ActionButton

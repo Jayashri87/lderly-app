@@ -2006,7 +2006,10 @@ try {
   );
   expect(arrivedResult.response.ok, "caretaker can mark arrived", arrivedResult.text);
 
-  const progressResult = await request(
+  const latestBookingForStart = (
+    await database.ref(`bookings/byId/${booking.id}`).get()
+  ).val();
+  const startWithoutOtpResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/status`,
     {
       method: "POST",
@@ -2014,7 +2017,48 @@ try {
     },
     caretakerCookie
   );
-  expect(progressResult.response.ok, "caretaker can start session", progressResult.text);
+  expect(
+    startWithoutOtpResult.response.status === 409,
+    "caretaker cannot start session without customer OTP",
+    startWithoutOtpResult.text
+  );
+
+  const progressResult = await request(
+    `/api/bookings/${encodeURIComponent(booking.id)}/start`,
+    {
+      method: "POST",
+      body: JSON.stringify({ otp: latestBookingForStart?.serviceStart?.otp })
+    },
+    caretakerCookie
+  );
+  expect(progressResult.response.ok, "caretaker can start session with customer OTP", progressResult.text);
+
+  const vitalsResult = await request(
+    "/api/care-quality/vitals",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        userId: booking.customerId,
+        caretakerId: "demo-caretaker",
+        bookingId: booking.id,
+        heartRate: 82,
+        bloodPressure: "126/82",
+        oxygen: 98,
+        mood: "calm",
+        note: "Smoke structured vitals"
+      })
+    },
+    caretakerCookie
+  );
+  expect(vitalsResult.response.ok, "caretaker can record structured vitals", vitalsResult.text);
+  if (vitalsResult.json?.vitals?.id) {
+    createdReliability.push({
+      kind: "vitals",
+      id: vitalsResult.json.vitals.id,
+      userId: booking.customerId,
+      bookingId: booking.id
+    });
+  }
 
   const completeResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/status`,
@@ -2544,6 +2588,17 @@ try {
           [`medicationAdherence/byId/${item.id}`]: null,
           [`medicationAdherence/byUser/${item.userId}/${item.id}`]: null,
           [`medicationAdherence/byBooking/${item.bookingId}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "vitals") {
+      await database
+        .ref()
+        .update({
+          [`vitals/byId/${item.id}`]: null,
+          [`vitals/byUser/${item.userId}/${item.id}`]: null,
+          [`vitals/byBooking/${item.bookingId}/${item.id}`]: null,
+          [`health/${item.userId}/activity/${item.id}`]: null
         })
         .catch(() => undefined);
     }

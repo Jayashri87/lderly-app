@@ -3721,6 +3721,51 @@ function ProfilePanel({
   onInviteFamily: () => void;
   onSignOut: () => void;
 }) {
+  const [profileActionMessage, setProfileActionMessage] = useState("");
+  const runProfileAction = (label: string) => {
+    trackProductEvent("profile_action_clicked", {
+      label,
+      recipient: recipient.shortName
+    });
+
+    if (["Family members", "Family access"].includes(label)) {
+      onInviteFamily();
+      setProfileActionMessage("Family access form opened. Add the person who should receive care updates.");
+      return;
+    }
+
+    if (
+      [
+        "Care preference",
+        "Medical readiness",
+        "Medication list",
+        "Preferred language",
+        "Care address"
+      ].includes(label)
+    ) {
+      onEditDetails();
+      setProfileActionMessage("Care details reopened so the profile can be updated.");
+      return;
+    }
+
+    if (label === "Trusted caregivers" || label === "Caregiver verification") {
+      window.open("/?tab=journey", "_self");
+      return;
+    }
+
+    if (label === "Refund support" || label === "Help center") {
+      window.open("https://wa.me/919916960524?text=I%20need%20LDERLY%20support", "_blank");
+      setProfileActionMessage("Support opened on WhatsApp so ops can respond quickly.");
+      return;
+    }
+
+    if (label === "Privacy and security") {
+      window.open("/legal/privacy", "_blank");
+      return;
+    }
+
+    setProfileActionMessage(`${label} is noted. Ops can enable the next step from the admin console.`);
+  };
   const profileSections: Array<{
     title: string;
     rows: Array<{ icon: LucideIcon; label: string; value: string; action?: string }>;
@@ -3930,12 +3975,18 @@ function ProfilePanel({
             <h3 className="mb-3 text-lg font-semibold">{section.title}</h3>
             <div className="space-y-3">
               {section.rows.map((row) => (
-                <ProfileRow key={row.label} row={row} />
+                <ProfileRow key={row.label} row={row} onAction={() => runProfileAction(row.label)} />
               ))}
             </div>
           </section>
         ))}
       </div>
+
+      {profileActionMessage && (
+        <p className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/70">
+          {profileActionMessage}
+        </p>
+      )}
 
       <button
         onClick={onSignOut}
@@ -4017,14 +4068,19 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
 }
 
 function ProfileRow({
-  row
+  row,
+  onAction
 }: {
   row: { icon: LucideIcon; label: string; value: string; action?: string };
+  onAction: () => void;
 }) {
   const Icon = row.icon;
 
   return (
-    <div className="flex items-center gap-4 rounded-3xl bg-white/10 p-4">
+    <button
+      onClick={onAction}
+      className="flex w-full items-center gap-4 rounded-3xl bg-white/10 p-4 text-left transition hover:bg-white/15"
+    >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10">
         <Icon className="h-5 w-5 text-emerald-200" />
       </div>
@@ -4037,6 +4093,6 @@ function ProfileRow({
           {row.action}
         </span>
       )}
-    </div>
+    </button>
   );
 }

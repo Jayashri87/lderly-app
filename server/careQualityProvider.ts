@@ -112,6 +112,87 @@ export const CareQualityProvider = {
     return { ok: true as const, adherence: record };
   },
 
+  async recordVitals({
+    userId,
+    caretakerId,
+    bookingId,
+    heartRate,
+    bloodPressure,
+    oxygen,
+    temperature,
+    mood,
+    note = ""
+  }: {
+    userId: string;
+    caretakerId?: string;
+    bookingId?: string;
+    heartRate: number;
+    bloodPressure: string;
+    oxygen: number;
+    temperature?: number;
+    mood?: "calm" | "happy" | "low" | "anxious" | "tired";
+    note?: string;
+  }) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const wellness =
+      heartRate > 100 || oxygen < 94 || (temperature && temperature >= 100.4)
+        ? "watch"
+        : "stable";
+    const id = `vitals-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const record = {
+      id,
+      userId,
+      caretakerId: caretakerId || "",
+      bookingId: bookingId || "",
+      heartRate,
+      bloodPressure,
+      oxygen,
+      temperature: temperature || null,
+      mood: mood || "calm",
+      note,
+      wellness,
+      recordedAt: Date.now()
+    };
+    const activity = {
+      label:
+        wellness === "watch"
+          ? `Vitals need attention: HR ${heartRate}, SpO2 ${oxygen}%`
+          : `Vitals recorded: HR ${heartRate}, BP ${bloodPressure}, SpO2 ${oxygen}%`,
+      at: Date.now()
+    };
+
+    await database.ref().update({
+      [`vitals/byId/${id}`]: record,
+      [`vitals/byUser/${userId}/${id}`]: true,
+      ...(bookingId ? { [`vitals/byBooking/${bookingId}/${id}`]: true } : {}),
+      [`health/${userId}/vitals`]: {
+        heartRate,
+        bloodPressure,
+        oxygen
+      },
+      [`health/${userId}/wellness`]: wellness,
+      [`health/${userId}/updatedAt`]: Date.now(),
+      [`health/${userId}/activity/${id}`]: activity
+    });
+
+    if (wellness === "watch") {
+      await dispatchInternalOpsAlert({
+        kind: "ai_risk",
+        title: "Vitals need attention",
+        message: `Vitals for ${userId}: HR ${heartRate}, BP ${bloodPressure}, SpO2 ${oxygen}%.`,
+        bookingId,
+        severity: "high"
+      });
+    }
+
+    return { ok: true as const, vitals: record };
+  },
+
   async createIncident({
     userId,
     caretakerId,

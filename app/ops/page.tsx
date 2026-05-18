@@ -431,6 +431,36 @@ export default function OpsApp() {
     setSession(admin);
   };
 
+  const runOpsWorkflow = async (
+    label: string,
+    path: string,
+    body?: Record<string, unknown>
+  ) => {
+    setOpsActionMessage("");
+    const response = await fetch(path, {
+      method: "POST",
+      headers: body
+        ? {
+            "Content-Type": "application/json"
+          }
+        : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    if (response.ok) {
+      trackProductEvent("ops_workflow_executed", {
+        label,
+        path,
+        bookingId: booking?.id || ""
+      });
+      setOpsActionMessage(`${label} completed and written to the operational ledger.`);
+      return response.json().catch(() => null);
+    }
+
+    setOpsActionMessage(`${label} could not be completed. Check the active booking and configuration.`);
+    return null;
+  };
+
   if (!session || session.role !== "admin") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#071018] px-5 text-white">
@@ -1485,6 +1515,19 @@ export default function OpsApp() {
               <p className="mt-1 text-white/50">
                 {opsKpis?.refundsRequested ?? 0} refund requests are awaiting ops review.
               </p>
+              <button
+                onClick={() =>
+                  booking?.id &&
+                  runOpsWorkflow("Open refund review", "/api/payments/refund", {
+                    bookingId: booking.id,
+                    reason: "Ops manual refund review"
+                  })
+                }
+                disabled={!booking?.id}
+                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+              >
+                Open refund review
+              </button>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">KYC reviews</p>
@@ -1630,6 +1673,19 @@ export default function OpsApp() {
             >
               Seed care partners
             </button>
+            <button
+              onClick={() =>
+                runOpsWorkflow("Dispatch ambulance partner", "/api/partners/dispatch", {
+                  partnerType: "ambulance",
+                  bookingId: booking?.id,
+                  zone: booking?.matching?.zone || "Central",
+                  reason: "Ops emergency readiness drill"
+                })
+              }
+              className="w-full rounded-full bg-red-500 px-4 py-3 text-sm font-semibold text-white"
+            >
+              Dispatch ambulance partner
+            </button>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Emergency escalation</p>
               <p className="mt-1 text-white/50">
@@ -1655,12 +1711,39 @@ export default function OpsApp() {
               <p className="mt-1 text-white/50">
                 Invoice records now track taxable value, GST, line items, and PDF readiness.
               </p>
+              <button
+                onClick={() =>
+                  booking?.id &&
+                  runOpsWorkflow("Generate GST invoice", "/api/finance/invoice", {
+                    bookingId: booking.id,
+                    billTo: booking.customerName
+                  })
+                }
+                disabled={!booking?.id}
+                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+              >
+                Generate invoice
+              </button>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Caregiver payouts</p>
               <p className="mt-1 text-white/50">
                 Payout and incentive records are queued for ops reconciliation.
               </p>
+              <button
+                onClick={() =>
+                  booking?.id &&
+                  runOpsWorkflow("Queue caregiver payout", "/api/finance/payout", {
+                    bookingId: booking.id,
+                    caretakerId: booking.caretakerId,
+                    incentiveAmount: 0
+                  })
+                }
+                disabled={!booking?.id || !booking?.caretakerId}
+                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+              >
+                Queue payout
+              </button>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Recurring care</p>
