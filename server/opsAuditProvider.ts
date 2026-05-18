@@ -57,9 +57,19 @@ type OpsAlertRecord = {
   createdAt?: number;
 };
 
+type MaintenanceRunRecord = {
+  id?: string;
+  actor?: string;
+  staleLocksRemoved?: number;
+  expiredIdempotencyRemoved?: number;
+  oldRecoverySignalsRemoved?: number;
+  startedAt?: number;
+  completedAt?: number;
+};
+
 export type OpsAuditEvent = {
   id: string;
-  type: "api_audit" | "recovery" | "command" | "reassignment" | "alert";
+  type: "api_audit" | "recovery" | "command" | "reassignment" | "alert" | "maintenance";
   title: string;
   subtitle: string;
   actor: string;
@@ -107,13 +117,15 @@ export const OpsAuditProvider = {
       recoverySnapshot,
       commandSnapshot,
       reassignmentSnapshot,
-      alertSnapshot
+      alertSnapshot,
+      maintenanceSnapshot
     ] = await Promise.all([
       database.ref("auditLogs").limitToLast(80).get(),
       database.ref("operations/recoveryActions").limitToLast(40).get(),
       database.ref("operations/commandCenter/actions").limitToLast(40).get(),
       database.ref("operations/reassignmentQueue/completed").limitToLast(40).get(),
-      database.ref("operations/internalAlerts/byId").limitToLast(60).get()
+      database.ref("operations/internalAlerts/byId").limitToLast(60).get(),
+      database.ref("operations/maintenanceRuns").limitToLast(20).get()
     ]);
 
     const auditEvents: OpsAuditEvent[] = normalizeObject<AuditLogRecord>(auditSnapshot.val()).map(
@@ -191,13 +203,30 @@ export const OpsAuditProvider = {
         metadata: record
       })
     );
+    const maintenanceEvents: OpsAuditEvent[] = normalizeObject<MaintenanceRunRecord>(
+      maintenanceSnapshot.val()
+    )
+      .filter((record) => record.id !== "latest")
+      .map((record) => ({
+        id: record.id,
+        type: "maintenance",
+        title: "Maintenance cleanup completed",
+        subtitle: `${record.staleLocksRemoved || 0} locks, ${record.expiredIdempotencyRemoved || 0} replay records cleaned`,
+        actor: record.actor || "ops",
+        status: "completed",
+        severity: "low",
+        bookingId: "",
+        createdAt: eventTime(record.completedAt || record.startedAt),
+        metadata: record
+      }));
 
     const events = [
       ...auditEvents,
       ...recoveryEvents,
       ...commandEvents,
       ...reassignmentEvents,
-      ...alertEvents
+      ...alertEvents,
+      ...maintenanceEvents
     ]
       .filter((event) => event.createdAt > 0)
       .sort((a, b) => b.createdAt - a.createdAt)
@@ -205,7 +234,7 @@ export const OpsAuditProvider = {
     const criticalEvents = events.filter((event) => event.severity === "critical").length;
     const failedEvents = events.filter((event) => event.status === "failure").length;
     const automationEvents = events.filter((event) =>
-      ["recovery", "command", "reassignment", "alert"].includes(event.type)
+      ["recovery", "command", "reassignment", "alert", "maintenance"].includes(event.type)
     ).length;
 
     return {

@@ -500,6 +500,18 @@ try {
     "ops recovery API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.opsMaintenanceApi === true,
+    "ops maintenance API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.expiredLockCleanup === true,
+    "expired lock cleanup is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.idempotencyRetentionCleanup === true,
+    "idempotency retention cleanup is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.staleBookingRecovery === true,
     "stale booking recovery is prepared"
   );
@@ -1767,6 +1779,66 @@ try {
     "ops audit ledger includes recovery evidence"
   );
 
+  const staleLockId = `smoke-maintenance-lock-${Date.now()}`;
+  const expiredIdempotencyId = `smoke-maintenance-idempotency-${Date.now()}`;
+  const oldRecoverySignalId = `smoke-maintenance-recovery-${Date.now()}`;
+  await database.ref().update({
+    [`operations/locks/bookings/${staleLockId}`]: {
+      owner: "smoke",
+      acquiredAt: Date.now() - 60_000,
+      expiresAt: Date.now() - 30_000
+    },
+    [`operations/idempotency/${expiredIdempotencyId}`]: {
+      owner: "smoke",
+      operation: "smoke.expired",
+      value: { ok: true },
+      createdAt: Date.now() - 48 * 60 * 60 * 1000,
+      expiresAt: Date.now() - 60_000
+    },
+    [`operations/recoveryQueue/byId/${oldRecoverySignalId}`]: {
+      id: oldRecoverySignalId,
+      bookingId: "smoke-old-recovery",
+      kind: "assignment_stuck",
+      severity: "watch",
+      createdAt: Date.now() - 48 * 60 * 60 * 1000
+    }
+  });
+  const maintenanceResult = await request(
+    "/api/ops/maintenance",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(maintenanceResult.response.ok, "admin can run ops maintenance cleanup", maintenanceResult.text);
+  expect(
+    maintenanceResult.json?.record?.staleLocksRemoved >= 1,
+    "ops maintenance removes expired booking locks"
+  );
+  expect(
+    maintenanceResult.json?.record?.expiredIdempotencyRemoved >= 1,
+    "ops maintenance removes expired idempotency records"
+  );
+  expect(
+    maintenanceResult.json?.record?.oldRecoverySignalsRemoved >= 1,
+    "ops maintenance removes old recovery signals"
+  );
+  if (maintenanceResult.json?.record?.id) {
+    createdReliability.push({
+      kind: "maintenanceRun",
+      id: maintenanceResult.json.record.id
+    });
+  }
+  const [staleLockAfter, expiredIdempotencyAfter, oldRecoverySignalAfter] = await Promise.all([
+    database.ref(`operations/locks/bookings/${staleLockId}`).get(),
+    database.ref(`operations/idempotency/${expiredIdempotencyId}`).get(),
+    database.ref(`operations/recoveryQueue/byId/${oldRecoverySignalId}`).get()
+  ]);
+  expect(!staleLockAfter.exists(), "expired booking lock is deleted");
+  expect(!expiredIdempotencyAfter.exists(), "expired idempotency record is deleted");
+  expect(!oldRecoverySignalAfter.exists(), "old recovery signal is deleted");
+
   const reassuranceResult = await request(
     "/api/ai/reassurance",
     {
@@ -2783,6 +2855,14 @@ try {
         .update({
           [`operations/recoveryActions/${item.id}`]: null,
           [`operations/recoveryQueue/byBooking/${item.bookingId}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "maintenanceRun") {
+      await database
+        .ref()
+        .update({
+          [`operations/maintenanceRuns/${item.id}`]: null
         })
         .catch(() => undefined);
     }

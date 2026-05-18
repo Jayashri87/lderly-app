@@ -211,7 +211,7 @@ type OpsAuditSnapshot = {
 
 type OpsAuditEvent = {
   id: string;
-  type: "api_audit" | "recovery" | "command" | "reassignment" | "alert";
+  type: "api_audit" | "recovery" | "command" | "reassignment" | "alert" | "maintenance";
   title: string;
   subtitle: string;
   actor: string;
