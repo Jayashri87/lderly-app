@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Mail, Phone, ShieldCheck } from "lucide-react";
+import {
+  ConfirmationResult,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
+} from "firebase/auth";
+import { auth } from "../../firebase";
 import { AuthService } from "../../services/authService";
 
 export default function SignInPage() {
@@ -12,25 +18,140 @@ export default function SignInPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
   const [customerUsername, setCustomerUsername] = useState("");
   const [customerPassword, setCustomerPassword] = useState("");
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+  const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
 
-  const sendOtp = () => {
+  useEffect(() => {
+    return () => {
+      recaptchaVerifier.current?.clear();
+      recaptchaVerifier.current = null;
+    };
+  }, []);
+
+  const normalizePhoneForFirebase = (value: string) => {
+    const trimmed = value.trim();
+
+    if (trimmed.startsWith("+")) {
+      return trimmed.replace(/\s/g, "");
+    }
+
+    const digits = trimmed.replace(/[^\d]/g, "");
+    return digits.length === 10 ? `+91${digits}` : `+${digits}`;
+  };
+
+  const getRecaptchaVerifier = () => {
+    if (!auth) {
+      return null;
+    }
+
+    if (!recaptchaVerifier.current) {
+      recaptchaVerifier.current = new RecaptchaVerifier(
+        auth,
+        "lderly-phone-recaptcha",
+        {
+          size: "invisible",
+          callback: () => undefined
+        }
+      );
+    }
+
+    return recaptchaVerifier.current;
+  };
+
+  const sendOtp = async () => {
     setAuthError("");
+    setAuthMessage("");
 
     if (phone.trim().length < 8) {
       setAuthError("Enter a valid phone number to continue.");
       return;
     }
 
-    setOtpSent(true);
+    if (!auth) {
+      setAuthMessage("Local fallback OTP is active because Firebase Auth is not configured.");
+      setOtpSent(true);
+      return;
+    }
+
+    setAuthBusy(true);
+
+    try {
+      const verifier = getRecaptchaVerifier();
+
+      if (!verifier) {
+        throw new Error("Firebase Auth is not ready.");
+      }
+
+      const result = await signInWithPhoneNumber(
+        auth,
+        normalizePhoneForFirebase(phone),
+        verifier
+      );
+
+      setConfirmation(result);
+      setOtpSent(true);
+      setAuthMessage("OTP sent securely with Firebase.");
+    } catch {
+      recaptchaVerifier.current?.clear();
+      recaptchaVerifier.current = null;
+      setAuthError(
+        "Could not send Firebase OTP. Check Firebase Phone Auth and authorized domains."
+      );
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   const verifyOtp = async () => {
     setAuthError("");
+    setAuthMessage("");
 
     if (otp.trim().length < 4) {
       setAuthError("Enter the OTP sent to your phone.");
+      return;
+    }
+
+    if (confirmation) {
+      setAuthBusy(true);
+
+      try {
+        const credential = await confirmation.confirm(otp.trim());
+        const idToken = await credential.user.getIdToken();
+        const response = await fetch("/api/auth/firebase-role", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            idToken,
+            role: "customer",
+            name: credential.user.phoneNumber || "Customer"
+          })
+        });
+
+        if (!response.ok || response.status === 202) {
+          setAuthError("Firebase sign-in succeeded, but backend session creation failed.");
+          return;
+        }
+
+        AuthService.storeSignedSession({
+          uid: credential.user.uid,
+          name: credential.user.phoneNumber || "Customer",
+          role: "customer",
+          authMode: "firebase"
+        });
+        router.replace("/");
+        return;
+      } catch {
+        setAuthError("Could not verify the Firebase OTP. Please try again.");
+      } finally {
+        setAuthBusy(false);
+      }
+
       return;
     }
 
@@ -148,9 +269,10 @@ export default function SignInPage() {
               />
               <button
                 onClick={sendOtp}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+                disabled={authBusy}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Send OTP
+                {authBusy ? "Sending..." : "Send OTP"}
                 <ArrowRight className="h-5 w-5" />
               </button>
               <div className="my-5 flex items-center gap-3">
@@ -206,9 +328,10 @@ export default function SignInPage() {
               />
               <button
                 onClick={verifyOtp}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+                disabled={authBusy}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Open Home
+                {authBusy ? "Verifying..." : "Open Home"}
                 <ArrowRight className="h-5 w-5" />
               </button>
               <button
@@ -216,6 +339,8 @@ export default function SignInPage() {
                   setOtpSent(false);
                   setOtp("");
                   setAuthError("");
+                  setAuthMessage("");
+                  setConfirmation(null);
                 }}
                 className="mt-3 w-full rounded-full bg-slate-100 px-5 py-4 font-semibold text-[#06130f]"
               >
@@ -224,6 +349,8 @@ export default function SignInPage() {
             </>
           )}
 
+          <div id="lderly-phone-recaptcha" />
+          {authMessage && <p className="mt-4 text-sm text-emerald-700">{authMessage}</p>}
           {authError && <p className="mt-4 text-sm text-amber-700">{authError}</p>}
         </motion.section>
       </div>
