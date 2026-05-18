@@ -300,6 +300,8 @@ const cleanupBooking = async (booking) => {
     [`operations/recoveryQueue/byId/recovery-${booking.id}-assignment`]: null,
     [`operations/recoveryQueue/byId/recovery-${booking.id}-arrival`]: null,
     [`operations/recoveryQueue/byId/recovery-${booking.id}-visit-start`]: null,
+    [`operations/recoveryQueue/byId/recovery-${booking.id}-dispatch-expired`]: null,
+    [`operations/recoveryQueue/byId/recovery-${booking.id}-completion-verify`]: null,
     [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-assignment`]: null,
     [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-assignment`]: null,
     [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-assignment`]: null,
@@ -309,6 +311,13 @@ const cleanupBooking = async (booking) => {
     [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-visit-start`]: null,
     [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-visit-start`]: null,
     [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-visit-start`]: null,
+    [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-dispatch-expired`]: null,
+    [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-dispatch-expired`]: null,
+    [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-dispatch-expired`]: null,
+    [`operations/recoveryQueue/bySeverity/watch/recovery-${booking.id}-completion-verify`]: null,
+    [`operations/recoveryQueue/bySeverity/breach/recovery-${booking.id}-completion-verify`]: null,
+    [`operations/recoveryQueue/bySeverity/critical/recovery-${booking.id}-completion-verify`]: null,
+    [`notifications/byUser/${booking.customerId}/completion-${booking.id}`]: null,
     [`trustLedger/caregivers/demo-caretaker/${booking.id}`]: null,
     [`trustLedger/caregivers/smoke-backup-caretaker/${booking.id}`]: null
   };
@@ -1377,6 +1386,147 @@ try {
       id: recoveryActionResult.json.action.alertId,
       alertKind: "sla_breach",
       severity: "critical"
+    });
+  }
+
+  const dispatchExpiredBooking = {
+    ...buildSmokeBooking("-dispatch-expired"),
+    status: "searching",
+    caretakerId: "",
+    caretakerName: "Nearby caregivers notified",
+    updatedAt: Date.now() - 5 * 60 * 1000,
+    dispatch: {
+      mode: "area_broadcast",
+      status: "broadcasting",
+      offerExpiresAt: Date.now() - 2 * 60 * 1000,
+      candidateCount: 1,
+      offers: {
+        "smoke-backup-caretaker": {
+          bookingId: `smoke-booking-${Date.now()}-dispatch-expired`,
+          caretakerId: "smoke-backup-caretaker",
+          caretakerName: "Smoke Backup Caretaker",
+          score: 98,
+          distanceKm: 2.3,
+          etaMinutes: 9,
+          status: "sent",
+          notifiedAt: Date.now() - 5 * 60 * 1000
+        }
+      }
+    },
+    sla: {
+      assignmentDueAt: Date.now() + 6 * 60 * 1000,
+      arrivalDueAt: Date.now() + 30 * 60 * 1000,
+      status: "watch",
+      breachReason: "Smoke dispatch expired recovery"
+    }
+  };
+  dispatchExpiredBooking.dispatch.offers["smoke-backup-caretaker"].bookingId =
+    dispatchExpiredBooking.id;
+  await database.ref(`bookings/byId/${dispatchExpiredBooking.id}`).set(dispatchExpiredBooking);
+  await database.ref(`caretakers/smoke-backup-caretaker/offers/${dispatchExpiredBooking.id}`).set({
+    bookingId: dispatchExpiredBooking.id,
+    serviceType: dispatchExpiredBooking.serviceType,
+    customerName: dispatchExpiredBooking.customerName,
+    destinationLabel: "Smoke care address",
+    distanceKm: 2.3,
+    etaMinutes: 9,
+    status: "sent",
+    notifiedAt: Date.now() - 5 * 60 * 1000,
+    expiresAt: Date.now() - 2 * 60 * 1000
+  });
+  createdPaths.push(dispatchExpiredBooking);
+
+  const dispatchRecoverySnapshotResult = await request("/api/ops/recovery", {}, adminCookie);
+  expect(
+    dispatchRecoverySnapshotResult.json?.snapshot?.signals?.some(
+      (signal) =>
+        signal.bookingId === dispatchExpiredBooking.id &&
+        signal.kind === "dispatch_offer_expired"
+    ),
+    "ops recovery detects expired caregiver broadcast"
+  );
+  const dispatchRecoveryActionResult = await request(
+    "/api/ops/recovery",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: dispatchExpiredBooking.id,
+        note: "Smoke dispatch rebroadcast recovery"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    dispatchRecoveryActionResult.response.ok,
+    "admin can rebroadcast expired dispatch",
+    dispatchRecoveryActionResult.text
+  );
+  expect(
+    dispatchRecoveryActionResult.json?.action?.action === "rebroadcast",
+    "dispatch recovery action rebroadcasts caregivers"
+  );
+  if (dispatchRecoveryActionResult.json?.action?.id) {
+    createdReliability.push({
+      kind: "recoveryAction",
+      id: dispatchRecoveryActionResult.json.action.id,
+      bookingId: dispatchExpiredBooking.id
+    });
+  }
+
+  const verificationDelayedBooking = {
+    ...buildSmokeBooking("-completion-verify"),
+    status: "completed",
+    caretakerId: "demo-caretaker",
+    caretakerName: "Smoke Caretaker",
+    updatedAt: Date.now() - 45 * 60 * 1000,
+    completion: {
+      caretakerMarkedDoneAt: Date.now() - 45 * 60 * 1000,
+      paymentReleaseStatus: "awaiting_customer"
+    },
+    sla: {
+      assignmentDueAt: Date.now() - 60 * 60 * 1000,
+      arrivalDueAt: Date.now() - 50 * 60 * 1000,
+      status: "healthy",
+      breachReason: ""
+    }
+  };
+  await database.ref(`bookings/byId/${verificationDelayedBooking.id}`).set(verificationDelayedBooking);
+  createdPaths.push(verificationDelayedBooking);
+
+  const completionRecoverySnapshotResult = await request("/api/ops/recovery", {}, adminCookie);
+  expect(
+    completionRecoverySnapshotResult.json?.snapshot?.signals?.some(
+      (signal) =>
+        signal.bookingId === verificationDelayedBooking.id &&
+        signal.kind === "completion_verification_delayed"
+    ),
+    "ops recovery detects delayed customer verification"
+  );
+  const completionRecoveryActionResult = await request(
+    "/api/ops/recovery",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: verificationDelayedBooking.id,
+        note: "Smoke completion verification nudge"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    completionRecoveryActionResult.response.ok,
+    "admin can nudge delayed completion verification",
+    completionRecoveryActionResult.text
+  );
+  expect(
+    completionRecoveryActionResult.json?.action?.action === "nudge_customer",
+    "completion recovery nudges family"
+  );
+  if (completionRecoveryActionResult.json?.action?.id) {
+    createdReliability.push({
+      kind: "recoveryAction",
+      id: completionRecoveryActionResult.json.action.id,
+      bookingId: verificationDelayedBooking.id
     });
   }
 

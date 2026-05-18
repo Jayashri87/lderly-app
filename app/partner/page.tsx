@@ -713,6 +713,25 @@ export default function PartnerApp() {
             }}
           />
           <ActionButton
+            label="Cancel Job"
+            icon={AlertTriangle}
+            disabled={!hasActiveAssignment || !["accepted", "en_route", "arrived"].includes(bookingStatus)}
+            onClick={() => {
+              runAssignmentAction("Cancellation recovery", () => {
+                trackCaretakerAction("cancelled_after_accepting");
+                fetch(`/api/bookings/${encodeURIComponent(activeBooking?.id || "")}/cancel`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    reason: "Caretaker cancelled after accepting"
+                  })
+                });
+              });
+            }}
+          />
+          <ActionButton
             label="Check Out"
             icon={Clock}
             onClick={() => {

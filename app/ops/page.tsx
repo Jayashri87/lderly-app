@@ -192,8 +192,10 @@ type OpsRecoverySnapshot = {
   openSignals: number;
   criticalSignals: number;
   assignmentStuck: number;
+  dispatchOfferExpired?: number;
   arrivalDelayed: number;
   visitStartDelayed: number;
+  completionVerificationDelayed?: number;
   emergencyUnresolved: number;
   signals: RecoverySignal[];
 };
@@ -222,7 +224,13 @@ type OpsAuditEvent = {
 type RecoverySignal = {
   id: string;
   bookingId: string;
-  kind: "assignment_stuck" | "arrival_delayed" | "visit_start_delayed" | "emergency_unresolved";
+  kind:
+    | "assignment_stuck"
+    | "arrival_delayed"
+    | "dispatch_offer_expired"
+    | "visit_start_delayed"
+    | "completion_verification_delayed"
+    | "emergency_unresolved";
   severity: "watch" | "breach" | "critical";
   status: string;
   serviceType: string;
@@ -231,8 +239,10 @@ type RecoverySignal = {
   delayMinutes: number;
   recommendedAction:
     | "assign_caregiver"
+    | "rebroadcast_caregivers"
     | "reassign_backup"
     | "escalate_ops"
+    | "nudge_customer"
     | "advance_emergency";
   reason: string;
   createdAt: number;
@@ -1021,9 +1031,10 @@ export default function OpsApp() {
           </div>
           <div className="mt-5 grid gap-3 lg:grid-cols-4">
             <FunnelTile label="Assignments" value={String(opsRecovery?.assignmentStuck ?? 0)} />
+            <FunnelTile label="Dispatch" value={String(opsRecovery?.dispatchOfferExpired ?? 0)} />
             <FunnelTile label="Arrivals" value={String(opsRecovery?.arrivalDelayed ?? 0)} />
             <FunnelTile label="Visit starts" value={String(opsRecovery?.visitStartDelayed ?? 0)} />
-            <FunnelTile label="Emergency" value={String(opsRecovery?.emergencyUnresolved ?? 0)} />
+            <FunnelTile label="Verify" value={String(opsRecovery?.completionVerificationDelayed ?? 0)} />
           </div>
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
             {recoverySignals.slice(0, 4).map((signal) => (
@@ -2024,8 +2035,12 @@ function RecoverySignalCard({
   const actionLabel =
     signal.recommendedAction === "assign_caregiver"
       ? "Assign caregiver"
+      : signal.recommendedAction === "rebroadcast_caregivers"
+        ? "Rebroadcast caregivers"
       : signal.recommendedAction === "reassign_backup"
         ? "Reassign backup"
+        : signal.recommendedAction === "nudge_customer"
+          ? "Nudge family"
         : signal.recommendedAction === "advance_emergency"
           ? "Escalate emergency"
           : "Escalate ops";

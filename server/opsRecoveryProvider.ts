@@ -6,7 +6,9 @@ import { TrustedBooking } from "./trustedBooking";
 type RecoveryKind =
   | "assignment_stuck"
   | "arrival_delayed"
+  | "dispatch_offer_expired"
   | "visit_start_delayed"
+  | "completion_verification_delayed"
   | "emergency_unresolved";
 
 type RecoverySeverity = "watch" | "breach" | "critical";
@@ -23,8 +25,10 @@ export type RecoverySignal = {
   delayMinutes: number;
   recommendedAction:
     | "assign_caregiver"
+    | "rebroadcast_caregivers"
     | "reassign_backup"
     | "escalate_ops"
+    | "nudge_customer"
     | "advance_emergency";
   reason: string;
   createdAt: number;
@@ -45,13 +49,7 @@ type EmergencyRecord = {
   }>;
 };
 
-const terminalStatuses = new Set([
-  "completed",
-  "payment_settled",
-  "report_generated",
-  "cancelled",
-  "none"
-]);
+const terminalStatuses = new Set(["payment_settled", "report_generated", "cancelled", "none"]);
 
 const normalizeBookings = (value: unknown) =>
   Object.entries((value || {}) as Record<string, CareBooking>).map(([id, booking]) => ({
@@ -81,7 +79,11 @@ const severityFor = (delayMinutes: number, priority?: string): RecoverySeverity 
 };
 
 const signalForBooking = (booking: CareBooking): RecoverySignal | null => {
-  if (terminalStatuses.has(booking.status)) {
+  const completionPending =
+    booking.status === "completed" &&
+    booking.completion?.paymentReleaseStatus === "awaiting_customer";
+
+  if (terminalStatuses.has(booking.status) || (booking.status === "completed" && !completionPending)) {
     return null;
   }
 
@@ -91,6 +93,31 @@ const signalForBooking = (booking: CareBooking): RecoverySignal | null => {
   const assignmentDelay = assignmentPending ? minutesPast(booking.sla?.assignmentDueAt) : 0;
   const arrivalDelay = arrivalPending ? minutesPast(booking.sla?.arrivalDueAt) : 0;
   const visitStartDelay = visitStartPending ? minutesPast((booking.updatedAt || 0) + 15 * 60 * 1000) : 0;
+  const dispatchExpired =
+    booking.status === "searching" &&
+    Boolean(booking.dispatch?.offerExpiresAt && Date.now() > booking.dispatch.offerExpiresAt);
+  const completionDelay = completionPending
+    ? minutesPast((booking.completion?.caretakerMarkedDoneAt || booking.updatedAt || 0) + 15 * 60 * 1000)
+    : 0;
+
+  if (dispatchExpired) {
+    const delayMinutes = minutesPast(booking.dispatch?.offerExpiresAt);
+
+    return {
+      id: `recovery-${booking.id}-dispatch-expired`,
+      bookingId: booking.id,
+      kind: "dispatch_offer_expired",
+      severity: severityFor(delayMinutes, booking.matching?.priority),
+      status: booking.status,
+      serviceType: booking.serviceType,
+      customerName: booking.customerName,
+      caretakerName: "No caregiver accepted",
+      delayMinutes,
+      recommendedAction: "rebroadcast_caregivers",
+      reason: "Nearby caregiver offers expired without acceptance.",
+      createdAt: Date.now()
+    };
+  }
 
   if (assignmentPending && (assignmentDelay > 0 || booking.sla?.status === "breached")) {
     const delayMinutes = Math.max(assignmentDelay, booking.sla?.status === "breached" ? 1 : 0);
@@ -145,6 +172,23 @@ const signalForBooking = (booking: CareBooking): RecoverySignal | null => {
       delayMinutes: visitStartDelay,
       recommendedAction: "escalate_ops",
       reason: "Caregiver arrived but the visit has not started within 15 minutes.",
+      createdAt: Date.now()
+    };
+  }
+
+  if (completionPending && completionDelay > 0) {
+    return {
+      id: `recovery-${booking.id}-completion-verify`,
+      bookingId: booking.id,
+      kind: "completion_verification_delayed",
+      severity: severityFor(completionDelay, booking.matching?.priority),
+      status: booking.status,
+      serviceType: booking.serviceType,
+      customerName: booking.customerName,
+      caretakerName: booking.caretakerName || "Caregiver",
+      delayMinutes: completionDelay,
+      recommendedAction: "nudge_customer",
+      reason: "Caregiver marked the visit complete but family has not verified payment release.",
       createdAt: Date.now()
     };
   }
@@ -270,8 +314,12 @@ export const OpsRecoveryProvider = {
         openSignals: signals.length,
         criticalSignals: signals.filter((signal) => signal.severity === "critical").length,
         assignmentStuck: signals.filter((signal) => signal.kind === "assignment_stuck").length,
+        dispatchOfferExpired: signals.filter((signal) => signal.kind === "dispatch_offer_expired").length,
         arrivalDelayed: signals.filter((signal) => signal.kind === "arrival_delayed").length,
         visitStartDelayed: signals.filter((signal) => signal.kind === "visit_start_delayed").length,
+        completionVerificationDelayed: signals.filter(
+          (signal) => signal.kind === "completion_verification_delayed"
+        ).length,
         emergencyUnresolved: signals.filter((signal) => signal.kind === "emergency_unresolved").length,
         signals: signals.slice(0, 25)
       }
@@ -319,15 +367,23 @@ export const OpsRecoveryProvider = {
     const action =
       primarySignal.recommendedAction === "assign_caregiver"
         ? "assign"
+        : primarySignal.recommendedAction === "rebroadcast_caregivers"
+          ? "rebroadcast"
         : primarySignal.recommendedAction === "reassign_backup"
           ? "reassign"
+          : primarySignal.recommendedAction === "nudge_customer"
+            ? "nudge_customer"
           : "escalate";
     const result =
       action === "assign"
         ? await TrustedBooking.assign(bookingId)
+        : action === "rebroadcast"
+          ? await TrustedBooking.rebroadcast(bookingId, "Recovery automation rebroadcast")
         : action === "reassign"
           ? await TrustedBooking.reassign(bookingId)
-          : { ok: false as const, status: 409, error: "Manual escalation required" };
+          : action === "nudge_customer"
+            ? await TrustedBooking.nudgeCompletionVerification(bookingId)
+            : { ok: false as const, status: 409, error: "Manual escalation required" };
 
     if (result.ok) {
       const actionId = await writeRecoveryAction(
