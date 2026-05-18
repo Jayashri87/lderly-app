@@ -94,6 +94,8 @@ The smoke test validates:
 - voice-note upload URL generation works
 - signed geocoding works
 - ops maintenance cleanup removes expired locks, old replay records, and old recovery signals
+- backup manifest generation records critical RTDB export counts
+- notification retry policy updates queued/failed delivery attempts
 
 ## Automated Maintenance
 
@@ -117,6 +119,45 @@ Ops admins can also run the cleanup manually with a signed admin session:
 ```bash
 POST /api/ops/maintenance
 ```
+
+## Backup Readiness
+
+LDERLY now exposes an admin-only backup manifest route:
+
+```bash
+POST /api/ops/backups
+GET /api/ops/backups
+```
+
+The manifest does not replace a real Firebase export. It records the critical RTDB paths and record counts that must be included in the external backup process:
+
+- `bookings/byId`
+- `caretakers`
+- `users`
+- `reports/byId`
+- `notifications/byId`
+- `auditLogs`
+- support, refund, and incident queues
+
+Production still needs an external export destination, such as scheduled Firebase export to Google Cloud Storage or a managed backup process.
+
+## Notification Retry Policy
+
+Notification dispatch now records:
+
+- delivery attempts
+- provider reference
+- last attempt timestamp
+- retry due timestamp
+- delivery target when provided
+
+Ops can process due retries with:
+
+```bash
+POST /api/notifications/retry
+```
+
+Retries stop after three attempts and are visible through audit/operations records.
 
 After Firebase Admin is configured, sign in with a Firebase customer account once and confirm `/api/auth/firebase-role` returns `trusted-role-sync`. This activates server-owned `users/{uid}` role writes and Firebase custom claims.
 

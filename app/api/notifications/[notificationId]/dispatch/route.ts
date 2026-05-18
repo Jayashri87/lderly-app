@@ -8,17 +8,29 @@ import { deliverNotification } from "../../../../../server/communicationProvider
 import { getAdminDatabase } from "../../../../../server/firebaseAdmin";
 import type { CareNotification } from "../../../../../services/notificationService";
 
+const compactNotification = (notification: CareNotification) =>
+  Object.fromEntries(
+    Object.entries(notification).filter(([, value]) => value !== undefined)
+  ) as CareNotification;
+
 const notificationUpdates = (
   notification: CareNotification,
   nextStatus: CareNotification["deliveryStatus"],
-  providerReference: string
+  providerReference: string,
+  to = ""
 ) => {
-  const nextNotification = {
+  const attempts = (notification.deliveryAttempts || 0) + 1;
+  const shouldRetry = nextStatus === "failed" || nextStatus === "queued";
+  const nextNotification = compactNotification({
     ...notification,
     deliveryStatus: nextStatus,
+    deliveryTarget: to || notification.deliveryTarget || "",
     providerReference,
-    deliveredAt: nextStatus === "sent" ? Date.now() : undefined
-  };
+    deliveryAttempts: attempts,
+    lastAttemptAt: Date.now(),
+    retryDueAt: shouldRetry && attempts < 3 ? Date.now() + attempts * 5 * 60 * 1000 : undefined,
+    deliveredAt: nextStatus === "sent" ? Date.now() : notification.deliveredAt
+  });
   const updates: Record<string, unknown> = {
     [`notifications/byId/${notification.id}`]: nextNotification
   };
@@ -94,7 +106,8 @@ export async function POST(
           notificationUpdates(
             notification,
             delivery.status,
-            delivery.providerReference
+            delivery.providerReference,
+            body.to
           )
         )
   );

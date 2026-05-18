@@ -396,6 +396,14 @@ try {
     "India-first communication readiness is exposed"
   );
   expect(
+    status.json?.productionReadiness?.notificationRetryApi === true,
+    "notification retry API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.notificationRetryPolicy === true,
+    "notification retry policy is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.pushTokenRegistrationApi === true,
     "push token registration API is prepared"
   );
@@ -502,6 +510,10 @@ try {
   expect(
     status.json?.productionReadiness?.opsMaintenanceApi === true,
     "ops maintenance API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.opsBackupManifestApi === true,
+    "ops backup manifest API is prepared"
   );
   expect(
     status.json?.productionReadiness?.opsMaintenanceCronPrepared === true,
@@ -1357,6 +1369,74 @@ try {
     });
   }
 
+  const retryNotificationId = `smoke-notification-retry-${Date.now()}`;
+  await database.ref().update({
+    [`notifications/byId/${retryNotificationId}`]: {
+      id: retryNotificationId,
+      userId: booking.customerId,
+      role: "customer",
+      title: "Smoke retry notification",
+      body: "Retry delivery policy validation.",
+      priority: "normal",
+      channel: "whatsapp",
+      deliveryStatus: "failed",
+      deliveryTarget: "+919876543210",
+      deliveryAttempts: 1,
+      retryDueAt: Date.now() - 60_000,
+      read: false,
+      createdAt: Date.now() - 120_000
+    },
+    [`notifications/byUser/${booking.customerId}/${retryNotificationId}`]: {
+      id: retryNotificationId,
+      userId: booking.customerId,
+      role: "customer",
+      title: "Smoke retry notification",
+      body: "Retry delivery policy validation.",
+      priority: "normal",
+      channel: "whatsapp",
+      deliveryStatus: "failed",
+      deliveryTarget: "+919876543210",
+      deliveryAttempts: 1,
+      retryDueAt: Date.now() - 60_000,
+      read: false,
+      createdAt: Date.now() - 120_000
+    }
+  });
+  createdReliability.push({
+    kind: "notification",
+    id: retryNotificationId,
+    userId: booking.customerId,
+    role: "customer"
+  });
+  const notificationRetryResult = await request(
+    "/api/notifications/retry",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(
+    notificationRetryResult.response.ok,
+    "admin can process notification retry queue",
+    notificationRetryResult.text
+  );
+  expect(
+    notificationRetryResult.json?.run?.processed >= 1,
+    "notification retry processes due notification"
+  );
+  if (notificationRetryResult.json?.run?.id) {
+    createdReliability.push({
+      kind: "notificationRetry",
+      id: notificationRetryResult.json.run.id
+    });
+  }
+  const retryNotificationAfter = await database.ref(`notifications/byId/${retryNotificationId}`).get();
+  expect(
+    retryNotificationAfter.val()?.deliveryAttempts >= 2,
+    "notification retry increments delivery attempts"
+  );
+
   const partnerSeedResult = await request(
     "/api/partners",
     {
@@ -1842,6 +1922,40 @@ try {
   expect(!staleLockAfter.exists(), "expired booking lock is deleted");
   expect(!expiredIdempotencyAfter.exists(), "expired idempotency record is deleted");
   expect(!oldRecoverySignalAfter.exists(), "old recovery signal is deleted");
+
+  const backupManifestResult = await request(
+    "/api/ops/backups",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(
+    backupManifestResult.response.ok,
+    "admin can create backup manifest",
+    backupManifestResult.text
+  );
+  expect(
+    backupManifestResult.json?.manifest?.counts?.bookings >= 1,
+    "backup manifest includes booking counts"
+  );
+  expect(
+    backupManifestResult.json?.manifest?.requiredExportPaths?.includes("bookings/byId"),
+    "backup manifest lists critical export paths"
+  );
+  if (backupManifestResult.json?.manifest?.id) {
+    createdReliability.push({
+      kind: "backupManifest",
+      id: backupManifestResult.json.manifest.id
+    });
+  }
+  const latestBackupManifestResult = await request("/api/ops/backups", {}, adminCookie);
+  expect(latestBackupManifestResult.response.ok, "admin can read latest backup manifest");
+  expect(
+    latestBackupManifestResult.json?.manifest?.id === backupManifestResult.json?.manifest?.id,
+    "latest backup manifest is persisted"
+  );
 
   const reassuranceResult = await request(
     "/api/ai/reassurance",
@@ -2870,6 +2984,15 @@ try {
         })
         .catch(() => undefined);
     }
+    if (item.kind === "backupManifest") {
+      await database
+        .ref()
+        .update({
+          [`operations/backups/manifests/${item.id}`]: null,
+          "operations/backups/latest": null
+        })
+        .catch(() => undefined);
+    }
     if (item.kind === "pushToken") {
       await database
         .ref()
@@ -2887,6 +3010,22 @@ try {
           [`pushDispatches/byId/${item.id}`]: null,
           [`pushDispatches/byUser/${item.userId}/${item.id}`]: null
         })
+        .catch(() => undefined);
+    }
+    if (item.kind === "notification") {
+      await database
+        .ref()
+        .update({
+          [`notifications/byId/${item.id}`]: null,
+          [`notifications/byUser/${item.userId}/${item.id}`]: null,
+          [`notifications/byRole/${item.role}/${item.id}`]: null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "notificationRetry") {
+      await database
+        .ref(`operations/notificationRetries/${item.id}`)
+        .remove()
         .catch(() => undefined);
     }
     if (item.kind === "attendance") {

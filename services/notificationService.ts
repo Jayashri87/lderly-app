@@ -11,6 +11,12 @@ export type CareNotification = {
   priority: "normal" | "urgent" | "critical";
   channel: "in_app" | "whatsapp" | "sms" | "voice";
   deliveryStatus: "pending" | "queued" | "sent" | "failed";
+  deliveryTarget?: string;
+  providerReference?: string;
+  deliveryAttempts?: number;
+  lastAttemptAt?: number;
+  retryDueAt?: number;
+  deliveredAt?: number;
   read: boolean;
   createdAt: number;
 };
