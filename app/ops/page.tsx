@@ -7,9 +7,12 @@ import {
   BarChart3,
   BellRing,
   CalendarClock,
+  Mail,
+  Phone,
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  UserPlus,
   Users
 } from "lucide-react";
 import LiveMap from "../../components/LiveMap";
@@ -272,6 +275,41 @@ type CommandQueueItem = {
   nextAction: string;
 };
 
+type CustomerLeadStatus =
+  | "new"
+  | "contacted"
+  | "qualified"
+  | "customer_created"
+  | "not_reachable"
+  | "archived";
+
+type CustomerLead = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  source: string;
+  status: CustomerLeadStatus;
+  touchCount: number;
+  notes?: string;
+  lastAction?: string;
+  createdCustomerId?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type CustomerLeadSnapshot = {
+  generatedAt: number;
+  total: number;
+  newCount: number;
+  contactedCount: number;
+  qualifiedCount: number;
+  customerCreatedCount: number;
+  notReachableCount: number;
+  archivedCount: number;
+  leads: CustomerLead[];
+};
+
 export default function OpsApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -290,6 +328,7 @@ export default function OpsApp() {
     useState<EmergencyCommandSnapshot | null>(null);
   const [opsRecovery, setOpsRecovery] = useState<OpsRecoverySnapshot | null>(null);
   const [opsAudit, setOpsAudit] = useState<OpsAuditSnapshot | null>(null);
+  const [leadSnapshot, setLeadSnapshot] = useState<CustomerLeadSnapshot | null>(null);
   const [aiOpsSummary, setAiOpsSummary] = useState<AiOpsSummary | null>(null);
   const [opsNow, setOpsNow] = useState(0);
   const [opsActionMessage, setOpsActionMessage] = useState("");
@@ -352,6 +391,12 @@ export default function OpsApp() {
           setOpsAudit(payload?.snapshot || null)
         )
         .catch(() => setOpsAudit(null));
+      fetch("/api/ops/leads")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { snapshot: CustomerLeadSnapshot } | null) =>
+          setLeadSnapshot(payload?.snapshot || null)
+        )
+        .catch(() => setLeadSnapshot(null));
     };
 
     refreshOps();
@@ -494,6 +539,69 @@ export default function OpsApp() {
   const delayedBookingQueue = emergencyCommand?.queues?.delayedBookings || [];
   const recoverySignals = opsRecovery?.signals || [];
   const auditEvents = opsAudit?.events || [];
+  const customerLeads = leadSnapshot?.leads || [];
+  const refreshLeads = async () => {
+    const response = await fetch("/api/ops/leads");
+    if (response.ok) {
+      const payload = (await response.json()) as { snapshot: CustomerLeadSnapshot };
+      setLeadSnapshot(payload.snapshot);
+    }
+  };
+  const updateLeadStatus = async (
+    lead: CustomerLead,
+    status: CustomerLeadStatus,
+    notes?: string
+  ) => {
+    setOpsActionMessage("");
+    trackProductEvent("ops_lead_status_clicked", {
+      leadId: lead.id,
+      status,
+      source: lead.source
+    });
+    const response = await fetch("/api/ops/leads", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        leadId: lead.id,
+        status,
+        notes
+      })
+    });
+    setOpsActionMessage(
+      response.ok
+        ? `${lead.name} marked ${status.replaceAll("_", " ")}.`
+        : `Could not update ${lead.name}.`
+    );
+    await refreshLeads();
+  };
+  const createCustomerFromLead = async (lead: CustomerLead) => {
+    setOpsActionMessage("");
+    trackProductEvent("ops_lead_create_customer_clicked", {
+      leadId: lead.id,
+      source: lead.source
+    });
+    const response = await fetch("/api/ops/leads", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "create_customer",
+        leadId: lead.id
+      })
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { customerId?: string; loginId?: string; temporaryPassword?: string; error?: string }
+      | null;
+    setOpsActionMessage(
+      response.ok
+        ? `Customer prepared for ${lead.name}. Login: ${payload?.loginId}, temporary password: ${payload?.temporaryPassword}`
+        : payload?.error || `Could not create customer for ${lead.name}.`
+    );
+    await refreshLeads();
+  };
   const reassignBooking = async (recommendation: CaregiverIntelligenceSnapshot["dispatchRecommendations"][number]) => {
     setOpsActionMessage("");
     trackProductEvent("ops_reassignment_clicked", {
@@ -709,6 +817,59 @@ export default function OpsApp() {
             label="Recovery queue"
             value={String(opsRecovery?.openSignals ?? 0)}
           />
+        </section>
+
+        <section className="mt-6 rounded-[2rem] bg-white p-5 text-[#071018]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+                <UserPlus size={16} />
+                Customer lead inbox
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">
+                {leadSnapshot?.newCount
+                  ? `${leadSnapshot.newCount} new family enquiries`
+                  : "No new family enquiry waiting"}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                Leads from the public callback funnel appear here. Ops can call, qualify,
+                archive, or prepare a customer account after speaking with the family.
+              </p>
+            </div>
+            <a
+              href="/signin"
+              className="rounded-full bg-[#071018] px-5 py-3 text-center text-sm font-semibold text-white"
+            >
+              View public funnel
+            </a>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-6">
+            <FunnelTile label="Total" value={String(leadSnapshot?.total ?? 0)} />
+            <FunnelTile label="New" value={String(leadSnapshot?.newCount ?? 0)} />
+            <FunnelTile label="Contacted" value={String(leadSnapshot?.contactedCount ?? 0)} />
+            <FunnelTile label="Qualified" value={String(leadSnapshot?.qualifiedCount ?? 0)} />
+            <FunnelTile label="Created" value={String(leadSnapshot?.customerCreatedCount ?? 0)} />
+            <FunnelTile label="Archived" value={String(leadSnapshot?.archivedCount ?? 0)} />
+          </div>
+          <div className="mt-5 grid gap-3 xl:grid-cols-2">
+            {customerLeads.slice(0, 8).map((lead) => (
+              <CustomerLeadCard
+                key={lead.id}
+                lead={lead}
+                now={opsNow}
+                onContacted={() => updateLeadStatus(lead, "contacted")}
+                onQualified={() => updateLeadStatus(lead, "qualified")}
+                onNotReachable={() => updateLeadStatus(lead, "not_reachable")}
+                onArchive={() => updateLeadStatus(lead, "archived")}
+                onCreateCustomer={() => createCustomerFromLead(lead)}
+              />
+            ))}
+            {customerLeads.length === 0 && (
+              <div className="rounded-3xl bg-slate-100 p-4 text-sm text-slate-500 xl:col-span-2">
+                New callback requests will appear here after families submit name, phone, and email.
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
@@ -1507,6 +1668,113 @@ export default function OpsApp() {
         </section>
       </div>
     </main>
+  );
+}
+
+function CustomerLeadCard({
+  lead,
+  now,
+  onContacted,
+  onQualified,
+  onNotReachable,
+  onArchive,
+  onCreateCustomer
+}: {
+  lead: CustomerLead;
+  now: number;
+  onContacted: () => void;
+  onQualified: () => void;
+  onNotReachable: () => void;
+  onArchive: () => void;
+  onCreateCustomer: () => void;
+}) {
+  const statusClass =
+    lead.status === "customer_created"
+      ? "bg-emerald-100 text-emerald-700"
+      : lead.status === "qualified"
+        ? "bg-blue-100 text-blue-700"
+        : lead.status === "not_reachable"
+          ? "bg-amber-100 text-amber-700"
+          : lead.status === "archived"
+            ? "bg-slate-200 text-slate-500"
+            : "bg-red-100 text-red-700";
+  const updatedAgo = lead.updatedAt
+    ? `${Math.max(0, Math.round(((now || lead.updatedAt) - lead.updatedAt) / 60000))}m ago`
+    : "new";
+
+  return (
+    <div className="rounded-3xl bg-slate-100 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold">{lead.name}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {lead.source || "web"} - updated {updatedAgo}
+          </p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+          {lead.status.replaceAll("_", " ")}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
+        <a
+          href={`tel:${lead.phone.replace(/[^\d+]/g, "")}`}
+          className="flex items-center gap-2 rounded-2xl bg-white px-3 py-3 font-semibold text-[#071018]"
+        >
+          <Phone className="h-4 w-4 text-emerald-700" />
+          {lead.phone}
+        </a>
+        <a
+          href={`mailto:${lead.email}`}
+          className="flex items-center gap-2 rounded-2xl bg-white px-3 py-3 font-semibold text-[#071018]"
+        >
+          <Mail className="h-4 w-4 text-blue-700" />
+          {lead.email}
+        </a>
+      </div>
+      <div className="mt-3 rounded-2xl bg-white p-3 text-sm text-slate-600">
+        <p className="font-semibold text-[#071018]">
+          {lead.lastAction || "Call family and verify care need"}
+        </p>
+        <p className="mt-1">
+          Touches: {lead.touchCount || 1}
+          {lead.createdCustomerId ? ` - Customer: ${lead.createdCustomerId}` : ""}
+        </p>
+        {lead.notes && <p className="mt-2 text-slate-500">{lead.notes}</p>}
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+        <button
+          onClick={onContacted}
+          className="rounded-full bg-white px-3 py-3 text-xs font-semibold text-[#071018]"
+        >
+          Contacted
+        </button>
+        <button
+          onClick={onQualified}
+          className="rounded-full bg-blue-100 px-3 py-3 text-xs font-semibold text-blue-700"
+        >
+          Qualified
+        </button>
+        <button
+          onClick={onCreateCustomer}
+          disabled={lead.status === "customer_created"}
+          className="rounded-full bg-[#071018] px-3 py-3 text-xs font-semibold text-white disabled:bg-slate-300"
+        >
+          Create ID
+        </button>
+        <button
+          onClick={onNotReachable}
+          className="rounded-full bg-amber-100 px-3 py-3 text-xs font-semibold text-amber-700"
+        >
+          No answer
+        </button>
+        <button
+          onClick={onArchive}
+          className="rounded-full bg-slate-200 px-3 py-3 text-xs font-semibold text-slate-600"
+        >
+          Archive
+        </button>
+      </div>
+    </div>
   );
 }
 
