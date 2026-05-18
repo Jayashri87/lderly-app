@@ -566,6 +566,7 @@ export default function OpsApp() {
             lat: 12.985,
             lng: 77.61
           },
+          lastLocationAt: booking.tracking?.lastLocationAt,
           createdAt: booking.createdAt,
           updatedAt: booking.updatedAt,
           timeline: booking.timeline

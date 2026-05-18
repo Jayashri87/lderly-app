@@ -189,6 +189,7 @@ export default function PartnerApp() {
             lat: 12.985,
             lng: 77.61
           },
+          lastLocationAt: activeBooking.tracking?.lastLocationAt,
           createdAt: activeBooking.createdAt,
           updatedAt: activeBooking.updatedAt,
           timeline: activeBooking.timeline

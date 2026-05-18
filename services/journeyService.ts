@@ -34,6 +34,7 @@ export type CareJourney = {
     lat: number;
     lng: number;
   };
+  lastLocationAt?: number;
   createdAt: number;
   updatedAt: number;
   timeline: Array<{

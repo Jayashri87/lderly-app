@@ -24,6 +24,31 @@ const googleMapsLibraries: Libraries = ["marker"];
 
 const formatCoord = (value: number) => value.toFixed(4);
 
+const locationFreshnessFor = (journey: CareJourney | null) => {
+  const timestamp = journey?.lastLocationAt || journey?.updatedAt || 0;
+
+  if (!timestamp) {
+    return {
+      label: "Location pending",
+      tone: "bg-amber-300/20 text-amber-100",
+      stale: true
+    };
+  }
+
+  const ageMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+  const activeTracking = ["accepted", "en_route", "arrived"].includes(journey?.status || "");
+  const stale = activeTracking && ageMinutes > 5;
+
+  return {
+    label:
+      ageMinutes <= 0
+        ? "Location just now"
+        : `${stale ? "GPS stale" : "GPS fresh"} ${ageMinutes}m ago`,
+    tone: stale ? "bg-red-500/25 text-red-100" : "bg-emerald-300/20 text-emerald-100",
+    stale
+  };
+};
+
 function GoogleLiveMap({ journey }: LiveMapProps) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
@@ -146,13 +171,20 @@ function AdvancedMapMarker({
 }
 
 function MapOverlay({ journey }: LiveMapProps) {
+  const freshness = locationFreshnessFor(journey);
+
   return (
     <div className="pointer-events-none absolute inset-x-3 top-3 flex items-center justify-between gap-3">
       <div className="rounded-full border border-white/10 bg-[#050816]/75 px-3 py-2 text-xs backdrop-blur-md">
         {journey?.destinationLabel || "Patient Home"}
       </div>
-      <div className="rounded-full border border-white/10 bg-[#050816]/75 px-3 py-2 text-xs backdrop-blur-md">
-        ETA {journey?.eta || 0} min
+      <div className="flex items-center gap-2">
+        <div className={`rounded-full px-3 py-2 text-xs backdrop-blur-md ${freshness.tone}`}>
+          {freshness.label}
+        </div>
+        <div className="rounded-full border border-white/10 bg-[#050816]/75 px-3 py-2 text-xs backdrop-blur-md">
+          ETA {journey?.eta || 0} min
+        </div>
       </div>
     </div>
   );
@@ -174,6 +206,7 @@ function MapFrame({
       lat: defaultCenter.lat + 0.01,
       lng: defaultCenter.lng + 0.01
     };
+  const freshness = locationFreshnessFor(journey);
 
   return (
     <div className="space-y-3">
@@ -186,6 +219,9 @@ function MapFrame({
           <span className="rounded-full bg-white/10 px-2 py-1">
             ETA {journey?.eta || 0} min
           </span>
+        </div>
+        <div className={`mt-3 rounded-2xl px-3 py-2 font-semibold ${freshness.tone}`}>
+          {freshness.label}
         </div>
         <div className="mt-3 flex gap-2 text-amber-100">
           {mode !== "Google Maps" && <AlertTriangle className="h-4 w-4 shrink-0" />}
