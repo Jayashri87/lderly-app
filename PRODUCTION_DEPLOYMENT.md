@@ -95,17 +95,17 @@ The smoke test validates:
 
 After Firebase Admin is configured, sign in with a Firebase customer account once and confirm `/api/auth/firebase-role` returns `trusted-role-sync`. This activates server-owned `users/{uid}` role writes and Firebase custom claims.
 
-## Customer Profile Sign-In
+## Customer Interest Capture
 
-Customer sign-in currently uses a no-OTP profile form on `/signin`.
+The public customer entry page currently works as a premium lead-capture funnel, not an instant self-service login.
 
 Required fields:
 
 - Name
-- Email address
 - Phone number
+- Email ID
 
-The form posts to `/api/auth/customer/profile`, creates a signed customer session cookie, and stores the customer profile under `users/{uid}` when Firebase Admin is configured. This keeps onboarding lightweight while preserving server-owned customer sessions for booking, payments, and care tracking.
+The form posts to `/api/leads/customer` and stores the inquiry under `customerLeads/{leadId}` when Firebase Admin is configured. The intended operating flow is: capture contact details, LDERLY team calls the family, verifies the care need, then creates the customer ID and password for the next step.
 
 ## Firebase Rules
 
