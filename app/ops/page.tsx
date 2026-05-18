@@ -1516,10 +1516,44 @@ export default function OpsApp() {
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Support tickets</p>
               <p className="mt-1 text-white/50">Customer issues route into ops support queue.</p>
+              <button
+                onClick={() =>
+                  booking?.id &&
+                  runOpsWorkflow("Open support ticket", "/api/support/tickets", {
+                    bookingId: booking.id,
+                    userId: booking.customerId,
+                    category: "booking",
+                    priority: "normal",
+                    subject: "Ops callback required",
+                    description: "Ops opened a customer support follow-up from command center."
+                  })
+                }
+                disabled={!booking?.id}
+                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+              >
+                Open support ticket
+              </button>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Complaints</p>
               <p className="mt-1 text-white/50">Care quality and safety complaints create escalations.</p>
+              <button
+                onClick={() =>
+                  booking?.id &&
+                  runOpsWorkflow("Open care complaint", "/api/support/complaints", {
+                    bookingId: booking.id,
+                    userId: booking.customerId,
+                    caretakerId: booking.caretakerId,
+                    type: "service_quality",
+                    severity: "medium",
+                    summary: "Ops opened a care quality review from command center."
+                  })
+                }
+                disabled={!booking?.id}
+                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+              >
+                Open complaint review
+              </button>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Refunds</p>
@@ -1545,6 +1579,21 @@ export default function OpsApp() {
               <p className="mt-1 text-white/50">
                 Aadhaar, PAN, and face checks route through the ops review API.
               </p>
+              <button
+                onClick={() =>
+                  caretakers[0]?.uid &&
+                  runOpsWorkflow("Approve caretaker Aadhaar", "/api/caretaker/kyc/review", {
+                    caretakerId: caretakers[0].uid,
+                    documentType: "aadhaar",
+                    status: "approved",
+                    note: "Ops command center review"
+                  })
+                }
+                disabled={!caretakers[0]?.uid}
+                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+              >
+                Review first KYC
+              </button>
             </div>
           </Panel>
           <Panel title="Monitoring">

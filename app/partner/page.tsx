@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -22,6 +22,58 @@ import { trackProductEvent } from "../../services/productAnalytics";
 
 type GpsStatus = "idle" | "requesting" | "tracking" | "simulated" | "blocked" | "unsupported" | "error";
 
+const checklistForService = (serviceType = "Care visit") => {
+  const service = serviceType.toLowerCase();
+
+  if (service.includes("doctor") || service.includes("hospital")) {
+    return [
+      "Reached care location",
+      "Doctor / hospital desk support completed",
+      "Family notes captured",
+      "Prescription or next step checked"
+    ];
+  }
+
+  if (service.includes("lab") || service.includes("report")) {
+    return [
+      "Reached lab or report desk",
+      "Appointment / token confirmed",
+      "Sample, visit, or report status updated",
+      "Family handover note captured"
+    ];
+  }
+
+  if (service.includes("medicine")) {
+    return [
+      "Medicine list verified",
+      "Dose / pickup status updated",
+      "Schedule explained clearly",
+      "Family handover note captured"
+    ];
+  }
+
+  if (
+    service.includes("temple") ||
+    service.includes("birthday") ||
+    service.includes("festival") ||
+    service.includes("companion")
+  ) {
+    return [
+      "Pickup / arrival support completed",
+      "Companion time completed",
+      "Return or family handover completed",
+      "Mood note captured"
+    ];
+  }
+
+  return [
+    "Reached care location",
+    "Requested support completed",
+    "Family handover note captured",
+    "Any concern escalated"
+  ];
+};
+
 export default function PartnerApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -41,6 +93,13 @@ export default function PartnerApp() {
   const [gpsMessage, setGpsMessage] = useState("Live GPS has not started.");
   const [gpsWatchId, setGpsWatchId] = useState<number | null>(null);
   const [lastGpsAt, setLastGpsAt] = useState<number | null>(null);
+  const [checklistState, setChecklistState] = useState<{
+    assignmentKey: string;
+    completed: Record<string, boolean>;
+  }>({
+    assignmentKey: "",
+    completed: {}
+  });
 
   useEffect(() => {
     return AuthService.subscribe((user) => setSession(user));
@@ -90,6 +149,9 @@ export default function PartnerApp() {
     (!journey || journey.status === "idle" || (booking?.updatedAt ?? 0) >= journey.updatedAt);
   const activeJourney = bookingIsFreshestActiveCare ? null : journey;
   const activeBooking = booking;
+  const assignmentKey = activeBooking?.id || activeJourney?.id || "no-assignment";
+  const completedChecklist =
+    checklistState.assignmentKey === assignmentKey ? checklistState.completed : {};
   const isJourneyAssignment = Boolean(activeJourney && activeJourney.status !== "idle");
   const isBookingAssignment = Boolean(activeBooking && activeBooking.status !== "none");
   const bookingMapJourney: CareJourney | null =
@@ -133,7 +195,19 @@ export default function PartnerApp() {
         }
       : activeJourney;
 
+  const activeServiceType = activeBooking?.serviceType || activeJourney?.serviceType || "Care visit";
+  const completionChecklist = useMemo(
+    () => checklistForService(activeServiceType),
+    [activeServiceType]
+  );
+  const checklistDone = completionChecklist.every((item) => completedChecklist[item]);
+
   const completeBooking = () => {
+    if (!checklistDone) {
+      setActionMessage("Complete the service checklist before checkout.");
+      return;
+    }
+
     trackProductEvent("caretaker_session_completed", {
       bookingId: activeBooking?.id,
       service: activeBooking?.serviceType,
@@ -144,6 +218,11 @@ export default function PartnerApp() {
   };
 
   const completeJourney = () => {
+    if (!checklistDone) {
+      setActionMessage("Complete the service checklist before checkout.");
+      return;
+    }
+
     trackProductEvent("caretaker_session_completed", {
       bookingId: activeJourney?.id,
       service: activeJourney?.serviceType,
@@ -175,8 +254,22 @@ export default function PartnerApp() {
     isJourneyAssignment || (bookingStatus === "arrived" && customerStartOtp.trim().length >= 4);
   const canCompleteVisit =
     isJourneyAssignment
-      ? journeyStatus === "arrived"
-      : bookingStatus === "in_progress";
+      ? journeyStatus === "arrived" && checklistDone
+      : bookingStatus === "in_progress" && checklistDone;
+  const completionBlockedReason = !hasActiveAssignment
+    ? "No active assignment"
+    : isJourneyAssignment
+      ? journeyStatus !== "arrived"
+        ? "Start the visit before checkout"
+        : !checklistDone
+          ? "Complete checklist first"
+          : ""
+      : bookingStatus !== "in_progress"
+        ? "Start with customer OTP first"
+        : !checklistDone
+          ? "Complete checklist first"
+          : "";
+
   const runAssignmentAction = (label: string, action: () => void) => {
     setActionMessage("");
 
@@ -594,6 +687,59 @@ export default function PartnerApp() {
           </p>
         </section>
 
+        <section className="mt-6 rounded-[2rem] border border-emerald-200/15 bg-white/10 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-emerald-200">Before checkout</p>
+              <h2 className="mt-1 text-xl font-semibold">Service proof checklist</h2>
+              <p className="mt-1 text-sm text-white/50">
+                Complete these items before marking the job done.
+              </p>
+            </div>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/70">
+              {completionChecklist.filter((item) => completedChecklist[item]).length}/
+              {completionChecklist.length}
+            </span>
+          </div>
+          <div className="mt-4 space-y-2">
+            {completionChecklist.map((item) => (
+              <button
+                key={item}
+                onClick={() => {
+                  setChecklistState((current) => ({
+                    assignmentKey,
+                    completed: {
+                      ...(current.assignmentKey === assignmentKey ? current.completed : {}),
+                      [item]:
+                        !(
+                          current.assignmentKey === assignmentKey &&
+                          current.completed[item]
+                        )
+                    }
+                  }));
+                  trackCaretakerAction("completion_checklist_toggled");
+                }}
+                disabled={!hasActiveAssignment}
+                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                  completedChecklist[item] ? "bg-emerald-300 text-[#080b10]" : "bg-white/10 text-white/70"
+                }`}
+              >
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                {item}
+              </button>
+            ))}
+          </div>
+          {completionBlockedReason ? (
+            <p className="mt-3 rounded-2xl bg-amber-200/10 px-4 py-3 text-sm text-amber-50">
+              Checkout locked: {completionBlockedReason}.
+            </p>
+          ) : (
+            <p className="mt-3 rounded-2xl bg-emerald-300/10 px-4 py-3 text-sm text-emerald-50">
+              Ready to complete session and create the visit report.
+            </p>
+          )}
+        </section>
+
         <section className="mt-6 grid grid-cols-2 gap-3">
           <ActionButton
             label="Check In"
@@ -617,6 +763,7 @@ export default function PartnerApp() {
             label="Accept"
             icon={CheckCircle2}
             disabled={!hasActiveAssignment || !canAcceptCare}
+            disabledReason={!hasActiveAssignment ? "No active assignment" : "Offer is not ready to accept"}
             onClick={() => {
               runAssignmentAction("Accepted", () => {
                 trackCaretakerAction("accepted_booking");
@@ -630,6 +777,7 @@ export default function PartnerApp() {
             label="En Route"
             icon={Navigation}
             disabled={!hasActiveAssignment || !canGoEnRoute}
+            disabledReason={!hasActiveAssignment ? "No active assignment" : "Accept the job first"}
             onClick={() => {
               runAssignmentAction("En route", () => {
                 trackCaretakerAction("marked_en_route");
@@ -644,6 +792,7 @@ export default function PartnerApp() {
             label="Arrived"
             icon={MapPinned}
             disabled={!hasActiveAssignment || !canMarkArrived}
+            disabledReason={!hasActiveAssignment ? "No active assignment" : "Mark en route first"}
             onClick={() => {
               runAssignmentAction("Arrival", () => {
                 trackCaretakerAction("marked_arrived");
@@ -657,6 +806,13 @@ export default function PartnerApp() {
             label="Start with OTP"
             icon={ShieldCheck}
             disabled={!hasActiveAssignment || !canStartVisit}
+            disabledReason={
+              !hasActiveAssignment
+                ? "No active assignment"
+                : bookingStatus !== "arrived"
+                  ? "Mark arrived first"
+                  : "Enter customer OTP"
+            }
             onClick={() => {
               runAssignmentAction("Visit started", () => {
                 trackCaretakerAction("visit_started");
@@ -673,6 +829,8 @@ export default function PartnerApp() {
           <ActionButton
             label="Record Vitals"
             icon={ShieldCheck}
+            disabled={!hasActiveAssignment}
+            disabledReason="No active assignment"
             onClick={() => {
               recordStructuredVitals();
             }}
@@ -681,6 +839,7 @@ export default function PartnerApp() {
             label="GPS Once"
             icon={Navigation}
             disabled={!hasActiveAssignment}
+            disabledReason="No active assignment"
             onClick={() => {
               runAssignmentAction("Location update", () => {
                 updateGpsOnce();
@@ -691,6 +850,7 @@ export default function PartnerApp() {
             label={gpsWatchId === null ? "Live GPS" : "Stop GPS"}
             icon={Navigation}
             disabled={!hasActiveAssignment}
+            disabledReason="No active assignment"
             onClick={() => {
               runAssignmentAction(gpsWatchId === null ? "Live GPS" : "GPS stopped", () => {
                 if (gpsWatchId === null) {
@@ -705,6 +865,7 @@ export default function PartnerApp() {
             label="Panic SOS"
             icon={AlertTriangle}
             disabled={!hasActiveAssignment}
+            disabledReason="No active assignment"
             onClick={() => {
               runAssignmentAction("Panic SOS", () => {
                 trackCaretakerAction("panic_sos_triggered");
@@ -716,6 +877,7 @@ export default function PartnerApp() {
             label="Cancel Job"
             icon={AlertTriangle}
             disabled={!hasActiveAssignment || !["accepted", "en_route", "arrived"].includes(bookingStatus)}
+            disabledReason={!hasActiveAssignment ? "No active assignment" : "Only after accepting a job"}
             onClick={() => {
               runAssignmentAction("Cancellation recovery", () => {
                 trackCaretakerAction("cancelled_after_accepting");
@@ -743,10 +905,11 @@ export default function PartnerApp() {
           <button
             onClick={isJourneyAssignment ? completeJourney : completeBooking}
             disabled={!hasActiveAssignment || !canCompleteVisit}
+            title={completionBlockedReason || "Complete session and report"}
             className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 py-4 font-semibold text-[#080b10] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
           >
             <FileText className="h-5 w-5" />
-            Complete Session & Report
+            {canCompleteVisit ? "Complete Session & Report" : completionBlockedReason}
           </button>
         </section>
         {actionMessage && (
@@ -781,21 +944,29 @@ function ActionButton({
   icon: Icon,
   label,
   onClick,
-  disabled = false
+  disabled = false,
+  disabledReason = ""
 }: {
   icon: typeof Clock;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  disabledReason?: string;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={disabled ? disabledReason : label}
       className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-[1.5rem] bg-white/10 p-4 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
     >
       <Icon className="h-6 w-6 text-emerald-200" />
       {label}
+      {disabled && disabledReason ? (
+        <span className="px-2 text-center text-[11px] font-normal text-white/45">
+          {disabledReason}
+        </span>
+      ) : null}
     </button>
   );
 }
