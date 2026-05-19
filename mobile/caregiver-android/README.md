@@ -47,6 +47,45 @@ EXPO_PUBLIC_LDERLY_API_BASE_URL=http://192.168.0.103:3000
 
 Use your computer's LAN IP, not `localhost`, because the Android device/emulator cannot reach your laptop's localhost directly.
 
+## Current Local Android Studio Status
+
+This folder now includes a generated native Android project at:
+
+```text
+mobile/caregiver-android/android
+```
+
+Android Studio can open that folder directly.
+
+On this machine:
+
+- Android Studio is installed.
+- Android SDK is installed at `C:\Users\jayan\AppData\Local\Android\Sdk`.
+- Android NDK `27.1.12297006` has been installed after the first Gradle attempt.
+- No Android emulator/AVD was configured when checked with `emulator -list-avds`.
+- No physical Android device was visible when checked with `adb devices`.
+
+To finish local device validation:
+
+1. Open Android Studio.
+2. Open `mobile/caregiver-android/android`.
+3. Create an emulator from Device Manager, or connect an Android phone with USB debugging enabled.
+4. Run the `app` configuration.
+
+Useful temporary shell setup for Windows:
+
+```powershell
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
+$env:ANDROID_SDK_ROOT="$env:LOCALAPPDATA\Android\Sdk"
+```
+
+Build command:
+
+```powershell
+.\android\gradlew.bat -p android assembleDebug --console=plain
+```
+
 ## Caregiver Workflow
 
 ```mermaid
@@ -98,4 +137,3 @@ For the first pilot, keep the flow simple:
 7. Complete job
 
 Do not add heavy marketplace or payment screens to the caregiver app initially.
-
