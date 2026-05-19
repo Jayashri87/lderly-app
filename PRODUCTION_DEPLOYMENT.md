@@ -162,6 +162,18 @@ The snapshot checks:
 
 `goLiveReady` becomes true only when blocker checks are clear. Warning checks should still be resolved before paid launch.
 
+## E2E QA Gate
+
+Before launch, run:
+
+```bash
+npm run e2e:prod
+```
+
+Then complete the LambdaTest real-device checklist in `E2E_QA_RUNBOOK.md`.
+
+The automated E2E suite verifies public lead capture, customer shell, caretaker portal, ops portal, mobile overflow, system status, and go-live readiness.
+
 ## Notification Retry Policy
 
 Notification dispatch now records:

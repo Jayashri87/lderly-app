@@ -12,6 +12,9 @@
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "ci:smoke": "node scripts/ci-smoke.mjs",
+    "e2e": "playwright test",
+    "e2e:prod": "node scripts/run-e2e-prod.mjs",
+    "e2e:headed": "playwright test --headed",
     "ci:validate": "npm run lint && npm run build && npm run ci:smoke"
   },
   "dependencies": {
@@ -33,7 +36,9 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
