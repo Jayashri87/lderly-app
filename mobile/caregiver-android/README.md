@@ -86,9 +86,11 @@ Build command:
 .\android\gradlew.bat -p android assembleDebug --console=plain
 ```
 
-## Debug APK Build
+## Standalone APK Build
 
-A debug APK was generated successfully on Windows from a short build path because React Native native builds can exceed Windows path limits inside the normal repo folder.
+A standalone release APK was generated successfully on Windows from a short build path because React Native native builds can exceed Windows path limits inside the normal repo folder.
+
+Use the release APK for direct phone testing. Debug APKs require Metro to be running and can show the `index.android.bundle` error when installed directly.
 
 Repeatable build flow:
 
@@ -104,19 +106,19 @@ npx expo prebuild --platform android --clean --no-install
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
 $env:ANDROID_SDK_ROOT="$env:LOCALAPPDATA\Android\Sdk"
-.\android\gradlew.bat -p android assembleDebug --console=plain --no-daemon -PreactNativeArchitectures=arm64-v8a
+.\android\gradlew.bat -p android assembleRelease --console=plain --no-daemon -PreactNativeArchitectures=arm64-v8a
 ```
 
 APK output:
 
 ```text
-C:\lcg\android\app\build\outputs\apk\debug\app-debug.apk
+C:\lcg\android\app\build\outputs\apk\release\app-release.apk
 ```
 
 Shared copy in the main repo:
 
 ```text
-share\lderly-caregiver-debug.apk
+share\lderly-caregiver-release.apk
 ```
 
 ## Caregiver Workflow
