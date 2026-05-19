@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "LDERLY Caregiver",
+    "slug": "lderly-caregiver",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "lderlycaregiver",
+    "android": {
+      "package": "in.lderly.caregiver",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "LDERLY uses your location while you are assigned to a care visit so families can track arrival and safety.",
+          "locationAlwaysPermission": "LDERLY uses background location only during active care assignments.",
+          "locationWhenInUsePermission": "LDERLY uses your location to update families during active care assignments.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "https://lderly-app.vercel.app"
+    }
+  }
+}
+
