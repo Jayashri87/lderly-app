@@ -83,6 +83,16 @@ export const CaregiverApi = {
     });
   },
 
+  async rejectBooking(session: CaregiverSession, bookingId: string, reason: string) {
+    return request<{ booking?: ActiveAssignment }>(`/api/bookings/${bookingId}/reject`, session, {
+      method: "POST",
+      headers: {
+        "idempotency-key": `reject-${bookingId}-${reason}`
+      },
+      body: JSON.stringify({ reason })
+    });
+  },
+
   async assignments(session: CaregiverSession) {
     return request<AssignmentFeed>("/api/caretaker/assignments", session, {
       method: "GET"

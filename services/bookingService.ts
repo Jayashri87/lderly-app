@@ -57,7 +57,7 @@ export type DispatchOffer = {
   score: number;
   distanceKm: number;
   etaMinutes: number;
-  status: "sent" | "accepted" | "expired" | "cancelled";
+  status: "sent" | "accepted" | "rejected" | "expired" | "cancelled";
   notifiedAt: number;
   respondedAt?: number;
 };

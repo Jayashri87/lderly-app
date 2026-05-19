@@ -79,6 +79,7 @@ export default function App() {
   const [feed, setFeed] = useState<AssignmentFeed | null>(null);
   const [online, setOnline] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<number | null>(null);
+  const [clock, setClock] = useState(0);
 
   const activeBooking = useMemo(() => {
     const active = feed?.bookings?.[0] || null;
@@ -92,6 +93,7 @@ export default function App() {
 
   const currentBookingId = activeBooking?.id || activeOffer?.bookingId || bookingId;
   const currentState = activeBooking?.status || (activeOffer ? "searching" : "idle");
+  const offerExpired = Boolean(activeOffer?.expiresAt && activeOffer.expiresAt <= clock);
   const stateCopy = statusCopy[currentState] || {
     label: online ? "Online" : "Offline",
     detail: online ? "Waiting for nearby care requests." : "Go online to receive care requests.",
@@ -132,6 +134,11 @@ export default function App() {
       })
       .catch(() => undefined);
   }, [refreshFeed]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!session) {
@@ -189,6 +196,10 @@ export default function App() {
     }
 
     if (currentState === "searching" || currentState === "assigned") {
+      if (offerExpired) {
+        run("Refreshing expired request", () => refreshFeed(session));
+        return;
+      }
       run("Accept request", () => CaregiverApi.acceptBooking(session, currentBookingId));
       return;
     }
@@ -224,6 +235,27 @@ export default function App() {
     }
 
     refreshFeed(session);
+  };
+
+  const rejectOffer = () => {
+    if (!session || !activeOffer) {
+      return;
+    }
+
+    Alert.alert("Reject care request?", "This request will move to another caregiver or ops review.", [
+      {
+        text: "Keep request",
+        style: "cancel"
+      },
+      {
+        text: "Reject",
+        style: "destructive",
+        onPress: () =>
+          run("Reject request", () =>
+            CaregiverApi.rejectBooking(session, activeOffer.bookingId, "Not available for this request")
+          )
+      }
+    ]);
   };
 
   if (!session) {
@@ -320,10 +352,12 @@ export default function App() {
         <AssignmentCard
           booking={activeBooking}
           offer={activeOffer}
-          serverTime={feed?.serverTime}
+          serverTime={clock}
           fallbackBookingId={bookingId}
           onBookingIdChange={setBookingId}
         />
+
+        <FunnelCard state={currentState} offerExpired={offerExpired} hasOtp={Boolean(otp.trim())} />
 
         {currentState === "arrived" ? (
           <View style={styles.panel}>
@@ -349,6 +383,7 @@ export default function App() {
 
         <View style={styles.actionGrid}>
           <SmallAction label="Refresh" onPress={() => refreshFeed(session)} />
+          {activeOffer ? <SmallAction label="Reject" onPress={rejectOffer} /> : null}
           <SmallAction
             label="Panic SOS"
             danger
@@ -461,6 +496,80 @@ function Progress({ booking }: { booking: ActiveAssignment | null }) {
           <View style={[styles.progressDot, index <= activeIndex ? styles.progressDotActive : null]} />
           <Text style={[styles.progressText, index <= activeIndex ? styles.progressTextActive : null]}>
             {statusCopy[step]?.label || step}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function FunnelCard({
+  state,
+  offerExpired,
+  hasOtp
+}: {
+  state: string;
+  offerExpired: boolean;
+  hasOtp: boolean;
+}) {
+  const steps = [
+    {
+      key: "offer",
+      label: "Accept request",
+      done: ["accepted", "en_route", "arrived", "in_progress", "completed"].includes(state),
+      active: ["searching", "assigned"].includes(state)
+    },
+    {
+      key: "navigation",
+      label: "Share live location",
+      done: ["en_route", "arrived", "in_progress", "completed"].includes(state),
+      active: state === "accepted"
+    },
+    {
+      key: "arrival",
+      label: "Reach location",
+      done: ["arrived", "in_progress", "completed"].includes(state),
+      active: state === "en_route"
+    },
+    {
+      key: "otp",
+      label: "Verify customer OTP",
+      done: ["in_progress", "completed"].includes(state),
+      active: state === "arrived"
+    },
+    {
+      key: "complete",
+      label: "Complete visit",
+      done: state === "completed",
+      active: state === "in_progress"
+    }
+  ];
+
+  return (
+    <View style={styles.panel}>
+      <Text style={styles.sectionLabel}>Care funnel</Text>
+      {offerExpired ? <Text style={styles.warningText}>Request expired. Refresh to get the latest offer.</Text> : null}
+      {state === "arrived" && !hasOtp ? (
+        <Text style={styles.warningText}>OTP is required before service can start.</Text>
+      ) : null}
+      {steps.map((step) => (
+        <View key={step.key} style={styles.funnelRow}>
+          <View
+            style={[
+              styles.funnelDot,
+              step.done ? styles.funnelDotDone : null,
+              step.active ? styles.funnelDotActive : null
+            ]}
+          >
+            <Text style={styles.funnelDotText}>{step.done ? "✓" : step.active ? "!" : ""}</Text>
+          </View>
+          <Text
+            style={[
+              styles.funnelText,
+              step.done || step.active ? styles.funnelTextActive : null
+            ]}
+          >
+            {step.label}
           </Text>
         </View>
       ))}
@@ -797,10 +906,12 @@ const styles = StyleSheet.create({
   },
   actionGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10
   },
   smallAction: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: "30%",
     alignItems: "center",
     borderColor: "rgba(255,255,255,.16)",
     borderRadius: 999,
@@ -841,6 +952,49 @@ const styles = StyleSheet.create({
   },
   progressTextActive: {
     color: "#0f172a"
+  },
+  funnelRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    paddingVertical: 6
+  },
+  funnelDot: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#e2e8f0"
+  },
+  funnelDotActive: {
+    backgroundColor: "#facc15"
+  },
+  funnelDotDone: {
+    backgroundColor: "#16a34a"
+  },
+  funnelDotText: {
+    color: "#052e22",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  funnelText: {
+    color: "#94a3b8",
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  funnelTextActive: {
+    color: "#0f172a"
+  },
+  warningText: {
+    borderRadius: 16,
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10
   },
   trustStrip: {
     flexDirection: "row",

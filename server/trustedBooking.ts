@@ -502,6 +502,93 @@ export const TrustedBooking = {
     return { ok: true as const, booking: nextBooking };
   },
 
+  async rejectOffer(bookingId: string, actor?: BookingActor, reason = "Caregiver rejected request") {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    if (!actor?.uid || actor.role !== "caretaker") {
+      return { ok: false as const, status: 403, error: "Caretaker session required" };
+    }
+
+    const bookingSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
+    const booking = bookingSnapshot.val() as CareBooking | null;
+
+    if (!booking) {
+      return { ok: false as const, status: 404, error: "Booking not found" };
+    }
+
+    const offer = booking.dispatch?.offers?.[actor.uid];
+
+    if (!offer) {
+      return { ok: false as const, status: 403, error: "No dispatch offer for caretaker" };
+    }
+
+    if (offer.status !== "sent") {
+      return { ok: false as const, status: 409, error: "Offer is no longer open" };
+    }
+
+    const timestamp = Date.now();
+    const remainingOpenOffers = Object.entries(booking.dispatch?.offers || {}).filter(
+      ([caretakerId, dispatchOffer]) =>
+        caretakerId !== actor.uid && dispatchOffer.status === "sent"
+    ).length;
+    const nextStatus = remainingOpenOffers > 0 ? booking.status : "searching";
+    const nextBooking = enrichBooking(
+      {
+        ...booking,
+        status: nextStatus,
+        caretakerId: booking.caretakerId === actor.uid ? "" : booking.caretakerId,
+        caretakerName:
+          booking.caretakerId === actor.uid
+            ? "Nearby caregivers notified"
+            : booking.caretakerName,
+        dispatch: {
+          ...(booking.dispatch || {
+            mode: "area_broadcast" as const,
+            status: "broadcasting" as const,
+            offerExpiresAt: timestamp,
+            candidateCount: 1
+          }),
+          status: remainingOpenOffers > 0 ? "broadcasting" : "manual_review",
+          offers: {
+            ...(booking.dispatch?.offers || {}),
+            [actor.uid]: {
+              ...offer,
+              status: "rejected",
+              respondedAt: timestamp
+            }
+          }
+        },
+        timeline: [
+          ...booking.timeline,
+          { label: `Caregiver declined request: ${reason}`, at: timestamp }
+        ]
+      },
+      "caretaker"
+    );
+
+    const updates = bookingIndexes(nextBooking, booking);
+    updates[`caretakers/${actor.uid}/offers/${booking.id}/status`] = "rejected";
+    updates[`caretakers/${actor.uid}/offers/${booking.id}/respondedAt`] = timestamp;
+    updates[`caretakers/${actor.uid}/activeBookingId`] = null;
+    updates[`operations/dispatchOffers/${booking.id}/${actor.uid}/status`] = "rejected";
+    updates[`operations/dispatchOffers/${booking.id}/${actor.uid}/respondedAt`] = timestamp;
+
+    if (!remainingOpenOffers) {
+      updates[`operations/reassignmentQueue/pending/${booking.id}`] = {
+        bookingId: booking.id,
+        reason: "All nearby caregivers rejected or expired",
+        createdAt: timestamp
+      };
+    }
+
+    await database.ref().update(updates);
+    return { ok: true as const, booking: nextBooking };
+  },
+
   async rebroadcast(bookingId: string, reason = "Ops rebroadcast") {
     const database = getAdminDatabase();
 
