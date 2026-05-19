@@ -3461,6 +3461,7 @@ function JourneyExperience({
   onCancelCare: () => void;
   onRateCare: () => void;
 }) {
+  const [liveNow, setLiveNow] = useState(() => new Date().getTime());
   const bookingStatus = booking?.status ?? "none";
   const status =
     journey?.status ??
@@ -3526,6 +3527,36 @@ function JourneyExperience({
             : 0;
   const currentStep = journeySteps[activeIndex];
   const nextStep = journeySteps[Math.min(activeIndex + 1, journeySteps.length - 1)];
+  useEffect(() => {
+    const interval = window.setInterval(() => setLiveNow(new Date().getTime()), 30000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const locationAgeMinutes = activeMapJourney?.lastLocationAt && liveNow
+    ? Math.max(0, Math.round((liveNow - activeMapJourney.lastLocationAt) / 60000))
+    : null;
+  const liveTrackingState =
+    status === "arrived"
+      ? "arrived"
+      : status === "en_route" && (activeMapJourney?.eta ?? 0) > 0 && (activeMapJourney?.eta ?? 0) <= 3
+        ? "arriving_soon"
+        : ["accepted", "en_route"].includes(status)
+          ? "live"
+          : "waiting";
+  const liveTrackingCopy =
+    liveTrackingState === "arrived"
+      ? "Caregiver has reached the care location."
+      : liveTrackingState === "arriving_soon"
+        ? "Arriving soon. Keep the service OTP ready."
+        : liveTrackingState === "live"
+          ? "Live location is updating from the caregiver app."
+          : "Tracking begins as soon as a caregiver accepts.";
+  const freshnessLabel =
+    locationAgeMinutes === null
+      ? "Location pending"
+      : locationAgeMinutes <= 0
+        ? "Updated just now"
+        : `Updated ${locationAgeMinutes} min ago`;
   const canCancelRequest = ["searching", "assigned", "accepted"].includes(bookingStatus);
   const canRateCare =
     ["payment_settled", "report_generated"].includes(bookingStatus) && !booking?.rating?.score;
@@ -3607,6 +3638,9 @@ function JourneyExperience({
         currentStep={currentStep}
         nextStep={nextStep}
         activeIndex={activeIndex}
+        liveTrackingState={liveTrackingState}
+        liveTrackingCopy={liveTrackingCopy}
+        freshnessLabel={freshnessLabel}
       />
 
       <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-white p-4 text-[#06130f]">
@@ -3675,8 +3709,12 @@ function JourneyExperience({
           {journeySteps.map((step, index) => (
             <div
               key={step}
-              className={`h-2 rounded-full ${
-                index <= activeIndex ? "bg-emerald-300" : "bg-white/15"
+              className={`h-2 rounded-full transition-colors duration-500 ${
+                index < activeIndex
+                  ? "bg-emerald-300"
+                  : index === activeIndex
+                    ? "animate-pulse bg-amber-300"
+                    : "bg-white/15"
               }`}
               title={step}
             />
@@ -3733,23 +3771,61 @@ function LiveEtaCard({
   eta,
   currentStep,
   nextStep,
-  activeIndex
+  activeIndex,
+  liveTrackingState,
+  liveTrackingCopy,
+  freshnessLabel
 }: {
   eta: number;
   currentStep: string;
   nextStep: string;
   activeIndex: number;
+  liveTrackingState: "arrived" | "arriving_soon" | "live" | "waiting";
+  liveTrackingCopy: string;
+  freshnessLabel: string;
 }) {
+  const isArrivingSoon = liveTrackingState === "arriving_soon";
+  const isLive = liveTrackingState === "live" || isArrivingSoon;
+
   return (
-    <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-emerald-200/10 p-4">
+    <section
+      className={`mt-5 rounded-[1.5rem] border p-4 transition-colors ${
+        isArrivingSoon
+          ? "border-amber-200/30 bg-amber-200/15"
+          : "border-emerald-200/15 bg-emerald-200/10"
+      }`}
+    >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-emerald-100">Live ETA</p>
-          <h3 className="mt-1 text-3xl font-semibold">{eta || 8} mins</h3>
+          <p className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                isLive ? "animate-ping bg-emerald-300" : "bg-white/40"
+              }`}
+            />
+            {isArrivingSoon ? "Arriving soon" : "Live ETA"}
+          </p>
+          <h3 className="mt-1 text-3xl font-semibold">
+            {liveTrackingState === "arrived" ? "Arrived" : `${eta || 8} mins`}
+          </h3>
+          <p className="mt-1 text-sm text-white/60">{liveTrackingCopy}</p>
+          <p className="mt-1 text-xs text-white/45">{freshnessLabel}</p>
         </div>
-        <div className="relative h-14 w-14 rounded-full bg-emerald-300/15">
-          <span className="absolute inset-2 animate-ping rounded-full bg-emerald-300/20" />
-          <span className="absolute inset-5 rounded-full bg-emerald-200" />
+        <div
+          className={`relative h-14 w-14 rounded-full ${
+            isArrivingSoon ? "bg-amber-300/15" : "bg-emerald-300/15"
+          }`}
+        >
+          <span
+            className={`absolute inset-2 animate-ping rounded-full ${
+              isArrivingSoon ? "bg-amber-300/25" : "bg-emerald-300/20"
+            }`}
+          />
+          <span
+            className={`absolute inset-5 rounded-full ${
+              isArrivingSoon ? "bg-amber-200" : "bg-emerald-200"
+            }`}
+          />
         </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

@@ -641,6 +641,22 @@ try {
     "live caregiver availability board is prepared"
   );
   expect(
+    status.json?.productionReadiness?.uberStyleTrackingPolish === true,
+    "Uber-style tracking polish is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.arrivingSoonCustomerState === true,
+    "arriving soon customer state is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.liveGpsFreshnessUi === true,
+    "live GPS freshness UI is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.animatedTrackingTimeline === true,
+    "animated tracking timeline is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.freeAiReassuranceApi === true,
     "free AI reassurance API is prepared"
   );

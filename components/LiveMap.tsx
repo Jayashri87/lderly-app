@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useMemo } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   GoogleMap,
   Libraries,
@@ -46,6 +46,41 @@ const locationFreshnessFor = (journey: CareJourney | null) => {
         : `${stale ? "GPS stale" : "GPS fresh"} ${ageMinutes}m ago`,
     tone: stale ? "bg-red-500/25 text-red-100" : "bg-emerald-300/20 text-emerald-100",
     stale
+  };
+};
+
+const routeMoodFor = (journey: CareJourney | null) => {
+  const eta = journey?.eta ?? 0;
+  const status = journey?.status || "idle";
+
+  if (status === "arrived") {
+    return {
+      label: "Caregiver has arrived",
+      tone: "bg-emerald-300 text-[#06130f]",
+      pulse: "bg-emerald-300"
+    };
+  }
+
+  if (status === "en_route" && eta > 0 && eta <= 3) {
+    return {
+      label: "Arriving soon",
+      tone: "bg-amber-300 text-[#06130f]",
+      pulse: "bg-amber-300"
+    };
+  }
+
+  if (status === "en_route" || status === "accepted") {
+    return {
+      label: "Live tracking",
+      tone: "bg-blue-300 text-[#06130f]",
+      pulse: "bg-blue-300"
+    };
+  }
+
+  return {
+    label: "Tracking ready",
+    tone: "bg-white/15 text-white",
+    pulse: "bg-white/70"
   };
 };
 
@@ -137,41 +172,61 @@ function AdvancedMapMarker({
   tone: "home" | "caretaker";
 }) {
   const map = useGoogleMap();
-  const markerOptions = useMemo(() => {
-    const pin = new google.maps.marker.PinElement({
-      background: tone === "home" ? "#34d399" : "#60a5fa",
-      borderColor: "#eff6ff",
-      glyph: label,
-      glyphColor: "#020617"
-    });
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const content = useMemo(() => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "relative flex h-10 w-10 items-center justify-center";
 
-    return {
-      content: pin.element,
-      position,
-      title
-    };
-  }, [label, position, title, tone]);
+    if (tone === "caretaker") {
+      const pulse = document.createElement("span");
+      pulse.className =
+        "absolute h-10 w-10 animate-ping rounded-full bg-blue-300/35";
+      wrapper.appendChild(pulse);
+    }
+
+    const pin = document.createElement("span");
+    pin.className = `relative flex h-8 min-w-8 items-center justify-center rounded-full border-2 border-white px-2 text-[10px] font-bold text-slate-950 shadow-xl transition-transform duration-700 ${
+      tone === "home" ? "bg-emerald-300" : "bg-blue-300"
+    }`;
+    pin.textContent = label;
+    wrapper.appendChild(pin);
+
+    return wrapper;
+  }, [label, tone]);
 
   useEffect(() => {
     if (!map) {
       return;
     }
 
-    const marker = new google.maps.marker.AdvancedMarkerElement({
+    markerRef.current = new google.maps.marker.AdvancedMarkerElement({
       map,
-      ...markerOptions
+      content,
+      position,
+      title
     });
 
     return () => {
-      marker.map = null;
+      if (markerRef.current) {
+        markerRef.current.map = null;
+        markerRef.current = null;
+      }
     };
-  }, [map, markerOptions]);
+  }, [content, map, position, title]);
+
+  useEffect(() => {
+    if (markerRef.current) {
+      markerRef.current.position = position;
+      markerRef.current.title = title;
+    }
+  }, [position, title]);
 
   return null;
 }
 
 function MapOverlay({ journey }: LiveMapProps) {
   const freshness = locationFreshnessFor(journey);
+  const routeMood = routeMoodFor(journey);
 
   return (
     <div className="pointer-events-none absolute inset-x-3 top-3 flex items-center justify-between gap-3">
@@ -179,6 +234,10 @@ function MapOverlay({ journey }: LiveMapProps) {
         {journey?.destinationLabel || "Patient Home"}
       </div>
       <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold backdrop-blur-md ${routeMood.tone}`}>
+          <span className={`h-2 w-2 rounded-full ${routeMood.pulse}`} />
+          {routeMood.label}
+        </div>
         <div className={`rounded-full px-3 py-2 text-xs backdrop-blur-md ${freshness.tone}`}>
           {freshness.label}
         </div>
@@ -205,8 +264,9 @@ function MapFrame({
     journey?.caretakerLocation ?? {
       lat: defaultCenter.lat + 0.01,
       lng: defaultCenter.lng + 0.01
-    };
+  };
   const freshness = locationFreshnessFor(journey);
+  const routeMood = routeMoodFor(journey);
 
   return (
     <div className="space-y-3">
@@ -222,6 +282,9 @@ function MapFrame({
         </div>
         <div className={`mt-3 rounded-2xl px-3 py-2 font-semibold ${freshness.tone}`}>
           {freshness.label}
+        </div>
+        <div className={`mt-2 rounded-2xl px-3 py-2 font-semibold ${routeMood.tone}`}>
+          {routeMood.label}
         </div>
         <div className="mt-3 flex gap-2 text-amber-100">
           {mode !== "Google Maps" && <AlertTriangle className="h-4 w-4 shrink-0" />}
@@ -281,7 +344,7 @@ function FallbackVisual({ journey }: LiveMapProps) {
         />
       ))}
       <div
-        className="absolute h-4 w-4 animate-pulse rounded-full bg-blue-400 shadow-[0_0_36px_rgba(96,165,250,.95)] transition-all"
+        className="absolute h-4 w-4 animate-pulse rounded-full bg-blue-400 shadow-[0_0_36px_rgba(96,165,250,.95)] transition-all duration-700 ease-out"
         style={{
           left: `${72 - progress * 8}%`,
           top: `${72 - progress * 7}%`
@@ -305,7 +368,13 @@ function FallbackMap({ journey }: LiveMapProps) {
 }
 
 export default function LiveMap({ journey }: LiveMapProps) {
+  const [, setTick] = useState(0);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setTick((value) => value + 1), 30000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   if (!apiKey) {
     return <FallbackMap journey={journey} />;
