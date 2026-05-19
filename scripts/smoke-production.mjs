@@ -388,8 +388,17 @@ try {
     "Firebase App Check is scaffolded"
   );
   expect(
+    status.json?.productionReadiness?.firebaseAppCheckReadiness?.enforceApi === false ||
+      status.json?.productionReadiness?.firebaseAppCheckReadiness?.enforceApi === true,
+    "Firebase App Check readiness is exposed"
+  );
+  expect(
     status.json?.productionReadiness?.internalOpsAlertsApi === true,
     "internal ops alerts API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.monitoringHealthSnapshotApi === true,
+    "monitoring health snapshot API is prepared"
   );
   expect(
     status.json?.productionReadiness?.indiaFirstCommunication?.firebasePushPrepared === true,
@@ -526,6 +535,14 @@ try {
   expect(
     status.json?.productionReadiness?.auditRetentionPolicyApi === true,
     "audit retention policy API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.uploadSafetyApi === true,
+    "upload safety API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.uploadMalwareScanPolicy === true,
+    "upload malware scan policy is prepared"
   );
   expect(
     status.json?.productionReadiness?.opsMaintenanceCronPrepared === true,
@@ -2474,6 +2491,22 @@ try {
     "ops KPIs include SLA analytics"
   );
 
+  const healthSnapshotResult = await request("/api/monitoring/snapshot", {}, adminCookie);
+  expect(
+    healthSnapshotResult.response.ok,
+    "admin can read monitoring health snapshot",
+    healthSnapshotResult.text
+  );
+  expect(
+    healthSnapshotResult.json?.health?.appCheck?.enforceApi === false ||
+      healthSnapshotResult.json?.health?.appCheck?.enforceApi === true,
+    "monitoring health exposes App Check readiness"
+  );
+  expect(
+    typeof healthSnapshotResult.json?.health?.pendingUploadScans === "number",
+    "monitoring health includes upload scan backlog"
+  );
+
   const snapshotResult = await request(
     "/api/monitoring/snapshot",
     {
@@ -2904,6 +2937,22 @@ try {
     caretakerCookie
   );
   expect(voiceResult.response.ok, "caretaker can create voice-note upload URL", voiceResult.text);
+  if (voiceResult.json?.upload?.id) {
+    const voiceScanResult = await request(
+      "/api/ops/upload-safety",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "voice_note",
+          uploadId: voiceResult.json.upload.id,
+          status: "clean",
+          note: "Smoke scan clean"
+        })
+      },
+      adminCookie
+    );
+    expect(voiceScanResult.response.ok, "admin can mark voice note scan clean", voiceScanResult.text);
+  }
 
   const kycResult = await request(
     "/api/caretaker/kyc/upload-url",
@@ -2917,6 +2966,40 @@ try {
     caretakerCookie
   );
   expect(kycResult.response.ok, "caretaker can create Aadhaar KYC upload URL", kycResult.text);
+
+  const blockedKycReviewResult = await request(
+    "/api/caretaker/kyc/review",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        caretakerId: "demo-caretaker",
+        documentType: "aadhaar",
+        status: "approved",
+        note: "Smoke KYC approval should wait for scan"
+      })
+    },
+    adminCookie
+  );
+  expect(
+    blockedKycReviewResult.response.status === 409,
+    "KYC approval is blocked until malware scan is clean",
+    blockedKycReviewResult.text
+  );
+  const kycScanResult = await request(
+    "/api/ops/upload-safety",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "kyc",
+        caretakerId: "demo-caretaker",
+        documentType: "aadhaar",
+        status: "clean",
+        note: "Smoke scan clean"
+      })
+    },
+    adminCookie
+  );
+  expect(kycScanResult.response.ok, "admin can mark KYC scan clean", kycScanResult.text);
 
   const kycReviewResult = await request(
     "/api/caretaker/kyc/review",

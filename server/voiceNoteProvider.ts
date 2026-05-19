@@ -74,6 +74,13 @@ export const createVoiceNoteUpload = async ({
       contentType: normalizedContentType,
       storagePath,
       status: "upload_url_created",
+      malwareScan: {
+        status: "pending",
+        required: true,
+        provider: "manual_ops",
+        updatedAt: Date.now()
+      },
+      trustedForPlayback: false,
       createdAt: Date.now(),
       expiresAt
     });

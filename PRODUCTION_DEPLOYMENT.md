@@ -196,6 +196,42 @@ The runbook summarizes:
 - rollback steps for Vercel and Firebase rules
 - customer communication guidance
 
+## App Check And Upload Safety
+
+App Check readiness is exposed through `/api/system/status` and `/api/monitoring/snapshot`.
+
+Staged enforcement:
+
+1. Configure `NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY`.
+2. Validate web traffic and E2E flows.
+3. Set `LDERLY_ENFORCE_APP_CHECK=true` only after production clients are sending valid tokens.
+
+Upload safety:
+
+- KYC uploads and voice-note uploads now include malware-scan metadata.
+- KYC approval is blocked until the KYC document scan status is `clean`.
+- Voice notes are not trusted for playback until scan status is `clean`.
+- Ops can update scan status with `POST /api/ops/upload-safety`.
+
+## Health Monitoring
+
+Admins can read:
+
+```bash
+GET /api/monitoring/snapshot
+```
+
+The health snapshot includes:
+
+- Firebase Admin status
+- App Check readiness
+- active bookings
+- critical recovery signals
+- queued/failed notifications
+- stale GPS bookings
+- pending upload scans
+- latest backup, maintenance, and audit retention manifests
+
 ## E2E QA Gate
 
 Before launch, run:

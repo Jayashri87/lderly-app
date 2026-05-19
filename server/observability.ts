@@ -1,5 +1,6 @@
 import { getAdminDatabase } from "./firebaseAdmin";
 import type { UserRole } from "../services/authService";
+import { appCheckReadiness } from "./appCheckProvider";
 
 export type AnalyticsEvent = {
   id: string;
@@ -389,6 +390,76 @@ export const Observability = {
       source: "server"
     });
     return result;
+  },
+
+  async getHealthSnapshot() {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const [
+      bookingsSnapshot,
+      recoverySnapshot,
+      notificationsSnapshot,
+      backupSnapshot,
+      maintenanceSnapshot,
+      auditRetentionSnapshot,
+      kycSnapshot,
+      voiceSnapshot
+    ] = await Promise.all([
+      database.ref("bookings/byId").get(),
+      database.ref("operations/recoveryQueue/byId").get(),
+      database.ref("notifications/byId").get(),
+      database.ref("operations/backups/latest").get(),
+      database.ref("operations/maintenanceRuns/latest").get(),
+      database.ref("operations/auditRetention/latest").get(),
+      database.ref("caretakerKyc/byCaretaker").get(),
+      database.ref("voiceNotes/byId").get()
+    ]);
+    const bookings = recordValues<BookingMetricRecord>(bookingsSnapshot.val());
+    const recoverySignals = recordValues<{ severity?: string }>(recoverySnapshot.val());
+    const notifications = recordValues<NotificationMetricRecord>(notificationsSnapshot.val());
+    const kycDocuments = Object.values(
+      (kycSnapshot.val() || {}) as Record<string, Record<string, { malwareScan?: { status?: string } }>>
+    ).flatMap((documents) => Object.values(documents || {}));
+    const voiceNotes = recordValues<{ malwareScan?: { status?: string } }>(voiceSnapshot.val());
+    const pendingScans = [...kycDocuments, ...voiceNotes].filter(
+      (item) => item.malwareScan?.status !== "clean"
+    ).length;
+    const staleGps = bookings.filter(
+      (booking) =>
+        ["accepted", "en_route", "arrived"].includes(booking.status || "") &&
+        Number((booking as { tracking?: { lastLocationAt?: number } }).tracking?.lastLocationAt || 0) <
+          Date.now() - 10 * 60 * 1000
+    ).length;
+
+    return {
+      ok: true as const,
+      health: {
+        generatedAt: Date.now(),
+        firebaseAdmin: "ok",
+        appCheck: appCheckReadiness,
+        activeBookings: bookings.filter(
+          (booking) =>
+            booking.status &&
+            !["completed", "payment_settled", "report_generated", "cancelled"].includes(
+              booking.status
+            )
+        ).length,
+        criticalRecoverySignals: recoverySignals.filter((signal) => signal.severity === "critical").length,
+        queuedOrFailedNotifications: notifications.filter((notification) =>
+          ["pending", "queued", "failed"].includes(notification.deliveryStatus || "")
+        ).length,
+        staleGpsBookings: staleGps,
+        pendingUploadScans: pendingScans,
+        latestBackupId: (backupSnapshot.val() as { id?: string } | null)?.id || "",
+        latestMaintenanceId: (maintenanceSnapshot.val() as { id?: string } | null)?.id || "",
+        latestAuditRetentionId:
+          (auditRetentionSnapshot.val() as { id?: string } | null)?.id || ""
+      }
+    };
   },
 
   async getEventCounts() {

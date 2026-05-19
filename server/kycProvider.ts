@@ -84,6 +84,13 @@ export const createKycUpload = async ({
       contentType: normalizedContentType,
       storagePath,
       status: "pending_review",
+      malwareScan: {
+        status: "pending",
+        required: true,
+        provider: "manual_ops",
+        updatedAt: Date.now()
+      },
+      trustedForVerification: false,
       createdAt: Date.now(),
       expiresAt
     });
@@ -125,7 +132,20 @@ export const reviewKycDocument = async ({
     reviewedAt: Date.now()
   };
 
-  await documentRef.update(review);
+  const current = snapshot.val() as { malwareScan?: { status?: string } } | null;
+
+  if (status === "approved" && current?.malwareScan?.status !== "clean") {
+    return {
+      ok: false as const,
+      status: 409,
+      error: "KYC document must be marked scan-clean before approval"
+    };
+  }
+
+  await documentRef.update({
+    ...review,
+    trustedForVerification: status === "approved"
+  });
   await database.ref(`caretakers/${caretakerId}/kycStatus/${documentType}`).set(status);
   await database.ref(`operations/kycReviewQueue/${status}/${caretakerId}-${documentType}`).set({
     caretakerId,

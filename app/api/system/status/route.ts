@@ -20,6 +20,7 @@ import {
   hasVoiceNoteStorageConfig,
   voiceNoteMockFailClosed
 } from "../../../../server/voiceNoteProvider";
+import { appCheckReadiness } from "../../../../server/appCheckProvider";
 
 const hasEnv = (name: string) => Boolean(process.env[name]);
 const hasAnyEnv = (names: string[]) => names.some((name) => hasEnv(name));
@@ -77,10 +78,12 @@ export async function GET() {
       opsCommandDispatchUi: true,
       liveCaregiverAvailabilityBoard: true,
       monitoringSnapshotApi: true,
+      monitoringHealthSnapshotApi: true,
       githubActionsCiPrepared: true,
       groupedCiSmokeRunner: true,
       featureFlags: featureFlagReadiness,
       firebaseAppCheckPrepared: true,
+      firebaseAppCheckReadiness: appCheckReadiness,
       firebaseAppCheckConfigured: hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY"),
       pwaManifest: true,
       legalPages: true,
@@ -138,6 +141,8 @@ export async function GET() {
       opsGoLiveReadinessApi: true,
       opsRunbookApi: true,
       auditRetentionPolicyApi: true,
+      uploadSafetyApi: true,
+      uploadMalwareScanPolicy: true,
       opsMaintenanceCronPrepared: existsSync(join(process.cwd(), "vercel.json")),
       opsMaintenanceCronConfigured: hasEnv("CRON_SECRET"),
       expiredLockCleanup: true,

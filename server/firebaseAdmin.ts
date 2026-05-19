@@ -1,4 +1,5 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getDatabase } from "firebase-admin/database";
 import { getMessaging } from "firebase-admin/messaging";
@@ -71,4 +72,14 @@ export const getAdminMessaging = () => {
   }
 
   return getMessaging(app);
+};
+
+export const getAdminAppCheck = () => {
+  const app = getAdminApp();
+
+  if (!app) {
+    return null;
+  }
+
+  return getAppCheck(app);
 };
