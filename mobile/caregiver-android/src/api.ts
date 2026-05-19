@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ActiveAssignment, CaregiverSession, LocationPoint } from "./types";
+import { ActiveAssignment, AssignmentFeed, CaregiverSession, LocationPoint } from "./types";
 
 const sessionKey = "lderly-caregiver-session";
 
@@ -76,7 +76,30 @@ export const CaregiverApi = {
 
   async acceptBooking(session: CaregiverSession, bookingId: string) {
     return request<{ ok: true }>(`/api/bookings/${bookingId}/accept`, session, {
-      method: "POST"
+      method: "POST",
+      headers: {
+        "idempotency-key": `accept-${bookingId}-${Date.now()}`
+      }
+    });
+  },
+
+  async assignments(session: CaregiverSession) {
+    return request<AssignmentFeed>("/api/caretaker/assignments", session, {
+      method: "GET"
+    });
+  },
+
+  async updateAvailability(
+    session: CaregiverSession,
+    available: boolean,
+    status: "available" | "standby" | "offline" | "on_visit"
+  ) {
+    return request<{ ok: true }>("/api/caretaker/availability", session, {
+      method: "POST",
+      body: JSON.stringify({
+        available,
+        status
+      })
     });
   },
 
@@ -90,6 +113,9 @@ export const CaregiverApi = {
       session,
       {
         method: "POST",
+        headers: {
+          "idempotency-key": `status-${bookingId}-${status}-${Date.now()}`
+        },
         body: JSON.stringify({ status })
       }
     );
@@ -101,6 +127,9 @@ export const CaregiverApi = {
       session,
       {
         method: "POST",
+        headers: {
+          "idempotency-key": `start-${bookingId}-${Date.now()}`
+        },
         body: JSON.stringify({ otp })
       }
     );
@@ -122,4 +151,3 @@ export const CaregiverApi = {
     });
   }
 };
-

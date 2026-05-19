@@ -41,9 +41,41 @@ export type ActiveAssignment = {
   };
 };
 
+export type CaregiverProfile = {
+  uid: string;
+  name: string;
+  status: "available" | "standby" | "offline" | "on_visit" | string;
+  available: boolean;
+  activeAssignments: number;
+  rating: number;
+  punctualityScore: number;
+  repeatVisits: number;
+};
+
+export type DispatchOffer = {
+  bookingId: string;
+  caretakerId: string;
+  caretakerName?: string;
+  serviceType?: string;
+  customerName?: string;
+  destinationLabel?: string;
+  distanceKm?: number;
+  etaMinutes?: number;
+  score?: number;
+  status: "sent" | "accepted" | "expired" | "cancelled";
+  notifiedAt?: number;
+  expiresAt?: number;
+};
+
+export type AssignmentFeed = {
+  caretaker: CaregiverProfile;
+  bookings: ActiveAssignment[];
+  offers: DispatchOffer[];
+  serverTime: number;
+};
+
 export type LocationPoint = {
   lat: number;
   lng: number;
   accuracyMeters?: number;
 };
-
