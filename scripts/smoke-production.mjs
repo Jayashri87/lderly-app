@@ -520,6 +520,14 @@ try {
     "ops go-live readiness API is prepared"
   );
   expect(
+    status.json?.productionReadiness?.opsRunbookApi === true,
+    "ops runbook API is prepared"
+  );
+  expect(
+    status.json?.productionReadiness?.auditRetentionPolicyApi === true,
+    "audit retention policy API is prepared"
+  );
+  expect(
     status.json?.productionReadiness?.opsMaintenanceCronPrepared === true,
     "ops maintenance cron is prepared"
   );
@@ -1978,6 +1986,58 @@ try {
     "go-live readiness includes latest backup manifest"
   );
 
+  const oldAuditId = `smoke-old-audit-${Date.now()}`;
+  await database.ref(`auditLogs/${oldAuditId}`).set({
+    id: oldAuditId,
+    action: "smoke.low_risk.audit",
+    resource: "smoke",
+    status: "success",
+    method: "POST",
+    path: "/api/smoke",
+    createdAt: Date.now() - 120 * 24 * 60 * 60 * 1000
+  });
+  const auditRetentionResult = await request(
+    "/api/ops/audit-retention",
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    },
+    adminCookie
+  );
+  expect(
+    auditRetentionResult.response.ok,
+    "admin can run audit retention policy",
+    auditRetentionResult.text
+  );
+  expect(
+    auditRetentionResult.json?.manifest?.archived >= 1,
+    "audit retention archives expired low-risk logs"
+  );
+  if (auditRetentionResult.json?.manifest?.id) {
+    createdReliability.push({
+      kind: "auditRetention",
+      id: auditRetentionResult.json.manifest.id
+    });
+  }
+  const oldAuditAfter = await database.ref(`auditLogs/${oldAuditId}`).get();
+  expect(!oldAuditAfter.exists(), "expired audit log is removed from active ledger");
+
+  const runbookResult = await request("/api/ops/runbook", {}, adminCookie);
+  expect(runbookResult.response.ok, "admin can read incident runbook snapshot", runbookResult.text);
+  expect(
+    ["ready", "watch", "blocked"].includes(runbookResult.json?.snapshot?.launchState),
+    "incident runbook returns launch state"
+  );
+  expect(
+    runbookResult.json?.snapshot?.steps?.some((step) => step.id === "rollback-vercel"),
+    "incident runbook includes Vercel rollback step"
+  );
+  expect(
+    runbookResult.json?.snapshot?.latestAuditRetentionId ===
+      auditRetentionResult.json?.manifest?.id,
+    "incident runbook includes audit retention manifest"
+  );
+
   const reassuranceResult = await request(
     "/api/ai/reassurance",
     {
@@ -3011,6 +3071,16 @@ try {
         .update({
           [`operations/backups/manifests/${item.id}`]: null,
           "operations/backups/latest": null
+        })
+        .catch(() => undefined);
+    }
+    if (item.kind === "auditRetention") {
+      await database
+        .ref()
+        .update({
+          [`operations/auditRetention/runs/${item.id}`]: null,
+          [`operations/auditRetention/archive/${item.id}`]: null,
+          "operations/auditRetention/latest": null
         })
         .catch(() => undefined);
     }

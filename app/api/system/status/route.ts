@@ -136,6 +136,8 @@ export async function GET() {
       opsMaintenanceApi: true,
       opsBackupManifestApi: true,
       opsGoLiveReadinessApi: true,
+      opsRunbookApi: true,
+      auditRetentionPolicyApi: true,
       opsMaintenanceCronPrepared: existsSync(join(process.cwd(), "vercel.json")),
       opsMaintenanceCronConfigured: hasEnv("CRON_SECRET"),
       expiredLockCleanup: true,
@@ -210,7 +212,6 @@ export async function GET() {
           : ["Firebase App Check reCAPTCHA Enterprise site key"]),
         ...(hasEnv("CRON_SECRET") ? [] : ["CRON_SECRET for automated ops maintenance"]),
         "Backend dependency: external Firebase RTDB export destination",
-        "Backend dependency: production audit-log retention policy",
         "Backend dependency: FCM web push/VAPID production setup",
         "Backend dependency: payment reconciliation job",
         "Backend dependency: refund reconciliation workflow",
@@ -224,7 +225,7 @@ export async function GET() {
         "Backend dependency: voice-note playback and retention policy",
         "Backend dependency: uptime monitoring for customer/partner/ops APIs",
         "Backend dependency: support-ticket provider decision",
-        "Backend dependency: staging environment and rollback runbook",
+        "Backend dependency: staging environment",
         "Backend dependency: domain/DNS split for app, partner, and ops"
       ]
     }

@@ -162,6 +162,40 @@ The snapshot checks:
 
 `goLiveReady` becomes true only when blocker checks are clear. Warning checks should still be resolved before paid launch.
 
+## Audit Retention
+
+Ops can run and inspect audit retention with:
+
+```bash
+POST /api/ops/audit-retention
+GET /api/ops/audit-retention
+```
+
+Retention policy:
+
+- default operational/API logs: 90 days
+- booking/auth/session/recovery/backup logs: 180 days
+- failure, emergency, payment, refund, KYC, and incident logs: 365 days
+
+Expired logs are moved into `operations/auditRetention/archive/{runId}` with a retention manifest.
+
+## Incident And Rollback Runbook
+
+Ops can read a launch/incident runbook snapshot with:
+
+```bash
+GET /api/ops/runbook
+```
+
+The runbook summarizes:
+
+- launch state: `ready`, `watch`, or `blocked`
+- go-live blockers and warnings
+- critical recovery queue count
+- latest backup, maintenance, and audit-retention manifests
+- rollback steps for Vercel and Firebase rules
+- customer communication guidance
+
 ## E2E QA Gate
 
 Before launch, run:

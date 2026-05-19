@@ -72,5 +72,20 @@ export const OpsMaintenanceProvider = {
       ok: true as const,
       record
     };
+  },
+
+  async latest() {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const snapshot = await database.ref("operations/maintenanceRuns/latest").get();
+
+    return {
+      ok: true as const,
+      record: snapshot.val()
+    };
   }
 };
