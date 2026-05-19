@@ -36,7 +36,9 @@ const locationFreshnessFor = (journey: CareJourney | null) => {
   }
 
   const ageMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
-  const activeTracking = ["accepted", "en_route", "arrived"].includes(journey?.status || "");
+  const activeTracking = ["accepted", "en_route", "arrived", "in_progress"].includes(
+    journey?.status || ""
+  );
   const stale = activeTracking && ageMinutes > 5;
 
   return {
@@ -53,9 +55,9 @@ const routeMoodFor = (journey: CareJourney | null) => {
   const eta = journey?.eta ?? 0;
   const status = journey?.status || "idle";
 
-  if (status === "arrived") {
+  if (status === "arrived" || status === "in_progress") {
     return {
-      label: "Caregiver has arrived",
+      label: status === "in_progress" ? "Care in progress" : "Caregiver has arrived",
       tone: "bg-emerald-300 text-[#06130f]",
       pulse: "bg-emerald-300"
     };

@@ -720,6 +720,29 @@ const postTrustedBookingAction = async (
   }
 };
 
+const fetchTrustedActiveBooking = async (bookingId?: string) => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const query = bookingId ? `?bookingId=${encodeURIComponent(bookingId)}` : "";
+
+  try {
+    const response = await fetch(`/api/bookings${query}`, {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as { booking?: CareBooking | null; serverTime?: number };
+  } catch {
+    return null;
+  }
+};
+
 const patchBooking = (
   patch: Partial<CareBooking>,
   label: string,
@@ -814,10 +837,29 @@ export const BookingService = {
   subscribe(session: SessionUser, callback: (booking: CareBooking) => void) {
     callback(readLocalBooking());
     localSubscribers.add(callback);
+    let latestBookingId = readLocalBooking().id !== "demo-booking" ? readLocalBooking().id : "";
+    let trustedPoll: number | null = null;
+
+    if (typeof window !== "undefined") {
+      const refreshTrustedBooking = () => {
+        fetchTrustedActiveBooking(latestBookingId).then((result) => {
+          if (result?.booking) {
+            latestBookingId = result.booking.id;
+            writeLocalBooking(enrichBooking(result.booking));
+          }
+        });
+      };
+
+      refreshTrustedBooking();
+      trustedPoll = window.setInterval(refreshTrustedBooking, 5000);
+    }
 
     if (!db) {
       return () => {
         localSubscribers.delete(callback);
+        if (trustedPoll) {
+          window.clearInterval(trustedPoll);
+        }
       };
     }
 
@@ -834,6 +876,8 @@ export const BookingService = {
           callback(readLocalBooking());
           return;
         }
+
+        latestBookingId = bookingId;
 
         if (activeBookingPath) {
           off(ref(database, activeBookingPath));
@@ -854,6 +898,9 @@ export const BookingService = {
 
     return () => {
       localSubscribers.delete(callback);
+      if (trustedPoll) {
+        window.clearInterval(trustedPoll);
+      }
       unsubscribeActive();
 
       if (activeBookingPath) {

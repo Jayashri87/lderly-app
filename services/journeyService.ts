@@ -11,6 +11,7 @@ export type JourneyStatus =
   | "accepted"
   | "en_route"
   | "arrived"
+  | "in_progress"
   | "completed"
   | "escalated";
 
@@ -171,6 +172,7 @@ const statusSummary: Record<JourneyStatus, string> = {
   accepted: "Caretaker Accepted",
   en_route: "Caretaker En Route",
   arrived: "Caretaker Arrived",
+  in_progress: "Care Visit In Progress",
   completed: "Care Visit Completed",
   escalated: "Escalated to Emergency Network"
 };

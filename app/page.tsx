@@ -737,6 +737,10 @@ const careStatusFor = ({
       return `Caregiver arrived`;
     }
 
+    if (journey.status === "in_progress") {
+      return `${service} in progress`;
+    }
+
     if (journey.status === "completed") {
       return `${service} completed`;
     }
@@ -761,6 +765,14 @@ const careStatusFor = ({
 
     if (booking.status === "accepted") {
       return `Caregiver accepted ${service}`;
+    }
+
+    if (booking.status === "en_route") {
+      return `Caregiver is on the way`;
+    }
+
+    if (booking.status === "arrived") {
+      return `Caregiver arrived`;
     }
 
     if (booking.status === "in_progress") {
@@ -3469,8 +3481,6 @@ function JourneyExperience({
       ? "idle"
       : bookingStatus === "searching"
         ? "requested"
-      : bookingStatus === "in_progress"
-        ? "arrived"
         : bookingStatus === "payment_settled" || bookingStatus === "report_generated"
           ? "completed"
         : bookingStatus);
@@ -3536,7 +3546,9 @@ function JourneyExperience({
     ? Math.max(0, Math.round((liveNow - activeMapJourney.lastLocationAt) / 60000))
     : null;
   const liveTrackingState =
-    status === "arrived"
+    status === "in_progress"
+      ? "live"
+      : status === "arrived"
       ? "arrived"
       : status === "en_route" && (activeMapJourney?.eta ?? 0) > 0 && (activeMapJourney?.eta ?? 0) <= 3
         ? "arriving_soon"
@@ -3544,7 +3556,9 @@ function JourneyExperience({
           ? "live"
           : "waiting";
   const liveTrackingCopy =
-    liveTrackingState === "arrived"
+    status === "in_progress"
+      ? "Care has started. Live updates will appear as tasks are completed."
+      : liveTrackingState === "arrived"
       ? "Caregiver has reached the care location."
       : liveTrackingState === "arriving_soon"
         ? "Arriving soon. Keep the service OTP ready."
@@ -3642,6 +3656,8 @@ function JourneyExperience({
         liveTrackingCopy={liveTrackingCopy}
         freshnessLabel={freshnessLabel}
       />
+
+      <CustomerCareFunnel booking={booking} status={status} />
 
       <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-white p-4 text-[#06130f]">
         <p className="text-sm font-semibold text-emerald-700">Care security</p>
@@ -3844,6 +3860,92 @@ function LiveEtaCard({
           animate={{ width: `${Math.max(16, ((activeIndex + 1) / journeySteps.length) * 100)}%` }}
           className="h-full rounded-full bg-emerald-300"
         />
+      </div>
+    </section>
+  );
+}
+
+function CustomerCareFunnel({
+  booking,
+  status
+}: {
+  booking: CareBooking | null;
+  status: CareJourney["status"];
+}) {
+  const paymentReleased =
+    booking?.status === "payment_settled" ||
+    booking?.completion?.paymentReleaseStatus === "released";
+  const steps = [
+    {
+      label: "Request sent",
+      detail: "Nearby caregivers are notified",
+      done: Boolean(booking && booking.status !== "none"),
+      active: status === "requested"
+    },
+    {
+      label: "Caregiver accepts",
+      detail: booking?.caretakerName || "Waiting for partner response",
+      done: ["accepted", "en_route", "arrived", "in_progress", "completed"].includes(status),
+      active: status === "assigned"
+    },
+    {
+      label: "Track arrival",
+      detail: `${booking?.tracking?.etaMinutes ?? 0} min ETA`,
+      done: ["arrived", "in_progress", "completed"].includes(status),
+      active: status === "accepted" || status === "en_route"
+    },
+    {
+      label: "Share OTP",
+      detail: booking?.status === "arrived" ? "OTP visible below" : "Shown only after arrival",
+      done: ["in_progress", "completed"].includes(status),
+      active: status === "arrived"
+    },
+    {
+      label: "Visit complete",
+      detail:
+        booking?.completion?.paymentReleaseStatus === "awaiting_customer"
+          ? "Verify to release payment"
+          : "Caregiver marks done",
+      done: paymentReleased,
+      active:
+        status === "in_progress" ||
+        (booking?.status === "completed" &&
+          booking.completion?.paymentReleaseStatus === "awaiting_customer")
+    }
+  ];
+
+  return (
+    <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-emerald-100">Customer-caregiver funnel</p>
+          <h3 className="mt-1 text-2xl font-semibold">One connected care flow</h3>
+          <p className="mt-2 text-sm leading-6 text-white/55">
+            The caregiver app and customer portal are now reading the same booking state.
+          </p>
+        </div>
+        <Badge variant="trust">Synced</Badge>
+      </div>
+      <div className="mt-4 space-y-2">
+        {steps.map((step) => (
+          <div key={step.label} className="flex items-center gap-3 rounded-2xl bg-white/10 p-3">
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                step.done
+                  ? "bg-emerald-300 text-[#06130f]"
+                  : step.active
+                    ? "bg-amber-300 text-[#06130f]"
+                    : "bg-white/10 text-white/40"
+              }`}
+            >
+              {step.done ? <Check className="h-4 w-4" /> : step.active ? "!" : ""}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-white/85">{step.label}</p>
+              <p className="mt-0.5 text-xs text-white/45">{step.detail}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
