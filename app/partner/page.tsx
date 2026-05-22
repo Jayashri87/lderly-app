@@ -879,7 +879,7 @@ export default function PartnerApp() {
                 if (isJourneyAssignment) {
                   JourneyService.updateStatus("escalated");
                 }
-                await fetch("/api/emergency/escalate", {
+                const response = await fetch("/api/emergency/escalate", {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json"
@@ -896,6 +896,9 @@ export default function PartnerApp() {
                     severity: "critical"
                   })
                 });
+                if (!response.ok) {
+                  throw new Error("Panic SOS failed");
+                }
               });
             }}
           />
@@ -905,9 +908,12 @@ export default function PartnerApp() {
             disabled={!hasActiveAssignment || !["accepted", "en_route", "arrived"].includes(bookingStatus)}
             disabledReason={!hasActiveAssignment ? "No active assignment" : "Only after accepting a job"}
             onClick={() => {
-              runAssignmentAction("Cancellation recovery", () => {
+              runAssignmentAction("Cancellation recovery", async () => {
                 trackCaretakerAction("cancelled_after_accepting");
-                fetch(`/api/bookings/${encodeURIComponent(activeBooking?.id || "")}/cancel`, {
+                if (!activeBooking?.id) {
+                  throw new Error("No booking to cancel");
+                }
+                const response = await fetch(`/api/bookings/${encodeURIComponent(activeBooking.id)}/cancel`, {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json"
@@ -916,6 +922,9 @@ export default function PartnerApp() {
                     reason: "Caretaker cancelled after accepting"
                   })
                 });
+                if (!response.ok) {
+                  throw new Error("Cancellation failed");
+                }
               });
             }}
           />

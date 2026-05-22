@@ -16,8 +16,6 @@ import { CaregiverApi, clearSession, readSession } from "./src/api";
 import { CaregiverLocation } from "./src/backgroundLocation";
 import { ActiveAssignment, AssignmentFeed, CaregiverSession } from "./src/types";
 
-const demoBookingId = "replace-with-active-booking-id";
-
 const statusCopy: Record<string, { label: string; detail: string; next: string }> = {
   searching: {
     label: "New request nearby",
@@ -72,7 +70,6 @@ export default function App() {
   const [session, setSession] = useState<CaregiverSession | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [bookingId, setBookingId] = useState(demoBookingId);
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("Ready.");
   const [busy, setBusy] = useState(false);
@@ -91,7 +88,7 @@ export default function App() {
     [feed]
   );
 
-  const currentBookingId = activeBooking?.id || activeOffer?.bookingId || bookingId;
+  const currentBookingId = activeBooking?.id || activeOffer?.bookingId || "";
   const currentState = activeBooking?.status || (activeOffer ? "searching" : "idle");
   const offerExpired = Boolean(activeOffer?.expiresAt && activeOffer.expiresAt <= clock);
   const stateCopy = statusCopy[currentState] || {
@@ -192,6 +189,11 @@ export default function App() {
 
     if (!online && currentState === "idle") {
       run("Going online", () => CaregiverApi.updateAvailability(session, true, "available"));
+      return;
+    }
+
+    if (!currentBookingId && currentState !== "idle") {
+      setMessage("No active booking found. Refresh assignments.");
       return;
     }
 
@@ -384,8 +386,6 @@ export default function App() {
           booking={activeBooking}
           offer={activeOffer}
           serverTime={clock}
-          fallbackBookingId={bookingId}
-          onBookingIdChange={setBookingId}
         />
 
         <FunnelCard state={currentState} offerExpired={offerExpired} hasOtp={Boolean(otp.trim())} />
@@ -455,15 +455,11 @@ export default function App() {
 function AssignmentCard({
   booking,
   offer,
-  serverTime,
-  fallbackBookingId,
-  onBookingIdChange
+  serverTime
 }: {
   booking: ActiveAssignment | null;
   offer: AssignmentFeed["offers"][number] | null;
   serverTime?: number;
-  fallbackBookingId: string;
-  onBookingIdChange: (value: string) => void;
 }) {
   const service = booking?.serviceType || offer?.serviceType || "Care request";
   const customer = booking?.customerName || offer?.customerName || "Family";
@@ -481,14 +477,6 @@ function AssignmentCard({
           When a family books care in your area, the request will appear here with ETA,
           distance, service, and one accept action.
         </Text>
-        <TextInput
-          value={fallbackBookingId}
-          onChangeText={onBookingIdChange}
-          placeholder="Fallback booking ID"
-          placeholderTextColor="#64748b"
-          autoCapitalize="none"
-          style={styles.input}
-        />
       </View>
     );
   }
