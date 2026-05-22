@@ -1729,6 +1729,7 @@ export default function CustomerApp() {
                 journey={visibleJourney}
                 booking={visibleBooking}
                 onImmediate={requestImmediateCare}
+                onCompletePayment={() => visibleBooking && openRazorpayCheckout(visibleBooking)}
                 onVerifyCompletion={verifyCareCompletion}
                 onCancelCare={cancelActiveCare}
                 onRateCare={rateLatestCare}
@@ -3500,6 +3501,7 @@ function JourneyExperience({
   journey,
   booking,
   onImmediate,
+  onCompletePayment,
   onVerifyCompletion,
   onCancelCare,
   onRateCare
@@ -3508,12 +3510,18 @@ function JourneyExperience({
   journey: CareJourney | null;
   booking: CareBooking | null;
   onImmediate: () => void;
+  onCompletePayment: () => void;
   onVerifyCompletion: () => void;
   onCancelCare: () => void;
   onRateCare: () => void;
 }) {
   const [liveNow, setLiveNow] = useState(() => new Date().getTime());
   const bookingStatus = booking?.status ?? "none";
+  const paymentPending = Boolean(
+    booking &&
+      booking.status !== "none" &&
+      !["paid", "refunded"].includes(booking.payment?.status || "pending")
+  );
   const status =
     journey?.status ??
     (bookingStatus === "none" || bookingStatus === "cancelled"
@@ -3616,6 +3624,14 @@ function JourneyExperience({
 
   return (
     <section>
+      {paymentPending && booking ? (
+        <PaymentPendingCare
+          booking={booking}
+          recipient={recipient}
+          onCompletePayment={onCompletePayment}
+        />
+      ) : null}
+
       {!hasActiveService && (
         <section className="rounded-[2rem] bg-white p-5 text-[#06130f]">
           <p className="text-sm font-medium text-emerald-700">Care</p>
@@ -3626,7 +3642,7 @@ function JourneyExperience({
         </section>
       )}
 
-      {hasActiveService && (
+      {hasActiveService && !paymentPending && (
         <>
       <div className="rounded-[2rem] bg-white p-5 text-[#06130f]">
         <div className="flex items-center justify-between gap-4">
@@ -3826,6 +3842,54 @@ function JourneyExperience({
       </button>
         </>
       )}
+    </section>
+  );
+}
+
+function PaymentPendingCare({
+  booking,
+  recipient,
+  onCompletePayment
+}: {
+  booking: CareBooking;
+  recipient: Recipient;
+  onCompletePayment: () => void;
+}) {
+  return (
+    <section className="rounded-[2rem] bg-white p-5 text-[#06130f]">
+      <p className="text-sm font-semibold text-amber-700">Payment pending</p>
+      <h2 className="mt-2 text-2xl font-semibold">Complete payment to start care</h2>
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        Your request for {recipient.shortName} is saved. Caregiver dispatch, live tracking,
+        OTP, and family updates will start after payment is verified.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-2xl bg-slate-100 p-3">
+          <p className="text-xs text-slate-500">Service</p>
+          <p className="mt-1 font-semibold">{cleanServiceName(booking.serviceType)}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-100 p-3">
+          <p className="text-xs text-slate-500">Amount</p>
+          <p className="mt-1 font-semibold">{booking.payment.estimatedTotal}</p>
+        </div>
+      </div>
+      <button
+        onClick={onCompletePayment}
+        className="mt-5 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+      >
+        Complete payment
+      </button>
+      <button
+        onClick={() =>
+          window.open(
+            "https://wa.me/919916960524?text=I%20need%20help%20completing%20my%20LDERLY%20payment",
+            "_blank"
+          )
+        }
+        className="mt-3 w-full rounded-full bg-slate-100 px-5 py-4 font-semibold"
+      >
+        Contact LDERLY
+      </button>
     </section>
   );
 }
