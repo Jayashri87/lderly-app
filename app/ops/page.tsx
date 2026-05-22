@@ -1322,10 +1322,10 @@ export default function OpsApp() {
                 <h2 className="mt-2 text-2xl font-semibold">
                   {systemStatus.firebaseAdmin.configured
                     ? "Trusted writes active"
-                    : "Client fallback mode"}
+                    : "Firebase Admin writes not configured"}
                 </h2>
                 <p className="mt-2 text-sm text-white/50">
-                  Booking APIs, scoped reads, and signed sessions are available.
+                  This panel separates configured backend capabilities from items that still need production setup.
                 </p>
               </div>
               <span
@@ -1346,7 +1346,7 @@ export default function OpsApp() {
             </div>
             {systemStatus.productionReadiness.pending.length > 0 && (
               <div className="mt-5 rounded-3xl bg-white/10 p-4">
-                <p className="text-sm font-semibold text-white/70">Pending</p>
+                <p className="text-sm font-semibold text-white/70">Production gaps</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {systemStatus.productionReadiness.pending.map((item) => (
                     <span
@@ -1520,7 +1520,7 @@ export default function OpsApp() {
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Support tickets</p>
               <p className="mt-1 text-white/50">Customer issues route into ops support queue.</p>
-              <button
+              <OpsActionButton
                 onClick={() =>
                   booking?.id &&
                   runOpsWorkflow("Open support ticket", "/api/support/tickets", {
@@ -1533,15 +1533,15 @@ export default function OpsApp() {
                   })
                 }
                 disabled={!booking?.id}
-                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+                disabledReason="Needs an active booking"
               >
                 Open support ticket
-              </button>
+              </OpsActionButton>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Complaints</p>
               <p className="mt-1 text-white/50">Care quality and safety complaints create escalations.</p>
-              <button
+              <OpsActionButton
                 onClick={() =>
                   booking?.id &&
                   runOpsWorkflow("Open care complaint", "/api/support/complaints", {
@@ -1554,17 +1554,17 @@ export default function OpsApp() {
                   })
                 }
                 disabled={!booking?.id}
-                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+                disabledReason="Needs an active booking"
               >
                 Open complaint review
-              </button>
+              </OpsActionButton>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Refunds</p>
               <p className="mt-1 text-white/50">
                 {opsKpis?.refundsRequested ?? 0} refund requests are awaiting ops review.
               </p>
-              <button
+              <OpsActionButton
                 onClick={() =>
                   booking?.id &&
                   runOpsWorkflow("Open refund review", "/api/payments/refund", {
@@ -1573,17 +1573,17 @@ export default function OpsApp() {
                   })
                 }
                 disabled={!booking?.id}
-                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+                disabledReason="Needs a paid active booking"
               >
                 Open refund review
-              </button>
+              </OpsActionButton>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">KYC reviews</p>
               <p className="mt-1 text-white/50">
                 Aadhaar, PAN, and face checks route through the ops review API.
               </p>
-              <button
+              <OpsActionButton
                 onClick={() =>
                   caretakers[0]?.uid &&
                   runOpsWorkflow("Approve caretaker Aadhaar", "/api/caretaker/kyc/review", {
@@ -1594,10 +1594,10 @@ export default function OpsApp() {
                   })
                 }
                 disabled={!caretakers[0]?.uid}
-                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+                disabledReason="Needs a caretaker profile"
               >
                 Review first KYC
-              </button>
+              </OpsActionButton>
             </div>
           </Panel>
           <Panel title="Monitoring">
@@ -1666,8 +1666,7 @@ export default function OpsApp() {
               Test ops alert route
             </button>
             <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/50">
-              Internal alerts are prepared for #emergency-alerts, #caregiver-ops,
-              #late-checkins, and #incident-reports.
+              Internal alert routing depends on the configured ops provider. Slack channel names are shown after provider setup.
             </div>
           </Panel>
           <Panel title="Workforce and family access">
@@ -1737,7 +1736,7 @@ export default function OpsApp() {
             >
               Seed care partners
             </button>
-            <button
+            <OpsActionButton
               onClick={() =>
                 runOpsWorkflow("Dispatch ambulance partner", "/api/partners/dispatch", {
                   partnerType: "ambulance",
@@ -1746,10 +1745,12 @@ export default function OpsApp() {
                   reason: "Ops emergency readiness drill"
                 })
               }
-              className="w-full rounded-full bg-red-500 px-4 py-3 text-sm font-semibold text-white"
+              disabled={!booking?.id}
+              disabledReason="Needs an active emergency or booking"
+              danger
             >
               Dispatch ambulance partner
-            </button>
+            </OpsActionButton>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Emergency escalation</p>
               <p className="mt-1 text-white/50">
@@ -1759,13 +1760,13 @@ export default function OpsApp() {
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Partner dispatch</p>
               <p className="mt-1 text-white/50">
-                Ambulance, labs, pharmacies, hospitals, and physio partners can be dispatched by SLA.
+                Ambulance, labs, pharmacies, hospitals, and physio partners dispatch after partner setup and an active booking.
               </p>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">NRI reports</p>
               <p className="mt-1 text-white/50">
-                Monthly family summaries are ready for PDF and WhatsApp delivery.
+                Monthly family summaries generate after completed visits and delivery-provider setup.
               </p>
             </div>
           </Panel>
@@ -1775,7 +1776,7 @@ export default function OpsApp() {
               <p className="mt-1 text-white/50">
                 Invoice records now track taxable value, GST, line items, and PDF readiness.
               </p>
-              <button
+              <OpsActionButton
                 onClick={() =>
                   booking?.id &&
                   runOpsWorkflow("Generate GST invoice", "/api/finance/invoice", {
@@ -1784,17 +1785,17 @@ export default function OpsApp() {
                   })
                 }
                 disabled={!booking?.id}
-                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+                disabledReason="Needs an active booking"
               >
                 Generate invoice
-              </button>
+              </OpsActionButton>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Caregiver payouts</p>
               <p className="mt-1 text-white/50">
                 Payout and incentive records are queued for ops reconciliation.
               </p>
-              <button
+              <OpsActionButton
                 onClick={() =>
                   booking?.id &&
                   runOpsWorkflow("Queue caregiver payout", "/api/finance/payout", {
@@ -1804,10 +1805,10 @@ export default function OpsApp() {
                   })
                 }
                 disabled={!booking?.id || !booking?.caretakerId}
-                className="mt-3 w-full rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#071018] disabled:opacity-40"
+                disabledReason={!booking?.id ? "Needs an active booking" : "Needs assigned caregiver"}
               >
                 Queue payout
-              </button>
+              </OpsActionButton>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">Recurring care</p>
@@ -1940,12 +1941,46 @@ function CustomerLeadCard({
   );
 }
 
+function OpsActionButton({
+  children,
+  onClick,
+  disabled,
+  disabledReason,
+  danger = false
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
+  danger?: boolean;
+}) {
+  return (
+    <div className="mt-3">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        title={disabled ? disabledReason : undefined}
+        className={`w-full rounded-full px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+          danger
+            ? "bg-red-500 text-white"
+            : "bg-white text-[#071018]"
+        }`}
+      >
+        {children}
+      </button>
+      {disabled && disabledReason ? (
+        <p className="mt-2 text-xs text-white/45">{disabledReason}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function StatusPill({ label, ready }: { label: string; ready: boolean }) {
   return (
     <div className="rounded-2xl bg-white/10 p-3">
       <p className="text-xs text-white/45">{label}</p>
       <p className={`mt-1 font-semibold ${ready ? "text-emerald-200" : "text-amber-200"}`}>
-        {ready ? "Ready" : "Pending"}
+        {ready ? "Configured" : "Needs setup"}
       </p>
     </div>
   );
