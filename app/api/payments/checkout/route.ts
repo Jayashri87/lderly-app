@@ -85,12 +85,12 @@ export async function POST(request: NextRequest) {
             booking.id,
             {
               method: "upi",
-              status: "authorized",
+              status: "pending",
               invoiceId: checkout.orderId
             },
             checkout.mode === "razorpay"
               ? "Razorpay order created"
-              : "Mock payment authorized"
+              : "Mock checkout created"
           )
       )
 

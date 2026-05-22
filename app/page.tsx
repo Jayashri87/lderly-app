@@ -1320,14 +1320,13 @@ export default function CustomerApp() {
     const checkout = (await checkoutResponse.json()) as RazorpayCheckout;
 
     if (checkout.mode === "mock") {
-      setPaymentMessage("Payment authorized for local testing");
-      BookingService.authorizePayment("upi");
-      trackProductEvent("payment_authorized", {
+      setPaymentMessage("Payment provider is not live. Your request is saved, but care will start after ops confirms payment.");
+      trackProductEvent("payment_mock_checkout_blocked", {
         bookingId: nextBooking.id,
         service: nextBooking.serviceType,
         mode: "mock"
       });
-      return true;
+      return false;
     }
 
     const scriptReady = await loadRazorpayScript();
@@ -1339,6 +1338,8 @@ export default function CustomerApp() {
       setPaymentMessage("Payment window could not open. Try again.");
       return false;
     }
+
+    let paymentVerified = false;
 
     await new Promise<void>((resolve) => {
       const razorpay = new Razorpay({
@@ -1369,6 +1370,7 @@ export default function CustomerApp() {
           if (confirmResponse.ok) {
             BookingService.markPaymentPaid(response.razorpay_payment_id);
             setPaymentMessage("Payment confirmed");
+            paymentVerified = true;
             trackProductEvent("payment_confirmed", {
               bookingId: nextBooking.id,
               service: nextBooking.serviceType,
@@ -1399,7 +1401,7 @@ export default function CustomerApp() {
       razorpay.open();
     });
 
-    return true;
+    return paymentVerified;
   };
 
   const confirmBooking = async () => {

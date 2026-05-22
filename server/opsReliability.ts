@@ -263,7 +263,14 @@ export const OpsReliability = {
       return { ok: false as const, status: 404, error: "Booking not found" };
     }
 
-    if (booking.payment.status !== "paid" && booking.payment.status !== "authorized") {
+    const paymentStatus = booking.payment.status;
+    const hasPaymentReference = Boolean(booking.payment.invoiceId);
+
+    if (
+      paymentStatus !== "paid" &&
+      paymentStatus !== "authorized" &&
+      !(paymentStatus === "pending" && hasPaymentReference)
+    ) {
       return { ok: false as const, status: 409, error: "Booking is not eligible for refund" };
     }
 
@@ -287,13 +294,15 @@ export const OpsReliability = {
       [`refunds/byBooking/${bookingId}/${id}`]: true,
       [`operations/refundQueue/requested/${id}`]: true
     });
-    await TrustedBooking.updatePayment(
-      bookingId,
-      {
-        status: "refunded"
-      },
-      `Refund requested by ${requestedBy}: ${reason}`
-    );
+    if (paymentStatus === "paid" || paymentStatus === "authorized") {
+      await TrustedBooking.updatePayment(
+        bookingId,
+        {
+          status: "refunded"
+        },
+        `Refund requested by ${requestedBy}: ${reason}`
+      );
+    }
     await writeNotification({
       userId: booking.customerId,
       role: "customer",
