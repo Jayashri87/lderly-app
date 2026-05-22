@@ -373,12 +373,12 @@ const timeOptions: TimeOption[] = [
 ];
 
 const journeySteps = [
-  "Request Created",
-  "Caregiver Assigned",
+  "Request Received",
+  "Caregiver Confirmed",
   "On The Way",
   "Arrived",
-  "Session Started",
-  "Session Completed"
+  "Care Started",
+  "Care Completed"
 ];
 
 const reassuranceFeed = [
@@ -726,7 +726,7 @@ const careStatusFor = ({
     }
 
     if (journey.status === "accepted") {
-      return `Caregiver accepted ${service}`;
+      return `Caregiver confirmed for ${service}`;
     }
 
     if (journey.status === "en_route") {
@@ -764,7 +764,7 @@ const careStatusFor = ({
     }
 
     if (booking.status === "accepted") {
-      return `Caregiver accepted ${service}`;
+      return `Caregiver confirmed for ${service}`;
     }
 
     if (booking.status === "en_route") {
@@ -3701,27 +3701,27 @@ function JourneyExperience({
               {booking?.serviceStart?.otp || "------"}
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              This OTP starts the service. Do not share it before the caregiver is at the care location.
+              This OTP starts the visit. Share it only after the caregiver is at the care location.
             </p>
           </>
         ) : booking?.status === "completed" && booking?.completion?.paymentReleaseStatus === "awaiting_customer" ? (
           <>
-            <h3 className="mt-1 text-2xl font-semibold">Verify completion to release payment</h3>
+            <h3 className="mt-1 text-2xl font-semibold">Confirm the visit went well</h3>
             <p className="mt-2 text-sm text-slate-500">
-              Confirm only after the visit notes, medicine/vitals, and family handover look correct.
+              Review the visit notes, medicine/vitals, and family handover before confirming.
             </p>
             <button
               onClick={onVerifyCompletion}
               className="mt-4 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
             >
-              Verify care & release payment
+              Confirm visit
             </button>
           </>
         ) : booking?.status === "payment_settled" ? (
           <>
-            <h3 className="mt-1 text-2xl font-semibold">Payment released</h3>
+            <h3 className="mt-1 text-2xl font-semibold">Visit confirmed</h3>
             <p className="mt-2 text-sm text-slate-500">
-              The family verified the visit and caregiver payout is ready for ops processing.
+              Thank you. Your care summary is ready for family review.
             </p>
             {canRateCare ? (
               <button
@@ -3734,7 +3734,7 @@ function JourneyExperience({
           </>
         ) : (
           <p className="mt-2 text-sm text-slate-500">
-            OTP and payment release controls appear at the right moment in the care journey.
+            OTP and visit confirmation controls appear at the right moment in the care journey.
           </p>
         )}
       </section>
@@ -3911,13 +3911,13 @@ function CustomerCareFunnel({
   const steps = [
     {
       label: "Request sent",
-      detail: "Nearby caregivers are notified",
+      detail: "We are finding the right caregiver",
       done: Boolean(booking && booking.status !== "none"),
       active: status === "requested"
     },
     {
-      label: "Caregiver accepts",
-      detail: booking?.caretakerName || "Waiting for partner response",
+      label: "Caregiver confirmed",
+      detail: booking?.caretakerName || "Our care team is coordinating",
       done: ["accepted", "en_route", "arrived", "in_progress", "completed"].includes(status),
       active: status === "assigned"
     },
@@ -3937,8 +3937,8 @@ function CustomerCareFunnel({
       label: "Visit complete",
       detail:
         booking?.completion?.paymentReleaseStatus === "awaiting_customer"
-          ? "Verify to release payment"
-          : "Caregiver marks done",
+          ? "Please confirm the visit"
+          : "Care summary will be ready",
       done: paymentReleased,
       active:
         status === "in_progress" ||
@@ -3951,13 +3951,13 @@ function CustomerCareFunnel({
     <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-emerald-100">Customer-caregiver funnel</p>
-          <h3 className="mt-1 text-2xl font-semibold">One connected care flow</h3>
+          <p className="text-sm font-semibold text-emerald-100">Care progress</p>
+          <h3 className="mt-1 text-2xl font-semibold">What is happening now</h3>
           <p className="mt-2 text-sm leading-6 text-white/55">
-            The caregiver app and customer portal are now reading the same booking state.
+            We keep this updated as your caregiver is assigned, arrives, starts care, and completes the visit.
           </p>
         </div>
-        <Badge variant="trust">Synced</Badge>
+        <Badge variant="trust">Live</Badge>
       </div>
       <div className="mt-4 space-y-2">
         {steps.map((step) => (
