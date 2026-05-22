@@ -51,7 +51,7 @@ const statusCopy: Record<string, { label: string; detail: string; next: string }
   },
   completed: {
     label: "Visit completed",
-    detail: "Waiting for customer verification and payment release.",
+    detail: "Waiting for family confirmation and ops closure.",
     next: "Completed"
   }
 };
@@ -197,7 +197,7 @@ export default function App() {
 
     if (currentState === "searching" || currentState === "assigned") {
       if (offerExpired) {
-        run("Refreshing expired request", () => refreshFeed(session));
+        run("Refreshing request", () => refreshFeed(session));
         return;
       }
       run("Accept request", () => CaregiverApi.acceptBooking(session, currentBookingId));
@@ -548,7 +548,7 @@ function FunnelCard({
   return (
     <View style={styles.panel}>
       <Text style={styles.sectionLabel}>Care funnel</Text>
-      {offerExpired ? <Text style={styles.warningText}>Request expired. Refresh to get the latest offer.</Text> : null}
+      {offerExpired ? <Text style={styles.warningText}>This request is no longer active. Refresh for the latest request.</Text> : null}
       {state === "arrived" && !hasOtp ? (
         <Text style={styles.warningText}>OTP is required before service can start.</Text>
       ) : null}

@@ -3597,7 +3597,7 @@ function JourneyExperience({
         ? "Arriving soon. Keep the service OTP ready."
         : liveTrackingState === "live"
           ? "Live location is updating from the caregiver app."
-          : "Tracking begins as soon as a caregiver accepts.";
+          : "Tracking begins as soon as your caregiver is confirmed.";
   const freshnessLabel =
     locationAgeMinutes === null
       ? "Location pending"
