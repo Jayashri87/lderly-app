@@ -42,6 +42,16 @@ type SystemStatus = {
   };
   productionReadiness: {
     pending: string[];
+    stricterRulesDeployed?: boolean;
+    razorpayConfigured?: boolean;
+    razorpayWebhookConfigured?: boolean;
+    geocodingConfigured?: boolean;
+    firebaseAppCheckConfigured?: boolean;
+    observabilityConfigured?: boolean;
+    messagingProviderConfigured?: boolean;
+    voiceNoteStorageConfigured?: boolean;
+    opsMaintenanceCronConfigured?: boolean;
+    monthlyNriReportApi?: boolean;
     indiaFirstCommunication?: {
       whatsappBusinessConfigured: boolean;
       whatsappManualReady: boolean;
@@ -584,6 +594,97 @@ export default function OpsApp() {
   const recoverySignals = opsRecovery?.signals || [];
   const auditEvents = opsAudit?.events || [];
   const customerLeads = leadSnapshot?.leads || [];
+  const launchBlockers = systemStatus
+    ? [
+        {
+          label: "Firebase Admin",
+          ready: systemStatus.firebaseAdmin.configured,
+          reason: "Server-owned writes and role claims"
+        },
+        {
+          label: "Firebase rules",
+          ready: Boolean(systemStatus.productionReadiness.stricterRulesDeployed),
+          reason: "RTDB read/write protection"
+        },
+        {
+          label: "Razorpay webhook",
+          ready: Boolean(
+            systemStatus.productionReadiness.razorpayConfigured &&
+              systemStatus.productionReadiness.razorpayWebhookConfigured
+          ),
+          reason: "Payment verification and reconciliation"
+        },
+        {
+          label: "Google Maps",
+          ready: Boolean(systemStatus.productionReadiness.geocodingConfigured),
+          reason: "Geocoding and live location support"
+        },
+        {
+          label: "App Check",
+          ready: Boolean(systemStatus.productionReadiness.firebaseAppCheckConfigured),
+          reason: "Client abuse protection"
+        },
+        {
+          label: "Sentry/analytics",
+          ready: Boolean(systemStatus.productionReadiness.observabilityConfigured),
+          reason: "Production error and funnel visibility"
+        },
+        {
+          label: "Role auth",
+          ready: Boolean(
+            systemStatus.auth.signedSessions &&
+              systemStatus.auth.adminCredentials &&
+              systemStatus.auth.caretakerCredentials &&
+              systemStatus.auth.customerCredentials
+          ),
+          reason: "Customer, caregiver, and ops access"
+        }
+      ]
+    : [];
+  const softDependencies = systemStatus
+    ? [
+        {
+          label: "WhatsApp API",
+          ready: Boolean(
+            systemStatus.productionReadiness.indiaFirstCommunication?.whatsappBusinessConfigured
+          ),
+          reason: "Automated family updates"
+        },
+        {
+          label: "MSG91 SMS",
+          ready: Boolean(systemStatus.productionReadiness.indiaFirstCommunication?.msg91SmsConfigured),
+          reason: "OTP/SMS fallback"
+        },
+        {
+          label: "Exotel voice",
+          ready: Boolean(systemStatus.productionReadiness.indiaFirstCommunication?.exotelVoiceConfigured),
+          reason: "Emergency calling"
+        },
+        {
+          label: "Slack ops alerts",
+          ready: Boolean(systemStatus.productionReadiness.internalOpsReadiness?.slackConfigured),
+          reason: "Internal incident routing"
+        },
+        {
+          label: "Voice storage",
+          ready: Boolean(systemStatus.productionReadiness.voiceNoteStorageConfigured),
+          reason: "Caregiver voice notes"
+        },
+        {
+          label: "Cron maintenance",
+          ready: Boolean(systemStatus.productionReadiness.opsMaintenanceCronConfigured),
+          reason: "Automated cleanup/recovery"
+        }
+      ]
+    : [];
+  const paymentReady = Boolean(
+    systemStatus?.productionReadiness.razorpayConfigured &&
+      systemStatus.productionReadiness.razorpayWebhookConfigured
+  );
+  const reportDeliveryReady = Boolean(
+    systemStatus?.productionReadiness.monthlyNriReportApi &&
+      systemStatus.productionReadiness.messagingProviderConfigured
+  );
   const refreshLeads = async () => {
     const response = await fetch("/api/ops/leads");
     if (response.ok) {
@@ -1359,6 +1460,18 @@ export default function OpsApp() {
                 </div>
               </div>
             )}
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <ReadinessChecklist
+                title="Launch blockers"
+                description="These should be green before accepting real paid customer visits."
+                items={launchBlockers}
+              />
+              <ReadinessChecklist
+                title="Soft dependencies"
+                description="These can be staged after launch if ops has manual fallback."
+                items={softDependencies}
+              />
+            </div>
           </section>
         )}
 
@@ -1572,8 +1685,8 @@ export default function OpsApp() {
                     reason: "Ops manual refund review"
                   })
                 }
-                disabled={!booking?.id}
-                disabledReason="Needs a paid active booking"
+                disabled={!booking?.id || !paymentReady}
+                disabledReason={!booking?.id ? "Needs a paid active booking" : "Needs Razorpay webhook/config"}
               >
                 Open refund review
               </OpsActionButton>
@@ -1766,7 +1879,9 @@ export default function OpsApp() {
             <div className="rounded-2xl bg-white/10 p-4 text-sm">
               <p className="font-semibold">NRI reports</p>
               <p className="mt-1 text-white/50">
-                Monthly family summaries generate after completed visits and delivery-provider setup.
+                {reportDeliveryReady
+                  ? "Monthly family summaries can be generated and delivered."
+                  : "Monthly summaries need completed visits plus a delivery provider."}
               </p>
             </div>
           </Panel>
@@ -1784,8 +1899,8 @@ export default function OpsApp() {
                     billTo: booking.customerName
                   })
                 }
-                disabled={!booking?.id}
-                disabledReason="Needs an active booking"
+                disabled={!booking?.id || !paymentReady}
+                disabledReason={!booking?.id ? "Needs an active booking" : "Needs Razorpay webhook/config"}
               >
                 Generate invoice
               </OpsActionButton>
@@ -1804,8 +1919,14 @@ export default function OpsApp() {
                     incentiveAmount: 0
                   })
                 }
-                disabled={!booking?.id || !booking?.caretakerId}
-                disabledReason={!booking?.id ? "Needs an active booking" : "Needs assigned caregiver"}
+                disabled={!booking?.id || !booking?.caretakerId || !paymentReady}
+                disabledReason={
+                  !booking?.id
+                    ? "Needs an active booking"
+                    : !booking?.caretakerId
+                      ? "Needs assigned caregiver"
+                      : "Needs Razorpay webhook/config"
+                }
               >
                 Queue payout
               </OpsActionButton>
@@ -1971,6 +2092,54 @@ function OpsActionButton({
       {disabled && disabledReason ? (
         <p className="mt-2 text-xs text-white/45">{disabledReason}</p>
       ) : null}
+    </div>
+  );
+}
+
+function ReadinessChecklist({
+  title,
+  description,
+  items
+}: {
+  title: string;
+  description: string;
+  items: Array<{ label: string; ready: boolean; reason: string }>;
+}) {
+  const openCount = items.filter((item) => !item.ready).length;
+
+  return (
+    <div className="rounded-3xl bg-white/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{title}</p>
+          <p className="mt-1 text-sm text-white/50">{description}</p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            openCount ? "bg-amber-300 text-[#071018]" : "bg-emerald-300 text-[#071018]"
+          }`}
+        >
+          {openCount ? `${openCount} open` : "clear"}
+        </span>
+      </div>
+      <div className="mt-4 space-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-start gap-3 rounded-2xl bg-white/10 p-3">
+            <span
+              className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+                item.ready ? "bg-emerald-300" : "bg-amber-300"
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{item.label}</p>
+              <p className="mt-0.5 text-xs text-white/45">{item.reason}</p>
+            </div>
+            <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white/60">
+              {item.ready ? "Configured" : "Needs setup"}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
