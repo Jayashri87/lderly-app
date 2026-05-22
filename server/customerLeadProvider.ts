@@ -14,6 +14,9 @@ export type CustomerLead = {
   name: string;
   email: string;
   phone: string;
+  careFor?: string;
+  careNeed?: string;
+  preferredContact?: string;
   source: string;
   status: CustomerLeadStatus;
   touchCount: number;
@@ -157,6 +160,9 @@ export const CustomerLeadProvider = {
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
+      careFor: lead.careFor || "",
+      careNeed: lead.careNeed || "",
+      preferredContact: lead.preferredContact || "Phone call",
       role: "customer",
       sourceLeadId: leadId,
       accountStatus: "manual_setup_pending",

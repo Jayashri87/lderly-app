@@ -51,6 +51,9 @@ export default function SignInPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [careFor, setCareFor] = useState("Mother");
+  const [careNeed, setCareNeed] = useState("Need help deciding");
+  const [preferredContact, setPreferredContact] = useState("Phone call");
   const [leadError, setLeadError] = useState("");
   const [leadBusy, setLeadBusy] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
@@ -113,6 +116,9 @@ export default function SignInPage() {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim(),
+          careFor,
+          careNeed,
+          preferredContact,
           source: "signin-care-interest"
         })
       });
@@ -425,6 +431,64 @@ export default function SignInPage() {
                     className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
                   />
                 </label>
+
+                <div>
+                  <span className="text-sm font-medium text-slate-600">Who needs care?</span>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {["Mother", "Father", "Self / Others"].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setCareFor(option)}
+                        className={`rounded-2xl px-3 py-3 text-sm font-semibold ${
+                          careFor === option
+                            ? "bg-[#06130f] text-white"
+                            : "bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-600">What help is needed?</span>
+                  <select
+                    value={careNeed}
+                    onChange={(event) => setCareNeed(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+                  >
+                    <option>Need help deciding</option>
+                    <option>Doctor visit / appointment</option>
+                    <option>Medicine help</option>
+                    <option>Lab test / report collection</option>
+                    <option>Hospital attender</option>
+                    <option>Companionship / temple visit</option>
+                    <option>Daily support</option>
+                    <option>Immediate assistance</option>
+                  </select>
+                </label>
+
+                <div>
+                  <span className="text-sm font-medium text-slate-600">Preferred contact</span>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {["Phone call", "WhatsApp"].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setPreferredContact(option)}
+                        className={`rounded-2xl px-3 py-3 text-sm font-semibold ${
+                          preferredContact === option
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button

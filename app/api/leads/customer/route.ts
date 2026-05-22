@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
     name?: string;
     email?: string;
     phone?: string;
+    careFor?: string;
+    careNeed?: string;
+    preferredContact?: string;
     source?: string;
   };
   const name = (body.name || "").trim();
@@ -62,6 +65,9 @@ export async function POST(request: NextRequest) {
       name,
       email,
       phone,
+      careFor: (body.careFor || "Not specified").trim().slice(0, 80),
+      careNeed: (body.careNeed || "Need help deciding").trim().slice(0, 140),
+      preferredContact: (body.preferredContact || "Phone call").trim().slice(0, 40),
       source: body.source || "web",
       status: previous?.createdAt ? "follow_up_requested" : "new",
       touchCount: (previous?.touchCount || 0) + 1,

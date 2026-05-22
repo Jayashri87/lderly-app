@@ -298,6 +298,9 @@ type CustomerLead = {
   name: string;
   email: string;
   phone: string;
+  careFor?: string;
+  careNeed?: string;
+  preferredContact?: string;
   source: string;
   status: CustomerLeadStatus;
   touchCount: number;
@@ -1887,6 +1890,17 @@ function CustomerLeadCard({
           Touches: {lead.touchCount || 1}
           {lead.createdCustomerId ? ` - Customer: ${lead.createdCustomerId}` : ""}
         </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <span className="rounded-2xl bg-slate-100 px-3 py-2">
+            For: <strong>{lead.careFor || "Not specified"}</strong>
+          </span>
+          <span className="rounded-2xl bg-slate-100 px-3 py-2">
+            Need: <strong>{lead.careNeed || "Need help deciding"}</strong>
+          </span>
+          <span className="rounded-2xl bg-slate-100 px-3 py-2">
+            Contact: <strong>{lead.preferredContact || "Phone call"}</strong>
+          </span>
+        </div>
         {lead.notes && <p className="mt-2 text-slate-500">{lead.notes}</p>}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">

@@ -1648,6 +1648,7 @@ export default function CustomerApp() {
                   details={activeRecipientDetails}
                   recipient={recipient}
                   onBook={openBooking}
+                  onImmediate={requestImmediateCare}
                 />
               ) : (
                 <>
@@ -3072,27 +3073,52 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
 function FirstTimeHome({
   details,
   recipient,
-  onBook
+  onBook,
+  onImmediate
 }: {
   details: RecipientDetails;
   recipient: Recipient;
   onBook: () => void;
+  onImmediate: () => void;
 }) {
   return (
     <section className="rounded-[2rem] bg-gradient-to-br from-emerald-200 via-white to-amber-100 p-6 text-[#06130f] shadow-2xl shadow-black/20">
       <Avatar recipient={recipient} size="lg" />
-      <h2 className="mt-6 text-4xl font-semibold tracking-tight">
+      <p className="mt-6 text-sm font-semibold uppercase tracking-[0.16em] text-emerald-800">
+        First care setup
+      </p>
+      <h2 className="mt-2 text-4xl font-semibold tracking-tight">
         Get care for {recipient.shortName}
       </h2>
       <p className="mt-3 text-base leading-7 text-slate-600">
-        {`We have ${details.fullName || recipient.displayName}'s basics. Continue and we will guide you to the right support.`}
+        {`We have ${details.fullName || recipient.displayName}'s basics. Choose the first care need and LDERLY will guide you through the right service.`}
       </p>
+      <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs text-slate-600">
+        <div className="rounded-2xl bg-white/70 p-3">
+          <ShieldCheck className="mx-auto mb-1 h-4 w-4 text-emerald-800" />
+          Verified care
+        </div>
+        <div className="rounded-2xl bg-white/70 p-3">
+          <MapPinned className="mx-auto mb-1 h-4 w-4 text-emerald-800" />
+          Live tracking
+        </div>
+        <div className="rounded-2xl bg-white/70 p-3">
+          <MessageCircle className="mx-auto mb-1 h-4 w-4 text-emerald-800" />
+          Family updates
+        </div>
+      </div>
       <button
         onClick={onBook}
         className="mt-8 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
       >
-        Continue
+        Continue to care options
         <ChevronRight className="h-5 w-5" />
+      </button>
+      <button
+        onClick={onImmediate}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-red-500 px-5 py-4 font-semibold text-white shadow-xl shadow-red-500/20"
+      >
+        Immediate Assistance
       </button>
     </section>
   );
@@ -3449,8 +3475,15 @@ function CareOnWay({ recipient }: { recipient: Recipient }) {
           Care is on the way
         </h2>
         <p className="mt-3 text-base leading-7 text-white/60">
-          We are finding a verified caregiver for {recipient.shortName}. ETA updates will appear in Care.
+          We have sent {recipient.shortName}&apos;s request to nearby verified caregivers. The Care screen will open automatically with assignment, ETA, OTP, and live updates.
         </p>
+        <div className="mt-6 grid grid-cols-3 gap-2 text-xs text-white/65">
+          {["Matching", "ETA", "OTP"].map((item) => (
+            <div key={item} className="rounded-2xl bg-white/10 px-3 py-3">
+              {item}
+            </div>
+          ))}
+        </div>
       </motion.div>
     </div>
   );
