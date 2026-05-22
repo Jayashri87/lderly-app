@@ -1693,7 +1693,6 @@ export default function CustomerApp() {
                   />
                   <SessionSummaryPreview
                     recipient={recipient}
-                    experience={currentServiceExperience}
                     reports={reports}
                   />
                   <VisitProofSystem
@@ -1741,6 +1740,7 @@ export default function CustomerApp() {
                 profile={profile}
                 recipient={recipient}
                 details={activeRecipientDetails}
+                reports={reports}
                 serviceExperience={currentServiceExperience}
                 onSelectRecipient={() => {
                   trackProductEvent("care_recipient_switch_started", {
@@ -2658,19 +2658,24 @@ function TrustedCaregiverProfile({
   trustProfile: CaregiverTrustProfile | null;
   onRebook: () => void;
 }) {
-  const caregiverName = trustProfile?.name || journey?.caretakerName || booking?.caretakerName || "Anita";
+  const assignedCaregiverName = trustProfile?.name || journey?.caretakerName || booking?.caretakerName || "";
+  const caregiverName = assignedCaregiverName || "Caregiver matching after booking";
   const hasAssignedCaregiver = Boolean(
-    caregiverName && caregiverName !== "Assigning now" && caregiverName !== "Best caregiver nearby"
+    assignedCaregiverName &&
+      assignedCaregiverName !== "Assigning now" &&
+      assignedCaregiverName !== "Best caregiver nearby"
   );
   const badges = trustProfile?.badges?.length
     ? trustProfile.badges
-    : ["ID verified", "Police checked", "4.9 rating", "12 repeat visits"];
+    : hasAssignedCaregiver
+      ? ["ID verified", "Police checked", "Trained caregiver", "Visit history updating"]
+      : ["ID verification", "Police check", "Training status", "Family rating"];
 
   return (
     <section className="mt-5 rounded-[1.5rem] bg-white p-4 text-[#06130f]">
       <div className="flex items-start gap-4">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-200 to-sky-200 text-2xl font-bold">
-          {caregiverName.charAt(0)}
+          {hasAssignedCaregiver ? caregiverName.charAt(0) : "?"}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-emerald-700">Verified caregiver profile</p>
@@ -2693,11 +2698,11 @@ function TrustedCaregiverProfile({
         </div>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-        <CaregiverTrustMetric label="Trust score" value={`${trustProfile?.trustScore ?? 96}%`} />
-        <CaregiverTrustMetric label="Punctuality" value={`${trustProfile?.punctualityScore ?? 98}%`} />
+        <CaregiverTrustMetric label="Trust score" value={trustProfile ? `${trustProfile.trustScore}%` : "After match"} />
+        <CaregiverTrustMetric label="Punctuality" value={trustProfile ? `${trustProfile.punctualityScore}%` : "After visit"} />
         <CaregiverTrustMetric
           label="Languages"
-          value={trustProfile?.languages?.slice(0, 2).join(", ") || "Kannada, Hindi"}
+          value={trustProfile?.languages?.slice(0, 2).join(", ") || "Shown after match"}
         />
       </div>
       <button
@@ -2705,7 +2710,7 @@ function TrustedCaregiverProfile({
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-4 py-3 text-sm font-semibold text-white"
       >
         <Repeat2 className="h-4 w-4" />
-        Rebook same caregiver
+        {hasAssignedCaregiver ? "Rebook same caregiver" : "Book verified caregiver"}
       </button>
     </section>
   );
@@ -2722,11 +2727,9 @@ function CaregiverTrustMetric({ label, value }: { label: string; value: string }
 
 function SessionSummaryPreview({
   recipient,
-  experience,
   reports
 }: {
   recipient: Recipient;
-  experience: ReturnType<typeof serviceExperienceFor>;
   reports: VisitReport[];
 }) {
   const latestReport = reports[0];
@@ -2737,23 +2740,32 @@ function SessionSummaryPreview({
         latestReport.familySummary,
         latestReport.caregiverNote
       ]
-    : experience.summary.map((item) => `${recipient.shortName}: ${item}`);
+    : [
+        `No completed visit summary for ${recipient.shortName} yet.`,
+        "Vitals, medicines, caregiver notes, and family handover will appear after the first visit."
+      ];
 
   return (
     <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-emerald-100">Today&apos;s care summary</p>
-          <h3 className="mt-1 text-2xl font-semibold">Family handover ready</h3>
+          <h3 className="mt-1 text-2xl font-semibold">
+            {latestReport ? "Family handover ready" : "Care summary appears after the visit"}
+          </h3>
         </div>
         <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/60">
-          Voice note
+          {latestReport ? "Voice note" : "After visit"}
         </span>
       </div>
       <div className="mt-4 space-y-2">
         {summaryItems.slice(0, 4).map((item) => (
           <div key={item} className="flex items-start gap-3 rounded-2xl bg-white/10 p-3 text-sm">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
+            {latestReport ? (
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
+            ) : (
+              <CircleHelp className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />
+            )}
             <span className="text-white/70">{item}</span>
           </div>
         ))}
@@ -2947,6 +2959,7 @@ function NriMonthlyReportPreview({
   reports: VisitReport[];
   aiInsight: AiReassuranceInsight | null;
 }) {
+  const reportReady = reports.length > 0;
   return (
     <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
       <p className="text-sm font-semibold text-emerald-100">NRI family report</p>
@@ -2956,8 +2969,8 @@ function NriMonthlyReportPreview({
       </p>
       <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-white/60">
         <div className="rounded-2xl bg-white/10 p-3">{reports.length} visits</div>
-        <div className="rounded-2xl bg-white/10 p-3">Care score 92%</div>
-        <div className="rounded-2xl bg-white/10 p-3">PDF ready</div>
+        <div className="rounded-2xl bg-white/10 p-3">{reportReady ? "Care score ready" : "Care score after visit"}</div>
+        <div className="rounded-2xl bg-white/10 p-3">{reportReady ? "PDF ready" : "PDF after visit"}</div>
       </div>
       <p className="mt-4 rounded-2xl bg-white/10 p-3 text-sm text-white/65">
         {aiInsight?.nextAction || `Next update: share ${recipient.shortName}'s weekly summary with family.`}
@@ -3629,18 +3642,26 @@ function JourneyExperience({
 
         <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-100 p-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white">
-            A
+            {(journey?.caretakerName || booking?.caretakerName || "?").charAt(0)}
           </div>
           <div className="flex-1">
             <p className="font-semibold">
-              {journey?.caretakerName || booking?.caretakerName || "Anita"}
+              {journey?.caretakerName || booking?.caretakerName || "Caregiver being matched"}
             </p>
             <p className="text-sm text-slate-500">
-              Verified caregiver - trained - 4.9 rating
+              {(journey?.caretakerName || booking?.caretakerName)
+                ? "Verified caregiver - trained - trust profile updating"
+                : "Verified caregiver details appear after assignment"}
             </p>
-            <p className="mt-1 text-xs text-emerald-700">
-              Anita has visited {recipient.shortName} 12 times
-            </p>
+            {(journey?.caretakerName || booking?.caretakerName) ? (
+              <p className="mt-1 text-xs text-emerald-700">
+                Familiarity and visit history will update after each completed visit.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-emerald-700">
+                We will show name, photo, ETA, and trust badges after assignment.
+              </p>
+            )}
           </div>
           <button
             onClick={() => {
@@ -3979,6 +4000,7 @@ function ProfilePanel({
   profile,
   recipient,
   details,
+  reports,
   serviceExperience,
   onSelectRecipient,
   onEditDetails,
@@ -3990,6 +4012,7 @@ function ProfilePanel({
   profile: CareProfile | null;
   recipient: Recipient;
   details: RecipientDetails;
+  reports: VisitReport[];
   serviceExperience: ReturnType<typeof serviceExperienceFor>;
   onSelectRecipient: () => void;
   onEditDetails: () => void;
@@ -4082,7 +4105,7 @@ function ProfilePanel({
         {
           icon: Star,
           label: "Trusted caregivers",
-          value: "Anita - familiar caregiver - 12 visits",
+          value: reports.length ? "Familiar caregivers appear after visits" : "Shown after first assigned visit",
           action: "View"
         },
         {
@@ -4237,8 +4260,8 @@ function ProfilePanel({
 
       <div className="mt-5 grid grid-cols-3 gap-3">
         <ProfileStat label="Plan" value={profile?.subscriptionPlan || "Premium"} />
-        <ProfileStat label="Care score" value="92%" />
-        <ProfileStat label="Trusted visits" value="12" />
+        <ProfileStat label="Care score" value={reports.length ? "Ready" : "After visit"} />
+        <ProfileStat label="Trusted visits" value={String(reports.length)} />
       </div>
 
       <FamilyPermissionsPanel profile={profile} onInviteFamily={onInviteFamily} />
