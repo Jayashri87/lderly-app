@@ -159,5 +159,23 @@ export const CaregiverApi = {
         accuracyMeters: location.accuracyMeters
       })
     });
+  },
+
+  async createEmergencyEscalation(
+    session: CaregiverSession,
+    bookingId: string | undefined,
+    reason: string,
+    locationLabel?: string
+  ) {
+    return request<{ ok: true }>("/api/emergency/escalate", session, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create",
+        bookingId,
+        reason,
+        locationLabel,
+        severity: "critical"
+      })
+    });
   }
 };

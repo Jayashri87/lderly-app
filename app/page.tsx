@@ -1765,26 +1765,17 @@ export default function CustomerApp() {
                   });
                 }}
                 onInviteFamily={() => {
-                  if (!session) {
-                    return;
-                  }
-
-                  ProfileService.saveFamilyMember(
-                    { ...session, role: "customer" },
-                    {
-                      name: "Family reviewer",
-                      relationship: "Sibling",
-                      phone: "+91 90000 00000",
-                      permissions: ["monitor", "alerts"],
-                      nriMode: true
-                    }
-                  );
                   trackProductEvent("family_member_invited", {
                     recipient: recipient.shortName,
-                    permissions: ["monitor", "alerts"],
-                    nriMode: true
+                    source: "profile"
                   });
+                  window.open(
+                    "https://wa.me/919916960524?text=I%20want%20to%20add%20a%20family%20member%20to%20LDERLY%20care%20updates",
+                    "_blank"
+                  );
                 }}
+                onBook={openBooking}
+                onTrack={() => selectTab("journey", "profile_action_track")}
                 onSignOut={async () => {
                   await AuthService.signOut();
                   router.replace("/signin");
@@ -3992,6 +3983,8 @@ function ProfilePanel({
   onSelectRecipient,
   onEditDetails,
   onInviteFamily,
+  onBook,
+  onTrack,
   onSignOut
 }: {
   profile: CareProfile | null;
@@ -4001,6 +3994,8 @@ function ProfilePanel({
   onSelectRecipient: () => void;
   onEditDetails: () => void;
   onInviteFamily: () => void;
+  onBook: () => void;
+  onTrack: () => void;
   onSignOut: () => void;
 }) {
   const [profileActionMessage, setProfileActionMessage] = useState("");
@@ -4030,14 +4025,36 @@ function ProfilePanel({
       return;
     }
 
-    if (label === "Trusted caregivers" || label === "Caregiver verification") {
-      window.open("/?tab=journey", "_self");
+    if (label === "Recurring care" || label === "Payment methods") {
+      onBook();
+      setProfileActionMessage(
+        label === "Recurring care"
+          ? "Booking opened. Choose Recurring Care in duration to set up a plan."
+          : "Booking opened. Payment is managed during booking review."
+      );
       return;
     }
 
-    if (label === "Refund support" || label === "Help center") {
+    if (label === "Trusted caregivers" || label === "Caregiver verification") {
+      onTrack();
+      setProfileActionMessage("Care tracking opened so caregiver trust details can be reviewed.");
+      return;
+    }
+
+    if (
+      label === "Refund support" ||
+      label === "Help center" ||
+      label === "WhatsApp updates" ||
+      label === "Notifications"
+    ) {
       window.open("https://wa.me/919916960524?text=I%20need%20LDERLY%20support", "_blank");
       setProfileActionMessage("Support opened on WhatsApp so ops can respond quickly.");
+      return;
+    }
+
+    if (label === "Voice summaries") {
+      onTrack();
+      setProfileActionMessage("Care tracking opened. Voice summaries appear with visit updates.");
       return;
     }
 
@@ -4046,7 +4063,8 @@ function ProfilePanel({
       return;
     }
 
-    setProfileActionMessage(`${label} is noted. Ops can enable the next step from the admin console.`);
+    window.open("https://wa.me/919916960524?text=I%20need%20help%20with%20my%20LDERLY%20profile", "_blank");
+    setProfileActionMessage(`${label} support opened on WhatsApp.`);
   };
   const profileSections: Array<{
     title: string;

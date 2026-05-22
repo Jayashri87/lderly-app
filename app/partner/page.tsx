@@ -271,7 +271,7 @@ export default function PartnerApp() {
           ? "Complete checklist first"
           : "";
 
-  const runAssignmentAction = (label: string, action: () => void) => {
+  const runAssignmentAction = async (label: string, action: () => void | Promise<void>) => {
     setActionMessage("");
 
     if (!hasActiveAssignment) {
@@ -279,8 +279,12 @@ export default function PartnerApp() {
       return;
     }
 
-    action();
-    setActionMessage(`${label} sent to LDERLY ops and family timeline.`);
+    try {
+      await action();
+      setActionMessage(`${label} sent to LDERLY ops and family timeline.`);
+    } catch {
+      setActionMessage(`${label} could not be sent. Check network and try again.`);
+    }
   };
 
   const stopGpsWatch = () => {
@@ -328,7 +332,7 @@ export default function PartnerApp() {
       await CaretakerService.updateLocation(session.uid, activeTrackingBookingId);
       setLastGpsAt(Date.now());
       setGpsStatus("simulated");
-      setGpsMessage("Device GPS was not available, so a demo movement update was sent.");
+      setGpsMessage("Device GPS was not available, so a backup location update was sent.");
       trackCaretakerAction("simulated_gps_updated");
     } catch {
       setGpsStatus("error");
@@ -344,7 +348,7 @@ export default function PartnerApp() {
 
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setGpsStatus("unsupported");
-      setGpsMessage("This browser does not support device GPS. Sending a demo fallback.");
+      setGpsMessage("This browser does not support device GPS. Sending a backup location update.");
       sendSimulatedLocationFallback();
       return;
     }
@@ -355,7 +359,7 @@ export default function PartnerApp() {
       sendDevicePosition,
       () => {
         setGpsStatus("blocked");
-        setGpsMessage("GPS permission was blocked. Sending a demo fallback for testing.");
+        setGpsMessage("GPS permission was blocked. Sending a backup location update.");
         sendSimulatedLocationFallback();
       },
       {
@@ -374,7 +378,7 @@ export default function PartnerApp() {
 
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setGpsStatus("unsupported");
-      setGpsMessage("This browser does not support live GPS. Sending a demo fallback.");
+      setGpsMessage("This browser does not support live GPS. Sending a backup location update.");
       sendSimulatedLocationFallback();
       return;
     }
@@ -390,7 +394,7 @@ export default function PartnerApp() {
       sendDevicePosition,
       () => {
         setGpsStatus("blocked");
-        setGpsMessage("Live GPS permission was blocked. Sending a demo fallback.");
+        setGpsMessage("Live GPS permission was blocked. Sending a backup location update.");
         sendSimulatedLocationFallback();
       },
       {
@@ -675,13 +679,15 @@ export default function PartnerApp() {
             >
               Send current location
             </button>
-            <button
-              onClick={sendSimulatedLocationFallback}
-              disabled={!hasActiveAssignment}
-              className="rounded-full bg-white/10 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              Demo fallback
-            </button>
+            {["unsupported", "blocked", "simulated"].includes(gpsStatus) ? (
+              <button
+                onClick={sendSimulatedLocationFallback}
+                disabled={!hasActiveAssignment}
+                className="rounded-full bg-white/10 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Send backup location
+              </button>
+            ) : null}
           </div>
           <p className="mt-3 text-xs text-white/40">
             Last update: {lastGpsAt ? new Date(lastGpsAt).toLocaleTimeString() : "Not sent yet"}
@@ -868,9 +874,28 @@ export default function PartnerApp() {
             disabled={!hasActiveAssignment}
             disabledReason="No active assignment"
             onClick={() => {
-              runAssignmentAction("Panic SOS", () => {
+              runAssignmentAction("Panic SOS", async () => {
                 trackCaretakerAction("panic_sos_triggered");
-                JourneyService.updateStatus("escalated");
+                if (isJourneyAssignment) {
+                  JourneyService.updateStatus("escalated");
+                }
+                await fetch("/api/emergency/escalate", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    action: "create",
+                    userId: activeBooking?.customerId || activeJourney?.customerId || session.uid,
+                    bookingId: activeBooking?.id || activeJourney?.id,
+                    reason: "Caretaker triggered Panic SOS from partner portal",
+                    locationLabel:
+                      activeBooking?.tracking?.destinationLabel ||
+                      activeJourney?.destinationLabel ||
+                      "Care location",
+                    severity: "critical"
+                  })
+                });
               });
             }}
           />

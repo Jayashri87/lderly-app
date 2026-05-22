@@ -258,6 +258,37 @@ export default function App() {
     ]);
   };
 
+  const triggerPanicSos = () => {
+    if (!session) {
+      return;
+    }
+
+    if (!activeBooking && !activeOffer) {
+      Alert.alert("No active request", "Go online or refresh assignments before sending Panic SOS.");
+      return;
+    }
+
+    Alert.alert("Send Panic SOS?", "This will alert LDERLY ops with the active booking context.", [
+      {
+        text: "Cancel",
+        style: "cancel"
+      },
+      {
+        text: "Send SOS",
+        style: "destructive",
+        onPress: () =>
+          run("Panic SOS", () =>
+            CaregiverApi.createEmergencyEscalation(
+              session,
+              currentBookingId,
+              "Caretaker triggered Panic SOS from partner app",
+              activeBooking?.tracking?.destinationLabel || activeOffer?.destinationLabel
+            )
+          )
+      }
+    ]);
+  };
+
   if (!session) {
     return (
       <SafeAreaView style={styles.screen}>
@@ -387,7 +418,7 @@ export default function App() {
           <SmallAction
             label="Panic SOS"
             danger
-            onPress={() => Alert.alert("Panic SOS", "Emergency escalation is ready for ops.")}
+            onPress={triggerPanicSos}
           />
           <SmallAction
             label="Sign out"
