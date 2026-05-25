@@ -116,16 +116,38 @@ export async function POST(request: NextRequest) {
 
   if (!idempotent.replayed) {
     const calendarResult = await GoogleWorkspaceProvider.createOpsCalendarEvent(result.booking);
+    const [opsSheetResult, dispatchSheetResult] = await Promise.all([
+      GoogleWorkspaceProvider.appendBookingToOpsSheet(result.booking, calendarResult),
+      GoogleWorkspaceProvider.appendDispatchToOpsSheet(result.booking)
+    ]);
     const database = getAdminDatabase();
 
     if (database) {
-      await database.ref(`bookings/byId/${result.booking.id}/integrations/googleCalendar`).update({
-        provider: "google_workspace",
-        status: calendarResult.ok ? "synced" : "not_synced",
-        updatedAt: Date.now(),
-        ...(calendarResult.ok
-          ? { eventId: calendarResult.id || "", eventUrl: calendarResult.url || "" }
-          : { error: calendarResult.error, httpStatus: calendarResult.status })
+      await database.ref(`bookings/byId/${result.booking.id}/integrations`).update({
+        googleCalendar: {
+          provider: "google_workspace",
+          status: calendarResult.ok ? "synced" : "not_synced",
+          updatedAt: Date.now(),
+          ...(calendarResult.ok
+            ? { eventId: calendarResult.id || "", eventUrl: calendarResult.url || "" }
+            : { error: calendarResult.error, httpStatus: calendarResult.status })
+        },
+        googleOpsSheet: {
+          provider: "google_workspace",
+          status: opsSheetResult.ok ? "synced" : "not_synced",
+          updatedAt: Date.now(),
+          ...(opsSheetResult.ok
+            ? { range: opsSheetResult.id || "", url: opsSheetResult.url || "" }
+            : { error: opsSheetResult.error, httpStatus: opsSheetResult.status })
+        },
+        googleDispatchSheet: {
+          provider: "google_workspace",
+          status: dispatchSheetResult.ok ? "synced" : "not_synced",
+          updatedAt: Date.now(),
+          ...(dispatchSheetResult.ok
+            ? { range: dispatchSheetResult.id || "", url: dispatchSheetResult.url || "" }
+            : { error: dispatchSheetResult.error, httpStatus: dispatchSheetResult.status })
+        }
       });
     }
   }

@@ -22,6 +22,52 @@ type MonthlyReportDocument = {
   }>;
 };
 
+type OpsSheetName =
+  | "Bookings"
+  | "Caregiver Dispatch"
+  | "Payments"
+  | "Escalations"
+  | "Feedback"
+  | "Reports";
+
+type PaymentSyncEvent = {
+  booking: CareBooking;
+  event: string;
+  provider?: string;
+  mode?: string;
+  orderId?: string;
+  paymentId?: string;
+  status?: string;
+  amount?: string | number;
+  actor?: string;
+};
+
+type EscalationSyncEvent = {
+  escalationId?: string;
+  bookingId?: string;
+  userId?: string;
+  action: string;
+  stage?: string;
+  severity?: string;
+  reason?: string;
+  locationLabel?: string;
+  status?: string;
+  actor?: string;
+  note?: string;
+};
+
+type FeedbackSyncEvent = {
+  complaintId?: string;
+  bookingId: string;
+  userId?: string;
+  caretakerId?: string;
+  type: string;
+  severity?: string;
+  summary: string;
+  status?: string;
+  actor?: string;
+};
+
 const scopes = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/calendar",
@@ -155,6 +201,66 @@ const replaceTokens = (text: string) =>
     "}}": ""
   }).reduce((result, [from, to]) => result.replaceAll(from, to), text);
 
+const spreadsheetIdForOps = () =>
+  process.env.GOOGLE_SHEETS_OPS_SPREADSHEET_ID?.trim() ||
+  process.env.GOOGLE_SHEETS_LEADS_SPREADSHEET_ID?.trim();
+
+const appendRows = async (
+  sheetName: OpsSheetName,
+  rows: unknown[][]
+): Promise<GoogleWorkspaceResult> => {
+  const spreadsheetId = spreadsheetIdForOps();
+
+  if (!spreadsheetId) {
+    return unavailable("GOOGLE_SHEETS_OPS_SPREADSHEET_ID");
+  }
+
+  const result = await googleFetch<{
+    updates?: { updatedRange?: string };
+  }>(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+      spreadsheetId
+    )}/values/${encodeURIComponent(`${sheetName}!A:Z`)}:append?valueInputOption=USER_ENTERED`,
+    {
+      method: "POST",
+      body: JSON.stringify({ values: rows.map((row) => row.map(sheetValue)) })
+    }
+  );
+
+  if (!result.ok) {
+    return { ok: false, provider: "google_workspace", status: result.status, error: result.error };
+  }
+
+  return {
+    ok: true,
+    provider: "google_workspace",
+    id: result.data.updates?.updatedRange,
+    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    details: { sheetName, updatedRange: result.data.updates?.updatedRange }
+  };
+};
+
+const bookingOpsRow = (
+  booking: CareBooking,
+  calendarResult?: GoogleWorkspaceResult
+) => [
+  new Date().toISOString(),
+  booking.id,
+  booking.customerId,
+  booking.customerName,
+  booking.serviceType,
+  booking.requestDetails?.careFor?.displayName || "",
+  booking.status,
+  eventDateTime(booking.scheduledFor),
+  booking.scheduleIndex?.zone || booking.matching?.zone || "",
+  booking.caretakerName || booking.caretakerId || "",
+  booking.payment?.status || "",
+  booking.payment?.estimatedTotal || booking.requestDetails?.pricing?.estimatedTotal || "",
+  booking.sla?.status || "",
+  calendarResult?.ok ? calendarResult.url || calendarResult.id || "" : "",
+  booking.notes || ""
+];
+
 export const GoogleWorkspaceProvider = {
   isConfigured() {
     return Boolean(getConfig());
@@ -168,6 +274,134 @@ export const GoogleWorkspaceProvider = {
       driveRootConfigured: hasValue(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID),
       monthlyReportTemplateConfigured: hasValue(process.env.GOOGLE_DOCS_MONTHLY_REPORT_TEMPLATE_ID)
     };
+  },
+
+  async appendBookingToOpsSheet(
+    booking: CareBooking,
+    calendarResult?: GoogleWorkspaceResult
+  ): Promise<GoogleWorkspaceResult> {
+    return appendRows("Bookings", [bookingOpsRow(booking, calendarResult)]);
+  },
+
+  async appendDispatchToOpsSheet(booking: CareBooking): Promise<GoogleWorkspaceResult> {
+    const offers = Object.values(booking.dispatch?.offers || {});
+
+    if (!offers.length) {
+      return appendRows("Caregiver Dispatch", [
+        [
+          new Date().toISOString(),
+          booking.id,
+          "",
+          booking.caretakerName || "Nearby caregivers notified",
+          booking.dispatch?.status || "manual_review",
+          "",
+          "",
+          "",
+          "",
+          "",
+          booking.dispatch?.status || "",
+          booking.dispatch?.candidateCount || 0
+        ]
+      ]);
+    }
+
+    return appendRows(
+      "Caregiver Dispatch",
+      offers.map((offer) => [
+        new Date().toISOString(),
+        booking.id,
+        offer.caretakerId,
+        offer.caretakerName,
+        offer.status,
+        offer.etaMinutes,
+        offer.distanceKm,
+        offer.score,
+        offer.notifiedAt ? new Date(offer.notifiedAt).toISOString() : "",
+        offer.respondedAt ? new Date(offer.respondedAt).toISOString() : "",
+        booking.dispatch?.status || "",
+        booking.dispatch?.candidateCount || 0
+      ])
+    );
+  },
+
+  async appendPaymentToOpsSheet(event: PaymentSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Payments", [
+      [
+        new Date().toISOString(),
+        event.booking.id,
+        event.event,
+        event.provider || "",
+        event.mode || "",
+        event.orderId || "",
+        event.paymentId || "",
+        event.status || event.booking.payment?.status || "",
+        event.amount || event.booking.payment?.estimatedTotal || "",
+        event.booking.customerId,
+        event.booking.serviceType,
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendEscalationToOpsSheet(event: EscalationSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Escalations", [
+      [
+        new Date().toISOString(),
+        event.escalationId || "",
+        event.bookingId || "",
+        event.userId || "",
+        event.action,
+        event.stage || "",
+        event.severity || "",
+        event.reason || "",
+        event.locationLabel || "",
+        event.status || "",
+        event.actor || "",
+        event.note || ""
+      ]
+    ]);
+  },
+
+  async appendFeedbackToOpsSheet(event: FeedbackSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Feedback", [
+      [
+        new Date().toISOString(),
+        event.complaintId || "",
+        event.bookingId,
+        event.userId || "",
+        event.caretakerId || "",
+        event.type,
+        event.severity || "",
+        event.summary,
+        event.status || "open",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendReportToOpsSheet(
+    report: MonthlyReportDocument,
+    event: string,
+    googleResult?: GoogleWorkspaceResult
+  ): Promise<GoogleWorkspaceResult> {
+    return appendRows("Reports", [
+      [
+        new Date().toISOString(),
+        report.id,
+        report.userId,
+        report.month,
+        event,
+        report.totalVisits,
+        report.wellnessSignal,
+        report.familyHeadline,
+        report.aiNarrative,
+        googleResult?.ok && googleResult.details && (googleResult.details as { mode?: string }).mode !== "sheet_fallback"
+          ? googleResult.url || ""
+          : "",
+        googleResult?.ok ? googleResult.url || "" : "",
+        googleResult?.ok ? "synced" : googleResult?.error || "not_synced"
+      ]
+    ]);
   },
 
   async appendLeadToSheet(lead: CustomerLead): Promise<GoogleWorkspaceResult> {

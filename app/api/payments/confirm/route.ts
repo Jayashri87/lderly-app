@@ -7,6 +7,7 @@ import {
   withMutationAudit
 } from "../../../../server/apiSecurity";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 import {
   hasRazorpayConfig,
   isMockPaymentConfirmationAllowed,
@@ -84,6 +85,16 @@ export async function POST(request: NextRequest) {
         )
     );
 
+    await GoogleWorkspaceProvider.appendPaymentToOpsSheet({
+      booking,
+      event: "payment_verification_failed",
+      provider: "razorpay",
+      orderId: body.razorpay_order_id,
+      paymentId: body.razorpay_payment_id,
+      status: "failed",
+      actor: auth.session.role
+    });
+
     return jsonError("Invalid Razorpay signature", 400);
   }
 
@@ -120,6 +131,18 @@ export async function POST(request: NextRequest) {
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  if (!idempotent.replayed) {
+    await GoogleWorkspaceProvider.appendPaymentToOpsSheet({
+      booking: result.booking,
+      event: "payment_confirmed",
+      provider: "razorpay",
+      orderId: body.razorpay_order_id,
+      paymentId: body.razorpay_payment_id,
+      status: "paid",
+      actor: auth.session.role
+    });
   }
 
   return NextResponse.json(

@@ -7,6 +7,7 @@ import {
   withMutationAudit
 } from "../../../../server/apiSecurity";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 import { createCheckout } from "../../../../server/paymentProvider";
 import { TrustedBooking } from "../../../../server/trustedBooking";
 import type { CareBooking } from "../../../../services/bookingService";
@@ -93,6 +94,17 @@ export async function POST(request: NextRequest) {
               : "Mock checkout created"
           )
       )
+
+      await GoogleWorkspaceProvider.appendPaymentToOpsSheet({
+        booking,
+        event: "checkout_created",
+        provider: checkout.provider,
+        mode: checkout.mode,
+        orderId: checkout.orderId,
+        status: "pending",
+        amount: booking.payment?.estimatedTotal || booking.requestDetails?.pricing?.estimatedTotal,
+        actor: auth.session.role
+      });
 
       return { ok: true as const, checkout };
     }

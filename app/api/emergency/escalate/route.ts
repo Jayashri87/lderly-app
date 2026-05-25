@@ -10,6 +10,7 @@ import {
   EmergencyEscalation,
   type EmergencyEscalationStage
 } from "../../../../server/emergencyEscalation";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 const stages: EmergencyEscalationStage[] = [
   "ambulance",
@@ -72,6 +73,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
+    await GoogleWorkspaceProvider.appendEscalationToOpsSheet({
+      escalationId: result.escalation.id,
+      bookingId: body.bookingId,
+      userId: body.userId || auth.session.uid,
+      action: "advance",
+      stage: body.stage,
+      severity: body.severity,
+      reason: body.reason,
+      status: result.escalation.status,
+      actor: auth.session.role,
+      note: body.note
+    });
+
     return NextResponse.json({ ok: true, escalation: result.escalation });
   }
 
@@ -112,6 +126,20 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendEscalationToOpsSheet({
+    escalationId: result.escalation.id,
+    bookingId: result.escalation.bookingId,
+    userId: result.escalation.userId,
+    action: "create",
+    stage: result.escalation.currentStage,
+    severity: result.escalation.severity,
+    reason: result.escalation.reason,
+    locationLabel: result.escalation.locationLabel,
+    status: result.escalation.status,
+    actor: auth.session.role,
+    note: body.note
+  });
 
   return NextResponse.json({ ok: true, escalation: result.escalation });
 }

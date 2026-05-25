@@ -81,6 +81,11 @@ export const MonthlyReportProvider = {
     };
 
     const googleDoc = await GoogleWorkspaceProvider.createMonthlyReportDoc(monthlyReport);
+    const googleReportLedger = await GoogleWorkspaceProvider.appendReportToOpsSheet(
+      monthlyReport,
+      "monthly_report_generated",
+      googleDoc
+    );
     const reportWithIntegrations = {
       ...monthlyReport,
       googleDocStatus: googleDoc.ok ? "synced" : "not_synced",
@@ -95,6 +100,14 @@ export const MonthlyReportProvider = {
             ? { docId: googleDoc.id || "", docUrl: googleDoc.url || "" }
             : { error: googleDoc.error, httpStatus: googleDoc.status })
         }
+      },
+      googleReportLedger: {
+        provider: "google_workspace",
+        status: googleReportLedger.ok ? "synced" : "not_synced",
+        updatedAt: Date.now(),
+        ...(googleReportLedger.ok
+          ? { range: googleReportLedger.id || "", url: googleReportLedger.url || "" }
+          : { error: googleReportLedger.error, httpStatus: googleReportLedger.status })
       }
     };
 
