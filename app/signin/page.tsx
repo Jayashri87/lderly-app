@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -150,16 +151,27 @@ export default function SignInPage() {
         >
           <p className="text-xs uppercase tracking-[0.32em] text-emerald-200">LDERLY</p>
           {!showLeadForm && !leadSubmitted ? (
-            <button
-              onClick={() => setShowLeadForm(true)}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur"
+              >
+                Customer login
+              </Link>
+              <button
+                onClick={() => setShowLeadForm(true)}
+                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur"
+              >
+                Skip
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
               className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur"
             >
-              Skip
-            </button>
-          ) : (
-            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur">
-              Family care
-            </span>
+              Customer login
+            </Link>
           )}
         </motion.header>
 
@@ -374,6 +386,12 @@ export default function SignInPage() {
                   <Phone className="h-5 w-5" />
                   Call now: {lderlyContactNumber}
                 </a>
+                <Link
+                  href="/login"
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-5 py-4 text-sm font-semibold text-[#06130f]"
+                >
+                  I already have customer login
+                </Link>
               </div>
             </div>
           ) : (
@@ -507,6 +525,13 @@ export default function SignInPage() {
                 <Phone className="h-5 w-5 text-emerald-700" />
                 Call us immediately
               </a>
+
+              <Link
+                href="/login"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-slate-100 px-5 py-4 font-semibold text-[#06130f]"
+              >
+                Already registered? Customer login
+              </Link>
 
               <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500">
                 <Clock3 className="h-4 w-4" />
