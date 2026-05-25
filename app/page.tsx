@@ -888,6 +888,7 @@ export default function CustomerApp() {
       window.localStorage.getItem(subscriptionKey) === "true"
   );
   const [paymentMessage, setPaymentMessage] = useState("");
+  const [paymentTermsBooking, setPaymentTermsBooking] = useState<CareBooking | null>(null);
   const [aiInsight, setAiInsight] = useState<AiReassuranceInsight | null>(null);
   const [caregiverTrust, setCaregiverTrust] = useState<CaregiverTrustProfile | null>(null);
   const [visitProof, setVisitProof] = useState<VisitProof | null>(null);
@@ -1404,6 +1405,48 @@ export default function CustomerApp() {
     return paymentVerified;
   };
 
+  const completePaidBookingFlow = () => {
+    window.localStorage.setItem(subscriptionKey, "true");
+    setCareSubscriptionStarted(true);
+    setBookingOpen(false);
+    setCareOnWay(true);
+
+    window.setTimeout(() => {
+      setCareOnWay(false);
+      selectTab("journey", "post_booking_auto_open");
+    }, 1600);
+  };
+
+  const acceptPaymentTermsAndPay = async () => {
+    if (!paymentTermsBooking) {
+      return;
+    }
+
+    const nextBooking = paymentTermsBooking;
+    setPaymentTermsBooking(null);
+    trackProductEvent("payment_terms_accepted", {
+      bookingId: nextBooking.id,
+      service: nextBooking.serviceType,
+      amount: nextBooking.payment.estimatedTotal
+    });
+
+    const paymentVerified = await openRazorpayCheckout(nextBooking);
+
+    if (paymentVerified) {
+      completePaidBookingFlow();
+    }
+  };
+
+  const requestPaymentWithTerms = (nextBooking: CareBooking) => {
+    setPaymentMessage("");
+    setPaymentTermsBooking(nextBooking);
+    trackProductEvent("payment_terms_presented", {
+      bookingId: nextBooking.id,
+      service: nextBooking.serviceType,
+      amount: nextBooking.payment.estimatedTotal
+    });
+  };
+
   const confirmBooking = async () => {
     if (!session) {
       router.replace("/signin");
@@ -1469,21 +1512,7 @@ export default function CustomerApp() {
       time: selectedTime.label,
       location: selectedLocation.label
     });
-    const checkoutStarted = await openRazorpayCheckout(nextBooking);
-
-    if (!checkoutStarted) {
-      return;
-    }
-
-    window.localStorage.setItem(subscriptionKey, "true");
-    setCareSubscriptionStarted(true);
-    setBookingOpen(false);
-    setCareOnWay(true);
-
-    window.setTimeout(() => {
-      setCareOnWay(false);
-      selectTab("journey", "post_booking_auto_open");
-    }, 1600);
+    requestPaymentWithTerms(nextBooking);
   };
 
   const verifyCareCompletion = async () => {
@@ -1636,6 +1665,22 @@ export default function CustomerApp() {
           </div>
         )}
 
+        <AnimatePresence>
+          {paymentTermsBooking && (
+            <PaymentTermsModal
+              booking={paymentTermsBooking}
+              onCancel={() => {
+                trackProductEvent("payment_terms_dismissed", {
+                  bookingId: paymentTermsBooking.id,
+                  service: paymentTermsBooking.serviceType
+                });
+                setPaymentTermsBooking(null);
+              }}
+              onAgree={acceptPaymentTermsAndPay}
+            />
+          )}
+        </AnimatePresence>
+
         <RealtimeCareStrip
           activeCare={Boolean(activeCare)}
           service={currentService}
@@ -1729,7 +1774,7 @@ export default function CustomerApp() {
                 journey={visibleJourney}
                 booking={visibleBooking}
                 onImmediate={requestImmediateCare}
-                onCompletePayment={() => visibleBooking && openRazorpayCheckout(visibleBooking)}
+                onCompletePayment={() => visibleBooking && requestPaymentWithTerms(visibleBooking)}
                 onVerifyCompletion={verifyCareCompletion}
                 onCancelCare={cancelActiveCare}
                 onRateCare={rateLatestCare}
@@ -3891,6 +3936,106 @@ function PaymentPendingCare({
         Contact LDERLY
       </button>
     </section>
+  );
+}
+
+function PaymentTermsModal({
+  booking,
+  onCancel,
+  onAgree
+}: {
+  booking: CareBooking;
+  onCancel: () => void;
+  onAgree: () => void;
+}) {
+  const [accepted, setAccepted] = useState(false);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-end bg-black/65 px-4 pb-4 backdrop-blur-sm sm:items-center sm:justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payment-terms-title"
+    >
+      <motion.section
+        className="w-full max-w-md rounded-[2rem] bg-white p-5 text-[#06130f] shadow-2xl"
+        initial={{ y: 32, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 32, opacity: 0 }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+            <ShieldCheck size={22} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              Payment agreement
+            </p>
+            <h2 id="payment-terms-title" className="mt-1 text-2xl font-semibold">
+              Review before payment
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              You are paying {booking.payment.estimatedTotal} for {cleanServiceName(booking.serviceType)}.
+              Care dispatch starts only after payment is verified.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3 text-sm text-slate-600">
+          {[
+            "Caregiver assignment, ETA, and visit tracking start after successful payment.",
+            "Cancellation and refund handling follows the LDERLY refund policy and depends on dispatch status.",
+            "Service starts only after customer OTP verification at the care location.",
+            "Emergency assistance coordinates support but does not replace hospital or ambulance emergency services.",
+            "Visit proof, caregiver notes, and payment records may be used for service verification and support."
+          ].map((item) => (
+            <div key={item} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+              <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} />
+              <p>{item}</p>
+            </div>
+          ))}
+        </div>
+
+        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(event) => setAccepted(event.target.checked)}
+            className="mt-1 h-5 w-5 rounded border-slate-300 accent-[#06130f]"
+          />
+          <span>
+            I agree to the{" "}
+            <Link href="/legal/terms" className="font-semibold text-[#06130f] underline">
+              Terms
+            </Link>
+            ,{" "}
+            <Link href="/legal/refunds" className="font-semibold text-[#06130f] underline">
+              Refund Policy
+            </Link>
+            , and payment authorization for this care request.
+          </span>
+        </label>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button
+            onClick={onCancel}
+            className="rounded-full bg-slate-100 px-4 py-4 font-semibold text-slate-700"
+          >
+            Not now
+          </button>
+          <button
+            onClick={onAgree}
+            disabled={!accepted}
+            className="rounded-full bg-[#06130f] px-4 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            Agree & pay
+          </button>
+        </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
