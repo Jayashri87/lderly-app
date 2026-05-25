@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   LockKeyhole,
+  Mail,
   Phone,
   ShieldCheck,
   UserRound
@@ -29,6 +30,7 @@ export default function CustomerLoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState("");
 
   const login = async () => {
@@ -75,6 +77,24 @@ export default function CustomerLoginPage() {
       setError("Could not connect. Please try again.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    setError("");
+    setGoogleBusy(true);
+
+    try {
+      await AuthService.continueWithGoogle("customer");
+      router.replace("/");
+    } catch (googleError) {
+      const message =
+        googleError instanceof Error && googleError.message.includes("popup-closed")
+          ? "Google login was closed before completion."
+          : "Google login is not available yet. Enable Google sign-in in Firebase and try again.";
+      setError(message);
+    } finally {
+      setGoogleBusy(false);
     }
   };
 
@@ -126,6 +146,24 @@ export default function CustomerLoginPage() {
           transition={{ delay: 0.08 }}
         >
           <Card className="rounded-[2rem] border-0 bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20">
+          <Button
+            onClick={loginWithGoogle}
+            disabled={googleBusy || busy}
+            variant="calm"
+            className="mb-5 w-full border border-slate-200 bg-white px-5 py-4 text-[#06130f] hover:bg-slate-50"
+          >
+            <Mail className="h-5 w-5 text-emerald-700" />
+            {googleBusy ? "Opening Google..." : "Continue with Gmail"}
+          </Button>
+
+          <div className="mb-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              or
+            </span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+
           <div className="space-y-4">
             <div>
               <Label className="flex items-center gap-2 text-slate-600">
