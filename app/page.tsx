@@ -934,6 +934,33 @@ export default function CustomerApp() {
       return;
     }
 
+    let cancelled = false;
+
+    fetch("/api/bookings", {
+      method: "GET",
+      cache: "no-store"
+    })
+      .then(async (response) => {
+        if (cancelled || response.status !== 401) {
+          return;
+        }
+
+        setPaymentMessage("Your session expired. Please sign in again.");
+        await AuthService.signOut();
+        router.replace("/signin");
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
     const customerSession: SessionUser = { ...session, role: "customer" };
     const unsubscribers = [
       JourneyService.subscribe(customerSession, setJourney),

@@ -32,6 +32,10 @@ const persistProductEvent = (
   properties: ProductEventProperties,
   bookingId?: string
 ) => {
+  if (window.localStorage.getItem("lderly-demo-session") === null) {
+    return;
+  }
+
   const payload = JSON.stringify({
     name,
     bookingId,
