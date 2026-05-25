@@ -336,6 +336,42 @@ type CustomerLeadSnapshot = {
   leads: CustomerLead[];
 };
 
+type GoogleSyncSnapshot = {
+  generatedAt: number;
+  readiness: {
+    configured: boolean;
+    sheetsLeadsConfigured: boolean;
+    calendarOpsConfigured: boolean;
+    driveRootConfigured: boolean;
+    monthlyReportTemplateConfigured: boolean;
+  };
+  totalRecent: number;
+  pendingRetries: number;
+  failedRecent: number;
+  syncedRecent: number;
+  resolvedRecent: number;
+  lastSyncedAt: number;
+  sheetUrl: string;
+  calendarId: string;
+  driveFolderUrl: string;
+  latestBySheet: Array<{
+    id: string;
+    sheetName: string;
+    status: string;
+    attempts: number;
+    updatedAt: number;
+    error: string;
+    url: string;
+  }>;
+  failed: Array<{
+    id: string;
+    sheetName: string;
+    attempts: number;
+    error: string;
+    updatedAt: number;
+  }>;
+};
+
 export default function OpsApp() {
   const router = useRouter();
   const [session, setSession] = useState<SessionUser | null>(null);
@@ -355,6 +391,8 @@ export default function OpsApp() {
   const [opsRecovery, setOpsRecovery] = useState<OpsRecoverySnapshot | null>(null);
   const [opsAudit, setOpsAudit] = useState<OpsAuditSnapshot | null>(null);
   const [leadSnapshot, setLeadSnapshot] = useState<CustomerLeadSnapshot | null>(null);
+  const [googleSync, setGoogleSync] = useState<GoogleSyncSnapshot | null>(null);
+  const [googleSyncBusy, setGoogleSyncBusy] = useState(false);
   const [aiOpsSummary, setAiOpsSummary] = useState<AiOpsSummary | null>(null);
   const [opsNow, setOpsNow] = useState(0);
   const [opsActionMessage, setOpsActionMessage] = useState("");
@@ -377,6 +415,15 @@ export default function OpsApp() {
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [session]);
+
+  const refreshGoogleSync = async () => {
+    const response = await fetch("/api/ops/google-sync-health");
+    const payload = response.ok
+      ? ((await response.json()) as { snapshot: GoogleSyncSnapshot })
+      : null;
+
+    setGoogleSync(payload?.snapshot || null);
+  };
 
   useEffect(() => {
     if (!session || session.role !== "admin") {
@@ -423,6 +470,7 @@ export default function OpsApp() {
           setLeadSnapshot(payload?.snapshot || null)
         )
         .catch(() => setLeadSnapshot(null));
+      refreshGoogleSync().catch(() => setGoogleSync(null));
     };
 
     refreshOps();
@@ -455,6 +503,36 @@ export default function OpsApp() {
       source: "ops_app"
     });
     setSession(admin);
+  };
+
+  const retryGoogleSync = async () => {
+    setGoogleSyncBusy(true);
+    setOpsActionMessage("Retrying failed Google Workspace sync rows...");
+
+    try {
+      const response = await fetch("/api/ops/google-sync-health", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ limit: 25 })
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setOpsActionMessage(payload?.error || "Google Workspace retry failed.");
+        return;
+      }
+
+      setOpsActionMessage(
+        `Google sync retry complete: ${payload.result?.resolved || 0} resolved, ${
+          payload.result?.failed || 0
+        } still failing.`
+      );
+      await refreshGoogleSync();
+    } finally {
+      setGoogleSyncBusy(false);
+    }
   };
 
   const runOpsWorkflow = async (
@@ -1474,6 +1552,146 @@ export default function OpsApp() {
                 description="These can be staged after launch if ops has manual fallback."
                 items={softDependencies}
               />
+            </div>
+          </section>
+        )}
+
+        {googleSync && (
+          <section className="mt-6 rounded-[2rem] bg-white/10 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-emerald-200">Google Workspace sync</p>
+                <h2 className="mt-2 text-2xl font-semibold">
+                  {googleSync.pendingRetries
+                    ? `${googleSync.pendingRetries} rows waiting for retry`
+                    : "Ops exports are synced"}
+                </h2>
+                <p className="mt-2 text-sm text-white/50">
+                  Bookings, dispatch, payments, support, risk, reports, and ops alerts are mirrored
+                  into Google Workspace with retry tracking.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="premium"
+                onClick={retryGoogleSync}
+                disabled={googleSyncBusy || googleSync.pendingRetries === 0}
+                className="shrink-0"
+              >
+                <RotateCcw className={`h-4 w-4 ${googleSyncBusy ? "animate-spin" : ""}`} />
+                Retry failed syncs
+              </Button>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <StatusPill label="Google auth" ready={googleSync.readiness.configured} />
+              <StatusPill label="Sheets" ready={googleSync.readiness.sheetsLeadsConfigured} />
+              <StatusPill label="Calendar" ready={googleSync.readiness.calendarOpsConfigured} />
+              <StatusPill label="Drive" ready={googleSync.readiness.driveRootConfigured} />
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-xs text-white/45">Last synced</p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  {googleSync.lastSyncedAt
+                    ? new Date(googleSync.lastSyncedAt).toLocaleString()
+                    : "No successful sync yet"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-xs text-white/45">Recent synced</p>
+                <p className="mt-1 text-lg font-semibold text-emerald-200">
+                  {googleSync.syncedRecent + googleSync.resolvedRecent}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-xs text-white/45">Recent failures</p>
+                <p className="mt-1 text-lg font-semibold text-amber-200">
+                  {googleSync.failedRecent}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-xs text-white/45">Recent records</p>
+                <p className="mt-1 text-lg font-semibold text-white">{googleSync.totalRecent}</p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {googleSync.sheetUrl && (
+                <a
+                  href={googleSync.sheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#071018]"
+                >
+                  Open ops sheet
+                </a>
+              )}
+              {googleSync.driveFolderUrl && (
+                <a
+                  href={googleSync.driveFolderUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Open care drive
+                </a>
+              )}
+              {googleSync.calendarId && (
+                <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white/60">
+                  Calendar: {googleSync.calendarId}
+                </span>
+              )}
+            </div>
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-3xl bg-white/10 p-4">
+                <p className="text-sm font-semibold text-white/70">Latest synced surfaces</p>
+                <div className="mt-3 space-y-2">
+                  {googleSync.latestBySheet.slice(0, 6).map((record) => (
+                    <div
+                      key={record.id}
+                      className="flex items-start justify-between gap-3 rounded-2xl bg-white/10 p-3 text-sm"
+                    >
+                      <div>
+                        <p className="font-semibold">{record.sheetName}</p>
+                        <p className="mt-1 text-xs text-white/45">
+                          {record.status} - {record.attempts} attempt
+                          {record.attempts === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          record.status === "failed"
+                            ? "bg-amber-300 text-[#071018]"
+                            : "bg-emerald-300 text-[#071018]"
+                        }`}
+                      >
+                        {record.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-3xl bg-white/10 p-4">
+                <p className="text-sm font-semibold text-white/70">Retry queue</p>
+                <div className="mt-3 space-y-2">
+                  {googleSync.failed.length ? (
+                    googleSync.failed.slice(0, 5).map((record) => (
+                      <div key={record.id} className="rounded-2xl bg-amber-300/10 p-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-semibold text-amber-100">{record.sheetName}</p>
+                          <span className="rounded-full bg-amber-300 px-2 py-1 text-[11px] font-semibold text-[#071018]">
+                            {record.attempts} attempts
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-white/55">{record.error}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl bg-white/10 p-3 text-sm text-white/55">
+                      No failed Google Workspace rows are waiting.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         )}

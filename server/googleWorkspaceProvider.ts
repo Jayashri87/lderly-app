@@ -1,10 +1,12 @@
 import { GoogleAuth } from "google-auth-library";
 import type { CareBooking } from "../services/bookingService";
 import type { CustomerLead } from "./customerLeadProvider";
+import { getAdminDatabase } from "./firebaseAdmin";
 
 type GoogleWorkspaceResult =
   | { ok: true; provider: "google_workspace"; id?: string; url?: string; details?: unknown }
   | { ok: false; provider: "google_workspace"; status: number; error: string };
+type GoogleWorkspaceFailure = Extract<GoogleWorkspaceResult, { ok: false }>;
 
 type MonthlyReportDocument = {
   id: string;
@@ -230,6 +232,23 @@ type OpsAlertSyncEvent = {
   status?: string;
 };
 
+type GoogleSyncLedgerStatus = "synced" | "failed" | "retrying" | "resolved";
+
+type GoogleSyncRecord = {
+  id: string;
+  sheetName: OpsSheetName;
+  rows: unknown[][];
+  status: GoogleSyncLedgerStatus;
+  attempts: number;
+  range?: string;
+  url?: string;
+  error?: string;
+  httpStatus?: number;
+  createdAt: number;
+  updatedAt: number;
+  lastAttemptAt: number;
+};
+
 const scopes = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/calendar",
@@ -254,7 +273,7 @@ const getConfig = () => {
   return { clientEmail, privateKey, projectId };
 };
 
-const unavailable = (missing: string): GoogleWorkspaceResult => ({
+const unavailable = (missing: string): GoogleWorkspaceFailure => ({
   ok: false,
   provider: "google_workspace",
   status: 501,
@@ -367,14 +386,77 @@ const spreadsheetIdForOps = () =>
   process.env.GOOGLE_SHEETS_OPS_SPREADSHEET_ID?.trim() ||
   process.env.GOOGLE_SHEETS_LEADS_SPREADSHEET_ID?.trim();
 
+const syncRecordId = () => `google-sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const firebaseKeyFor = (value: string) => value.replace(/[.#$/[\]]/g, "_");
+
+const writeSyncRecord = async (
+  record: Omit<GoogleSyncRecord, "id" | "createdAt" | "updatedAt" | "lastAttemptAt"> & {
+    id?: string;
+    createdAt?: number;
+  }
+) => {
+  const database = getAdminDatabase();
+
+  if (!database) {
+    return "";
+  }
+
+  const timestamp = Date.now();
+  const id = record.id || syncRecordId();
+  const payload: GoogleSyncRecord = {
+    ...record,
+    id,
+    createdAt: record.createdAt || timestamp,
+    updatedAt: timestamp,
+    lastAttemptAt: timestamp
+  };
+  const updates: Record<string, unknown> = {
+    [`operations/googleSync/byId/${id}`]: payload,
+    [`operations/googleSync/byStatus/${payload.status}/${id}`]: true,
+    [`operations/googleSync/latest/${firebaseKeyFor(payload.sheetName)}`]: payload
+  };
+
+  (["synced", "failed", "retrying", "resolved"] as GoogleSyncLedgerStatus[])
+    .filter((status) => status !== payload.status)
+    .forEach((status) => {
+      updates[`operations/googleSync/byStatus/${status}/${id}`] = null;
+    });
+
+  if (payload.status === "failed") {
+    updates[`operations/googleSyncQueue/pending/${id}`] = true;
+  } else {
+    updates[`operations/googleSyncQueue/pending/${id}`] = null;
+  }
+
+  await database.ref().update(updates);
+  return id;
+};
+
 const appendRows = async (
   sheetName: OpsSheetName,
-  rows: unknown[][]
+  rows: unknown[][],
+  options: { queueOnFailure?: boolean; existingRecord?: GoogleSyncRecord } = {}
 ): Promise<GoogleWorkspaceResult> => {
   const spreadsheetId = spreadsheetIdForOps();
+  const queueOnFailure = options.queueOnFailure !== false;
 
   if (!spreadsheetId) {
-    return unavailable("GOOGLE_SHEETS_OPS_SPREADSHEET_ID");
+    const result = unavailable("GOOGLE_SHEETS_OPS_SPREADSHEET_ID");
+
+    if (queueOnFailure) {
+      await writeSyncRecord({
+        sheetName,
+        rows,
+        status: "failed",
+        attempts: (options.existingRecord?.attempts || 0) + 1,
+        error: result.error,
+        httpStatus: result.status,
+        id: options.existingRecord?.id,
+        createdAt: options.existingRecord?.createdAt
+      });
+    }
+
+    return result;
   }
 
   const result = await googleFetch<{
@@ -390,8 +472,32 @@ const appendRows = async (
   );
 
   if (!result.ok) {
+    if (queueOnFailure) {
+      await writeSyncRecord({
+        sheetName,
+        rows,
+        status: "failed",
+        attempts: (options.existingRecord?.attempts || 0) + 1,
+        error: result.error,
+        httpStatus: result.status,
+        id: options.existingRecord?.id,
+        createdAt: options.existingRecord?.createdAt
+      });
+    }
+
     return { ok: false, provider: "google_workspace", status: result.status, error: result.error };
   }
+
+  await writeSyncRecord({
+    sheetName,
+    rows,
+    status: options.existingRecord ? "resolved" : "synced",
+    attempts: (options.existingRecord?.attempts || 0) + 1,
+    range: result.data.updates?.updatedRange,
+    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    id: options.existingRecord?.id,
+    createdAt: options.existingRecord?.createdAt
+  });
 
   return {
     ok: true,
@@ -435,6 +541,134 @@ export const GoogleWorkspaceProvider = {
       calendarOpsConfigured: hasValue(process.env.GOOGLE_CALENDAR_OPS_CALENDAR_ID),
       driveRootConfigured: hasValue(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID),
       monthlyReportTemplateConfigured: hasValue(process.env.GOOGLE_DOCS_MONTHLY_REPORT_TEMPLATE_ID)
+    };
+  },
+
+  async getSyncHealth() {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const [byIdSnapshot, pendingSnapshot, latestSnapshot] = await Promise.all([
+      database.ref("operations/googleSync/byId").limitToLast(200).get(),
+      database.ref("operations/googleSyncQueue/pending").get(),
+      database.ref("operations/googleSync/latest").get()
+    ]);
+    const records = Object.values(
+      (byIdSnapshot.val() || {}) as Record<string, GoogleSyncRecord>
+    ).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const pendingIds = Object.keys((pendingSnapshot.val() || {}) as Record<string, boolean>);
+    const latestBySheet = Object.values(
+      (latestSnapshot.val() || {}) as Record<string, GoogleSyncRecord>
+    ).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const failed = records.filter((record) => record.status === "failed");
+
+    return {
+      ok: true as const,
+      snapshot: {
+        generatedAt: Date.now(),
+        readiness: this.readiness(),
+        totalRecent: records.length,
+        pendingRetries: pendingIds.length,
+        failedRecent: failed.length,
+        syncedRecent: records.filter((record) => record.status === "synced").length,
+        resolvedRecent: records.filter((record) => record.status === "resolved").length,
+        lastSyncedAt:
+          records.find((record) => record.status === "synced" || record.status === "resolved")
+            ?.updatedAt || 0,
+        sheetUrl: spreadsheetIdForOps()
+          ? `https://docs.google.com/spreadsheets/d/${spreadsheetIdForOps()}/edit`
+          : "",
+        calendarId: process.env.GOOGLE_CALENDAR_OPS_CALENDAR_ID || "",
+        driveFolderUrl: process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID
+          ? `https://drive.google.com/drive/folders/${process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID}`
+          : "",
+        latestBySheet: latestBySheet.slice(0, 24).map((record) => ({
+          id: record.id,
+          sheetName: record.sheetName,
+          status: record.status,
+          attempts: record.attempts,
+          updatedAt: record.updatedAt,
+          error: record.error || "",
+          url: record.url || ""
+        })),
+        failed: failed.slice(0, 25).map((record) => ({
+          id: record.id,
+          sheetName: record.sheetName,
+          attempts: record.attempts,
+          error: record.error || "",
+          updatedAt: record.updatedAt
+        }))
+      }
+    };
+  },
+
+  async retryFailedSyncs({ limit = 20 }: { limit?: number } = {}) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return { ok: false as const, status: 503, error: "Firebase Admin is not configured" };
+    }
+
+    const pendingSnapshot = await database.ref("operations/googleSyncQueue/pending").get();
+    const pendingIds = Object.keys((pendingSnapshot.val() || {}) as Record<string, boolean>).slice(
+      0,
+      limit
+    );
+    const results = [];
+
+    for (const id of pendingIds) {
+      const recordSnapshot = await database.ref(`operations/googleSync/byId/${id}`).get();
+      const record = recordSnapshot.val() as GoogleSyncRecord | null;
+
+      if (!record) {
+        await database.ref(`operations/googleSyncQueue/pending/${id}`).remove();
+        continue;
+      }
+
+      await database.ref(`operations/googleSync/byId/${id}`).update({
+        status: "retrying",
+        updatedAt: Date.now()
+      });
+
+      const result = await appendRows(record.sheetName, record.rows, {
+        queueOnFailure: false,
+        existingRecord: record
+      });
+
+      if (!result.ok) {
+        await writeSyncRecord({
+          id: record.id,
+          createdAt: record.createdAt,
+          sheetName: record.sheetName,
+          rows: record.rows,
+          status: "failed",
+          attempts: (record.attempts || 0) + 1,
+          error: result.error,
+          httpStatus: result.status,
+          range: record.range,
+          url: record.url
+        });
+      }
+
+      results.push({
+        id,
+        sheetName: record.sheetName,
+        ok: result.ok,
+        error: result.ok ? "" : result.error
+      });
+    }
+
+    return {
+      ok: true as const,
+      result: {
+        attempted: results.length,
+        resolved: results.filter((item) => item.ok).length,
+        failed: results.filter((item) => !item.ok).length,
+        results
+      }
     };
   },
 
