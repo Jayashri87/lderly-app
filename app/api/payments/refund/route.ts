@@ -5,6 +5,7 @@ import {
   requireApiSession,
   withMutationAudit
 } from "../../../../server/apiSecurity";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 import { OpsReliability } from "../../../../server/opsReliability";
 
 export async function POST(request: NextRequest) {
@@ -42,6 +43,17 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendRefundToOpsSheet({
+    refundId: result.refund.id,
+    bookingId: result.refund.bookingId,
+    userId: result.refund.userId,
+    paymentId: result.refund.paymentId,
+    amountPaise: result.refund.amountPaise,
+    reason: result.refund.reason,
+    status: result.refund.status,
+    actor: auth.session.role
+  });
 
   return NextResponse.json({ refund: result.refund });
 }

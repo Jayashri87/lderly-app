@@ -28,7 +28,12 @@ type OpsSheetName =
   | "Payments"
   | "Escalations"
   | "Feedback"
-  | "Reports";
+  | "Reports"
+  | "Support Tickets"
+  | "Refunds"
+  | "Invoices"
+  | "Caregiver Attendance"
+  | "Care Risk";
 
 type PaymentSyncEvent = {
   booking: CareBooking;
@@ -66,6 +71,70 @@ type FeedbackSyncEvent = {
   summary: string;
   status?: string;
   actor?: string;
+};
+
+type SupportTicketSyncEvent = {
+  ticketId?: string;
+  bookingId: string;
+  userId?: string;
+  category: string;
+  priority?: string;
+  subject: string;
+  description: string;
+  status?: string;
+  actor?: string;
+};
+
+type RefundSyncEvent = {
+  refundId?: string;
+  bookingId: string;
+  userId?: string;
+  paymentId?: string;
+  amountPaise?: number;
+  reason?: string;
+  status?: string;
+  actor?: string;
+};
+
+type InvoiceSyncEvent = {
+  invoiceId?: string;
+  bookingId: string;
+  userId?: string;
+  billTo?: string;
+  gstin?: string;
+  paymentId?: string;
+  taxableAmount?: number;
+  gstAmount?: number;
+  totalAmount?: number;
+  status?: string;
+  pdfStatus?: string;
+};
+
+type AttendanceSyncEvent = {
+  shiftId?: string;
+  caretakerId: string;
+  action: string;
+  lat?: number;
+  lng?: number;
+  accuracyMeters?: number;
+  note?: string;
+  status?: string;
+  actor?: string;
+};
+
+type CareRiskSyncEvent = {
+  userId: string;
+  recipientName?: string;
+  relationship?: string;
+  riskScore?: number;
+  riskLevel?: string;
+  fallRisk?: string;
+  medicationRisk?: string;
+  vitalsRisk?: string;
+  emergencyReadinessScore?: number;
+  openIncidents?: number;
+  signals?: string[];
+  recommendations?: string[];
 };
 
 const scopes = [
@@ -375,6 +444,95 @@ export const GoogleWorkspaceProvider = {
         event.summary,
         event.status || "open",
         event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendSupportTicketToOpsSheet(event: SupportTicketSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Support Tickets", [
+      [
+        new Date().toISOString(),
+        event.ticketId || "",
+        event.bookingId,
+        event.userId || "",
+        event.category,
+        event.priority || "normal",
+        event.subject,
+        event.description,
+        event.status || "open",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendRefundToOpsSheet(event: RefundSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Refunds", [
+      [
+        new Date().toISOString(),
+        event.refundId || "",
+        event.bookingId,
+        event.userId || "",
+        event.paymentId || "",
+        event.amountPaise || 0,
+        event.reason || "",
+        event.status || "requested",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendInvoiceToOpsSheet(event: InvoiceSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Invoices", [
+      [
+        new Date().toISOString(),
+        event.invoiceId || "",
+        event.bookingId,
+        event.userId || "",
+        event.billTo || "",
+        event.gstin || "",
+        event.paymentId || "",
+        event.taxableAmount || 0,
+        event.gstAmount || 0,
+        event.totalAmount || 0,
+        event.status || "",
+        event.pdfStatus || ""
+      ]
+    ]);
+  },
+
+  async appendAttendanceToOpsSheet(event: AttendanceSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Caregiver Attendance", [
+      [
+        new Date().toISOString(),
+        event.shiftId || "",
+        event.caretakerId,
+        event.action,
+        event.status || "",
+        event.lat || "",
+        event.lng || "",
+        event.accuracyMeters || "",
+        event.note || "",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendCareRiskToOpsSheet(event: CareRiskSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Care Risk", [
+      [
+        new Date().toISOString(),
+        event.userId,
+        event.recipientName || "",
+        event.relationship || "",
+        event.riskScore || 0,
+        event.riskLevel || "",
+        event.fallRisk || "",
+        event.medicationRisk || "",
+        event.vitalsRisk || "",
+        event.emergencyReadinessScore || 0,
+        event.openIncidents || 0,
+        (event.signals || []).join(" | "),
+        (event.recommendations || []).join(" | ")
       ]
     ]);
   },

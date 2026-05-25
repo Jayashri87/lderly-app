@@ -7,6 +7,7 @@ import {
   withMutationAudit
 } from "../../../../server/apiSecurity";
 import { FinanceProvider } from "../../../../server/financeProvider";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiSession(request, ["admin", "customer"], { rateLimit: 40 });
@@ -46,6 +47,20 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendInvoiceToOpsSheet({
+    invoiceId: result.invoice.id,
+    bookingId: result.invoice.bookingId,
+    userId: result.invoice.userId,
+    billTo: result.invoice.billTo,
+    gstin: result.invoice.gstin,
+    paymentId: result.invoice.paymentId,
+    taxableAmount: result.invoice.taxableAmount,
+    gstAmount: result.invoice.gstAmount,
+    totalAmount: result.invoice.totalAmount,
+    status: result.invoice.status,
+    pdfStatus: result.invoice.pdfStatus
+  });
 
   return NextResponse.json({ ok: true, invoice: result.invoice });
 }

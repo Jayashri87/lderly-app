@@ -5,6 +5,7 @@ import {
   requireApiSession,
   withMutationAudit
 } from "../../../../server/apiSecurity";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 import { OpsReliability, SupportTicket } from "../../../../server/opsReliability";
 
 export async function POST(request: NextRequest) {
@@ -48,6 +49,18 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendSupportTicketToOpsSheet({
+    ticketId: result.ticket.id,
+    bookingId: result.ticket.bookingId,
+    userId: result.ticket.userId,
+    category: result.ticket.category,
+    priority: result.ticket.priority,
+    subject: result.ticket.subject,
+    description: result.ticket.description,
+    status: result.ticket.status,
+    actor: auth.session.role
+  });
 
   return NextResponse.json({ ticket: result.ticket });
 }

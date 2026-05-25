@@ -9,6 +9,7 @@ import {
   CaretakerAttendance,
   type AttendanceAction
 } from "../../../../server/caretakerAttendance";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 const actions: AttendanceAction[] = [
   "break_end",
@@ -73,6 +74,18 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendAttendanceToOpsSheet({
+    shiftId: result.shift.id,
+    caretakerId: result.shift.caretakerId,
+    action: result.shift.action,
+    lat: body.lat,
+    lng: body.lng,
+    accuracyMeters: body.accuracyMeters,
+    note: body.note,
+    status: result.shift.action,
+    actor: auth.session.role
+  });
 
   return NextResponse.json({ ok: true, shift: result.shift });
 }

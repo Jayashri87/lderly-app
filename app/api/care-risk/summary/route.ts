@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isNonEmptyString, requireApiSession } from "../../../../server/apiSecurity";
 import { CareRiskProvider } from "../../../../server/careRiskProvider";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiSession(request, ["admin", "caretaker", "customer"], {
@@ -24,6 +25,21 @@ export async function GET(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendCareRiskToOpsSheet({
+    userId: result.summary.userId,
+    recipientName: result.summary.recipientName,
+    relationship,
+    riskScore: result.summary.riskScore,
+    riskLevel: result.summary.riskLevel,
+    fallRisk: result.summary.fallRisk,
+    medicationRisk: result.summary.medicationRisk,
+    vitalsRisk: result.summary.vitalsRisk,
+    emergencyReadinessScore: result.summary.emergencyReadinessScore,
+    openIncidents: result.summary.openIncidents,
+    signals: result.summary.riskSignals,
+    recommendations: result.summary.recommendations
+  });
 
   return NextResponse.json({ summary: result.summary });
 }
