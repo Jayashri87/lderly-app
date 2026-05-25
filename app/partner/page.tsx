@@ -141,7 +141,18 @@ export default function PartnerApp() {
       return;
     }
 
-    const partner = await AuthService.continueAs("caretaker");
+    const payload = (await response.json()) as {
+      uid?: string;
+      name?: string;
+      role?: "caretaker";
+    };
+    const partner = AuthService.storeSignedSession({
+      uid: payload.uid || "demo-caretaker",
+      name: payload.name || "Anita",
+      role: "caretaker",
+      authMode: "demo"
+    });
+    CaretakerService.seedDefaults();
     trackProductEvent("caretaker_login_success", {
       source: "partner_app"
     });
@@ -207,7 +218,7 @@ export default function PartnerApp() {
   );
   const checklistDone = completionChecklist.every((item) => completedChecklist[item]);
 
-  const completeBooking = () => {
+  const completeBooking = async () => {
     if (!checklistDone) {
       setActionMessage("Complete the service checklist before checkout.");
       return;
@@ -218,7 +229,7 @@ export default function PartnerApp() {
       service: activeBooking?.serviceType,
       source: "booking"
     });
-    BookingService.updateStatus("completed");
+    await BookingService.updateStatus("completed");
     ReportService.createFromBooking(activeBooking, health);
   };
 
@@ -275,7 +286,7 @@ export default function PartnerApp() {
           ? "Complete checklist first"
           : "";
 
-  const runAssignmentAction = async (label: string, action: () => void | Promise<void>) => {
+  const runAssignmentAction = async (label: string, action: () => unknown | Promise<unknown>) => {
     setActionMessage("");
 
     if (!hasActiveAssignment) {
@@ -831,8 +842,7 @@ export default function PartnerApp() {
               runAssignmentAction("Visit started", () => {
                 trackCaretakerAction("visit_started");
                 if (isBookingAssignment) {
-                  BookingService.startWithCustomerOtp(customerStartOtp);
-                  return;
+                  return BookingService.startWithCustomerOtp(customerStartOtp);
                 }
                 return isJourneyAssignment
                   ? JourneyService.updateStatus("arrived")

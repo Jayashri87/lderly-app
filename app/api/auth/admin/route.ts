@@ -46,7 +46,12 @@ export async function POST(request: NextRequest) {
   const signedUsername = expectedUsername!;
   const sessionId = createSessionId();
   const response = attachRoleSession(
-    NextResponse.json({ ok: true, role: "admin" }),
+    NextResponse.json({
+      ok: true,
+      role: "admin",
+      uid: "demo-admin",
+      name: "Admin"
+    }),
     "admin",
     signedUsername,
     "demo-admin",

@@ -497,7 +497,17 @@ export default function OpsApp() {
       return;
     }
 
-    const admin = await AuthService.continueAs("admin");
+    const payload = (await response.json()) as {
+      uid?: string;
+      name?: string;
+      role?: "admin";
+    };
+    const admin = AuthService.storeSignedSession({
+      uid: payload.uid || "demo-admin",
+      name: payload.name || "Admin",
+      role: "admin",
+      authMode: "demo"
+    });
     CaretakerService.seedDefaults();
     trackProductEvent("ops_login_success", {
       source: "ops_app"

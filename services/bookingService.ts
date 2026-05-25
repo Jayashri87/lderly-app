@@ -710,14 +710,34 @@ const postTrustedBookingAction = async (
       body: JSON.stringify(body)
     });
 
+    const payload = (await response.json().catch(() => null)) as {
+      booking?: CareBooking;
+      error?: string;
+    } | null;
+
     if (!response.ok) {
-      return null;
+      return {
+        ok: false as const,
+        status: response.status,
+        error: payload?.error || "Booking action failed"
+      };
     }
 
-    return (await response.json()) as { booking?: CareBooking };
+    return { ok: true as const, booking: payload?.booking };
   } catch {
-    return null;
+    return { ok: false as const, status: 0, error: "Network error" };
   }
+};
+
+const confirmedBookingAction = async (path: string, body: Record<string, unknown>) => {
+  const result = await postTrustedBookingAction(path, body);
+
+  if (!result?.ok || !result.booking) {
+    throw new Error(result?.error || "Booking action was not confirmed by the backend");
+  }
+
+  writeLocalBooking(enrichBooking(result.booking));
+  return result.booking;
 };
 
 const fetchTrustedActiveBooking = async (bookingId?: string) => {
@@ -1000,11 +1020,7 @@ export const BookingService = {
     };
 
     saveBooking(booking);
-    postTrustedBookingAction("/api/bookings", { booking }).then((result) => {
-      if (result?.booking) {
-        writeLocalBooking(enrichBooking(result.booking));
-      }
-    });
+    // Booking creation is persisted explicitly by the customer confirmation flow.
     NotificationService.create({
       userId: session.uid,
       role: "admin",
@@ -1031,7 +1047,7 @@ export const BookingService = {
   async persistBooking(booking: CareBooking) {
     const result = await postTrustedBookingAction("/api/bookings", { booking });
 
-    if (result?.booking) {
+    if (result?.ok && result.booking) {
       writeLocalBooking(enrichBooking(result.booking));
       return result.booking;
     }
@@ -1058,7 +1074,7 @@ export const BookingService = {
       {}
     );
 
-    if (trustedResult?.booking) {
+    if (trustedResult?.ok && trustedResult.booking) {
       writeLocalBooking(enrichBooking(trustedResult.booking));
       NotificationService.create({
         userId: trustedResult.booking.customerId,
@@ -1105,48 +1121,34 @@ export const BookingService = {
     });
   },
 
-  acceptDispatchOffer() {
+  async acceptDispatchOffer() {
     const booking = readLocalBooking();
 
-    postTrustedBookingAction(
+    return confirmedBookingAction(
       `/api/bookings/${encodeURIComponent(booking.id)}/accept`,
       {}
-    ).then((result) => {
-      if (result?.booking) {
-        writeLocalBooking(enrichBooking(result.booking));
-      }
-    });
+    );
   },
 
   startWithCustomerOtp(otp: string) {
     const booking = readLocalBooking();
 
-    return postTrustedBookingAction(
+    return confirmedBookingAction(
       `/api/bookings/${encodeURIComponent(booking.id)}/start`,
       { otp }
-    ).then((result) => {
-      if (result?.booking) {
-        writeLocalBooking(enrichBooking(result.booking));
-      }
-      return result;
-    });
+    );
   },
 
   verifyCompletion(approved = true, note = "") {
     const booking = readLocalBooking();
 
-    return postTrustedBookingAction(
+    return confirmedBookingAction(
       `/api/bookings/${encodeURIComponent(booking.id)}/verify-completion`,
       { approved, note }
-    ).then((result) => {
-      if (result?.booking) {
-        writeLocalBooking(enrichBooking(result.booking));
-      }
-      return result;
-    });
+    );
   },
 
-  updateStatus(status: BookingStatus, actor: SessionUser["role"] | "system" = "system") {
+  async updateStatus(status: BookingStatus, actor: SessionUser["role"] | "system" = "system") {
     const currentBooking = readLocalBooking();
 
     if (!canTransition(currentBooking.status, status) && currentBooking.status !== status) {
@@ -1157,18 +1159,15 @@ export const BookingService = {
         body: `Cannot move booking from ${currentBooking.status} to ${status}.`,
         priority: "urgent"
       });
-      return;
+      throw new Error(`Cannot move booking from ${currentBooking.status} to ${status}`);
     }
 
-    postTrustedBookingAction(
-      `/api/bookings/${encodeURIComponent(currentBooking.id)}/status`,
-      { status }
-    ).then((result) => {
-      if (result?.booking) {
-        writeLocalBooking(enrichBooking(result.booking));
-        return;
-      }
-
+    try {
+      await confirmedBookingAction(
+        `/api/bookings/${encodeURIComponent(currentBooking.id)}/status`,
+        { status }
+      );
+    } catch (error) {
       if (!allowLocalFallback()) {
         NotificationService.create({
           userId: currentBooking.customerId,
@@ -1177,7 +1176,7 @@ export const BookingService = {
           body: "The backend did not confirm this care status change.",
           priority: "urgent"
         });
-        return;
+        throw error;
       }
 
       patchBooking(
@@ -1187,7 +1186,7 @@ export const BookingService = {
         statusLabel[status],
         actor
       );
-    });
+    }
     NotificationService.create({
       userId: readLocalBooking().customerId,
       role: "all",
@@ -1197,20 +1196,17 @@ export const BookingService = {
     });
   },
 
-  cancelBooking(
+  async cancelBooking(
     reason = "Customer requested cancellation",
     actor: "customer" | "caretaker" | "admin" | "system" = "customer"
   ) {
     const booking = readLocalBooking();
-    postTrustedBookingAction(
-      `/api/bookings/${encodeURIComponent(booking.id)}/cancel`,
-      { reason }
-    ).then((result) => {
-      if (result?.booking) {
-        writeLocalBooking(enrichBooking(result.booking));
-        return;
-      }
-
+    try {
+      return await confirmedBookingAction(
+        `/api/bookings/${encodeURIComponent(booking.id)}/cancel`,
+        { reason }
+      );
+    } catch (error) {
       if (!allowLocalFallback()) {
         NotificationService.create({
           userId: booking.customerId,
@@ -1219,7 +1215,7 @@ export const BookingService = {
           body: "The backend did not confirm this cancellation.",
           priority: "urgent"
         });
-        return;
+        throw error;
       }
 
       patchBooking(
@@ -1236,16 +1232,17 @@ export const BookingService = {
         "Booking cancelled",
         actor
       );
-    });
+      return readLocalBooking();
+    }
   },
 
   rateBooking(score: number, note = "Care completed well") {
     const booking = readLocalBooking();
-    postTrustedBookingAction(
+    return postTrustedBookingAction(
       `/api/bookings/${encodeURIComponent(booking.id)}/rating`,
       { score, note }
     ).then((result) => {
-      if (result?.booking) {
+      if (result?.ok && result.booking) {
         writeLocalBooking(enrichBooking(result.booking));
         return;
       }

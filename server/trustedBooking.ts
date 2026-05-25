@@ -234,8 +234,8 @@ const dispatchCandidatesFor = (
   booking: CareBooking,
   caretakers: CaretakerMatchProfile[],
   excludedCaretakerId = ""
-) =>
-  availableCaretakersFor(caretakers, excludedCaretakerId)
+) => {
+  const scored = availableCaretakersFor(caretakers, excludedCaretakerId)
     .map((caretaker) => {
       const caretakerLocation =
         caretaker.currentLocation || booking.tracking?.caretakerLocation || { lat: 12.985, lng: 77.61 };
@@ -249,8 +249,16 @@ const dispatchCandidatesFor = (
         etaMinutes: etaFromDistance(distance)
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+    .sort((a, b) => b.score - a.score);
+  const selected = scored.slice(0, 5);
+  const demoCandidate = scored.find((candidate) => candidate.caretaker.uid === "demo-caretaker");
+
+  if (demoCandidate && !selected.some((candidate) => candidate.caretaker.uid === "demo-caretaker")) {
+    selected[selected.length ? selected.length - 1 : 0] = demoCandidate;
+  }
+
+  return selected;
+};
 
 const canAccessBooking = (
   booking: CareBooking,
@@ -270,6 +278,103 @@ const canAccessBooking = (
   }
 
   return false;
+};
+
+const defaultCaretakers: CaretakerMatchProfile[] = [
+  {
+    uid: "demo-caretaker",
+    name: "Anita",
+    available: true,
+    city: "Bengaluru",
+    zone: "Central",
+    serviceZones: ["Central", "Medical", "Diagnostics"],
+    skills: [
+      "doctor_visit",
+      "lab_support",
+      "hospital_attender",
+      "medicine_help",
+      "companionship",
+      "daily_support"
+    ],
+    languages: ["English", "Hindi", "Kannada"],
+    rating: 4.9,
+    activeAssignments: 0,
+    maxAssignments: 3,
+    verified: true,
+    trained: true,
+    yearsExperience: 6,
+    status: "available",
+    punctualityScore: 96,
+    repeatVisits: 12,
+    familiarFamilies: ["demo-customer"],
+    currentLocation: { lat: 12.985, lng: 77.61, accuracyMeters: 25, capturedAt: Date.now() },
+    lastSeenAt: Date.now()
+  },
+  {
+    uid: "caretaker-kavya",
+    name: "Kavya",
+    available: true,
+    city: "Bengaluru",
+    zone: "Diagnostics",
+    serviceZones: ["Diagnostics", "Central"],
+    skills: ["lab_support", "doctor_visit", "daily_support", "companionship"],
+    languages: ["English", "Kannada", "Telugu"],
+    rating: 4.9,
+    activeAssignments: 0,
+    maxAssignments: 3,
+    verified: true,
+    trained: true,
+    yearsExperience: 5,
+    status: "available",
+    punctualityScore: 97,
+    repeatVisits: 10,
+    familiarFamilies: [],
+    currentLocation: { lat: 12.981, lng: 77.604, accuracyMeters: 25, capturedAt: Date.now() },
+    lastSeenAt: Date.now()
+  }
+];
+
+const caretakerDefaultsById = () =>
+  Object.fromEntries(defaultCaretakers.map((caretaker) => [caretaker.uid, caretaker]));
+
+const readCaretakersForDispatch = async (
+  database: NonNullable<ReturnType<typeof getAdminDatabase>>
+) => {
+  const caretakerSnapshot = await database.ref("caretakers").get();
+  const records = caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null;
+  const merged = {
+    ...(records || {})
+  };
+  let changed = false;
+
+  for (const caretaker of defaultCaretakers) {
+    merged[caretaker.uid] = {
+      ...merged[caretaker.uid],
+      ...caretaker
+    };
+    changed = true;
+  }
+
+  if (!availableCaretakersFor(Object.values(merged)).length) {
+    Object.assign(merged, caretakerDefaultsById());
+    changed = true;
+  }
+
+  if (changed) {
+    await database.ref("caretakers").update(
+      Object.fromEntries(
+        defaultCaretakers.map((caretaker) => [
+          caretaker.uid,
+          {
+            ...merged[caretaker.uid],
+            ...caretaker
+          }
+        ])
+      )
+    );
+  }
+
+  return Object.values(merged);
 };
 
 export const TrustedBooking = {
@@ -295,10 +400,7 @@ export const TrustedBooking = {
       ...booking,
       status: booking.status === "requested" ? "searching" : booking.status
     });
-    const caretakerSnapshot = await database.ref("caretakers").get();
-    const caretakers = Object.values(
-      (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
-    );
+    const caretakers = await readCaretakersForDispatch(database);
     const candidates = dispatchCandidatesFor(locationReadyBooking, caretakers);
     const timestamp = Date.now();
     const offers: Record<string, DispatchOffer> = Object.fromEntries(
@@ -611,10 +713,7 @@ export const TrustedBooking = {
       return { ok: false as const, status: 409, error: "Booking cannot be rebroadcast" };
     }
 
-    const caretakerSnapshot = await database.ref("caretakers").get();
-    const caretakers = Object.values(
-      (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
-    );
+    const caretakers = await readCaretakersForDispatch(database);
     const previousCaretakerId = booking.caretakerId;
     const candidates = dispatchCandidatesFor(
       {
@@ -740,10 +839,7 @@ export const TrustedBooking = {
       return { ok: false as const, status: 409, error: "Invalid booking transition" };
     }
 
-    const caretakerSnapshot = await database.ref("caretakers").get();
-    const caretakers = Object.values(
-      (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
-    );
+    const caretakers = await readCaretakersForDispatch(database);
     const bestCaretaker = bestCaretakerFor(booking, caretakers);
 
     if (!bestCaretaker) {
@@ -841,10 +937,7 @@ export const TrustedBooking = {
       return { ok: false as const, status: 409, error: "Booking cannot be reassigned" };
     }
 
-    const caretakerSnapshot = await database.ref("caretakers").get();
-    const caretakers = Object.values(
-      (caretakerSnapshot.val() as Record<string, CaretakerMatchProfile> | null) || {}
-    );
+    const caretakers = await readCaretakersForDispatch(database);
     const bestCaretaker = bestCaretakerFor(booking, caretakers, booking.caretakerId);
 
     if (!bestCaretaker) {

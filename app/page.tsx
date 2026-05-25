@@ -1580,9 +1580,10 @@ export default function CustomerApp() {
       service: visibleBooking.serviceType
     });
     await BookingService.verifyCompletion(true, "Family verified service completion");
+    setPaymentMessage("Visit confirmed. Payment release has been queued.");
   };
 
-  const cancelActiveCare = () => {
+  const cancelActiveCare = async () => {
     if (
       !visibleBooking ||
       !["searching", "assigned", "accepted"].includes(visibleBooking.status)
@@ -1595,11 +1596,15 @@ export default function CustomerApp() {
       service: visibleBooking.serviceType,
       status: visibleBooking.status
     });
-    BookingService.cancelBooking("Family cancelled before service started", "customer");
-    setPaymentMessage("Care request cancelled. We will keep the family updated.");
+    try {
+      await BookingService.cancelBooking("Family cancelled before service started", "customer");
+      setPaymentMessage("Care request cancelled. We will keep the family updated.");
+    } catch {
+      setPaymentMessage("Cancellation could not be confirmed. Please contact LDERLY support.");
+    }
   };
 
-  const rateLatestCare = () => {
+  const rateLatestCare = async () => {
     if (
       !visibleBooking ||
       !["payment_settled", "report_generated"].includes(visibleBooking.status) ||
@@ -1613,7 +1618,7 @@ export default function CustomerApp() {
       service: visibleBooking.serviceType,
       score: 5
     });
-    BookingService.rateBooking(5, "Family felt reassured after this visit");
+    await BookingService.rateBooking(5, "Family felt reassured after this visit");
     setPaymentMessage("Thank you. Your rating helps keep caregiver quality high.");
   };
 
@@ -3965,8 +3970,8 @@ function PaymentPendingCare({
       <p className="text-sm font-semibold text-amber-700">Payment pending</p>
       <h2 className="mt-2 text-2xl font-semibold">Complete payment to start care</h2>
       <p className="mt-2 text-sm leading-6 text-slate-500">
-        Your request for {recipient.shortName} is saved. Caregiver dispatch, live tracking,
-        OTP, and family updates will start after payment is verified.
+        Your request for {recipient.shortName} is saved. Payment verification unlocks live
+        tracking, OTP start, family verification, and caregiver payment release.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-2xl bg-slate-100 p-3">

@@ -13,6 +13,7 @@
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
+    "verify:care-flow": "node scripts/verify-care-flow.mjs",
     "ci:smoke": "node scripts/ci-smoke.mjs",
     "e2e": "playwright test",
     "e2e:prod": "node scripts/run-e2e-prod.mjs",
