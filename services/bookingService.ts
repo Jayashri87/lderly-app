@@ -1028,6 +1028,17 @@ export const BookingService = {
     return booking;
   },
 
+  async persistBooking(booking: CareBooking) {
+    const result = await postTrustedBookingAction("/api/bookings", { booking });
+
+    if (result?.booking) {
+      writeLocalBooking(enrichBooking(result.booking));
+      return result.booking;
+    }
+
+    return null;
+  },
+
   async assignCaretaker() {
     const booking = enrichBooking(readLocalBooking(), "admin");
 

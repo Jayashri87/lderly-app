@@ -889,6 +889,7 @@ export default function CustomerApp() {
   );
   const [paymentMessage, setPaymentMessage] = useState("");
   const [paymentTermsBooking, setPaymentTermsBooking] = useState<CareBooking | null>(null);
+  const [bookingConfirmBusy, setBookingConfirmBusy] = useState(false);
   const [aiInsight, setAiInsight] = useState<AiReassuranceInsight | null>(null);
   const [caregiverTrust, setCaregiverTrust] = useState<CaregiverTrustProfile | null>(null);
   const [visitProof, setVisitProof] = useState<VisitProof | null>(null);
@@ -1475,71 +1476,89 @@ export default function CustomerApp() {
   };
 
   const confirmBooking = async () => {
+    if (bookingConfirmBusy) {
+      return;
+    }
+
     if (!session) {
       router.replace("/signin");
       return;
     }
 
-    const requestedFor =
-      selectedTime.label === "Now"
-        ? Date.now()
-        : selectedTime.label === "Today later"
-          ? Date.now() + 3 * 60 * 60 * 1000
-          : selectedTime.label === "Tomorrow"
-            ? Date.now() + 24 * 60 * 60 * 1000
-            : Date.now() + 60 * 60 * 1000;
-    const bookingDetails: BookingRequestDetails = {
-      careFor: {
-        relationship: recipient.name,
-        displayName: activeRecipientDetails?.fullName || recipient.displayName
-      },
-      careNeed: selectedNeed.title,
-      service: selectedService,
-      duration: {
-        label: selectedDuration.label,
-        price: selectedDuration.price,
-        note: selectedDuration.note
-      },
-      schedule: {
-        label: selectedTime.label,
-        detail: selectedTime.detail,
-        requestedFor
-      },
-      location: {
-        label: selectedLocation.label,
-        detail:
-          selectedLocation.label === "Saved care address"
-            ? activeRecipientDetails?.address || selectedLocation.detail
-            : selectedLocation.detail
-      },
-      pricing: {
-        careEstimate: selectedDuration.price,
-        coordinationFee: "Included",
-        estimatedTotal: selectedDuration.price
-      },
-      trust: [
-        "Verified caregivers",
-        "Family updates included",
-        "Support available",
-        "Trained attendants"
-      ]
-    };
+    setBookingConfirmBusy(true);
+    setPaymentMessage("Saving your care request");
 
-    const nextBooking = BookingService.createBooking(
-      { ...session, role: "customer" },
-      selectedService,
-      bookingDetails
-    );
-    trackProductEvent("booking_confirmed", {
-      bookingId: nextBooking.id,
-      recipient: recipient.shortName,
-      need: selectedNeed.title,
-      service: selectedService,
-      duration: selectedDuration.label,
-      time: selectedTime.label,
-      location: selectedLocation.label
-    });
-    requestPaymentWithTerms(nextBooking);
+    try {
+      const requestedFor =
+        selectedTime.label === "Now"
+          ? Date.now()
+          : selectedTime.label === "Today later"
+            ? Date.now() + 3 * 60 * 60 * 1000
+            : selectedTime.label === "Tomorrow"
+              ? Date.now() + 24 * 60 * 60 * 1000
+              : Date.now() + 60 * 60 * 1000;
+      const bookingDetails: BookingRequestDetails = {
+        careFor: {
+          relationship: recipient.name,
+          displayName: activeRecipientDetails?.fullName || recipient.displayName
+        },
+        careNeed: selectedNeed.title,
+        service: selectedService,
+        duration: {
+          label: selectedDuration.label,
+          price: selectedDuration.price,
+          note: selectedDuration.note
+        },
+        schedule: {
+          label: selectedTime.label,
+          detail: selectedTime.detail,
+          requestedFor
+        },
+        location: {
+          label: selectedLocation.label,
+          detail:
+            selectedLocation.label === "Saved care address"
+              ? activeRecipientDetails?.address || selectedLocation.detail
+              : selectedLocation.detail
+        },
+        pricing: {
+          careEstimate: selectedDuration.price,
+          coordinationFee: "Included",
+          estimatedTotal: selectedDuration.price
+        },
+        trust: [
+          "Verified caregivers",
+          "Family updates included",
+          "Support available",
+          "Trained attendants"
+        ]
+      };
+
+      const nextBooking = BookingService.createBooking(
+        { ...session, role: "customer" },
+        selectedService,
+        bookingDetails
+      );
+      const trustedBooking = await BookingService.persistBooking(nextBooking);
+
+      if (!trustedBooking) {
+        setPaymentMessage("We could not save this care request. Please try again.");
+        return;
+      }
+
+      trackProductEvent("booking_confirmed", {
+        bookingId: trustedBooking.id,
+        recipient: recipient.shortName,
+        need: selectedNeed.title,
+        service: selectedService,
+        duration: selectedDuration.label,
+        time: selectedTime.label,
+        location: selectedLocation.label
+      });
+      requestPaymentWithTerms(trustedBooking);
+    } finally {
+      setBookingConfirmBusy(false);
+    }
   };
 
   const verifyCareCompletion = async () => {
@@ -1962,6 +1981,7 @@ export default function CustomerApp() {
             }
           }}
           onConfirm={confirmBooking}
+          confirmBusy={bookingConfirmBusy}
         />
       )}
 
@@ -3218,7 +3238,8 @@ function BookingFunnel({
   onTime,
   onLocation,
   onBack,
-  onConfirm
+  onConfirm,
+  confirmBusy
 }: {
   recipient: Recipient;
   step: BookingStep;
@@ -3235,6 +3256,7 @@ function BookingFunnel({
   onLocation: (location: LocationOption) => void;
   onBack: () => void;
   onConfirm: () => void;
+  confirmBusy: boolean;
 }) {
   const stepIndex = ["need", "service", "duration", "time", "location", "review"].indexOf(step);
   const stepLabel = `${stepIndex + 1} of 6`;
@@ -3464,9 +3486,10 @@ function BookingFunnel({
                 </div>
                 <button
                   onClick={onConfirm}
-                  className="mt-5 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+                  disabled={confirmBusy}
+                  className="mt-5 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-wait disabled:bg-slate-400"
                 >
-                  Confirm Care
+                  {confirmBusy ? "Preparing payment..." : "Confirm Care"}
                 </button>
               </section>
             </FunnelScreen>
@@ -3975,8 +3998,6 @@ function PaymentTermsModal({
   onCancel: () => void;
   onAgree: () => void;
 }) {
-  const [accepted, setAccepted] = useState(false);
-
   return (
     <motion.div
       className="fixed inset-0 z-50 flex items-end bg-black/65 px-4 pb-4 backdrop-blur-sm sm:items-center sm:justify-center"
@@ -4026,15 +4047,9 @@ function PaymentTermsModal({
           ))}
         </div>
 
-        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={accepted}
-            onChange={(event) => setAccepted(event.target.checked)}
-            className="mt-1 h-5 w-5 rounded border-slate-300 accent-[#06130f]"
-          />
+        <div className="mt-5 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
           <span>
-            I agree to the{" "}
+            By continuing to payment, I agree to the{" "}
             <Link href="/legal/terms" className="font-semibold text-[#06130f] underline">
               Terms
             </Link>
@@ -4044,7 +4059,7 @@ function PaymentTermsModal({
             </Link>
             , and payment authorization for this care request.
           </span>
-        </label>
+        </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button
@@ -4055,10 +4070,9 @@ function PaymentTermsModal({
           </button>
           <button
             onClick={onAgree}
-            disabled={!accepted}
-            className="rounded-full bg-[#06130f] px-4 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-full bg-[#06130f] px-4 py-4 font-semibold text-white"
           >
-            Agree & pay
+            I agree & pay
           </button>
         </div>
       </motion.section>
