@@ -1,9 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050816;
+  --background: #04110e;
   --foreground: #ffffff;
   --lderly-focus: #a7f3d0;
+  --lderly-ink: #06130f;
+  --lderly-ink-soft: #0b2019;
+  --lderly-mint: #a7f3d0;
+  --lderly-mint-strong: #34d399;
+  --lderly-gold: #f7d774;
+  --lderly-danger: #ff3648;
+  --lderly-glass: rgba(255, 255, 255, 0.1);
+  --lderly-glass-strong: rgba(255, 255, 255, 0.16);
+  --lderly-border: rgba(255, 255, 255, 0.14);
+  --lderly-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
 }
 
 * {
@@ -17,13 +27,145 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background: radial-gradient(circle at top, #172554, #050816 60%);
+  background:
+    radial-gradient(circle at 18% 8%, rgba(52, 211, 153, 0.22), transparent 30%),
+    radial-gradient(circle at 85% 0%, rgba(247, 215, 116, 0.13), transparent 28%),
+    linear-gradient(180deg, #06130f 0%, #07110f 44%, #030605 100%);
   color: var(--foreground);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Geist", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+.lderly-shell {
+  position: relative;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 12% 6%, rgba(45, 212, 191, 0.2), transparent 32%),
+    radial-gradient(circle at 88% 10%, rgba(251, 191, 36, 0.14), transparent 28%),
+    linear-gradient(180deg, #06130f 0%, #08110f 48%, #040706 100%);
+  color: white;
+}
+
+.lderly-shell::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent 72%);
+}
+
+.lderly-content {
+  position: relative;
+  z-index: 1;
+}
+
+.glass-panel {
+  border: 1px solid var(--lderly-border);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07)),
+    rgba(255, 255, 255, 0.08);
+  box-shadow: var(--lderly-shadow);
+  backdrop-filter: blur(24px);
+}
+
+.premium-card {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(167, 243, 208, 0.42), transparent 38%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(235, 250, 244, 0.92));
+  color: var(--lderly-ink);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+}
+
+.trust-surface {
+  border: 1px solid rgba(167, 243, 208, 0.26);
+  background:
+    linear-gradient(145deg, rgba(16, 185, 129, 0.16), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.motion-lift {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.motion-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.live-dot {
+  position: relative;
+  display: inline-flex;
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 999px;
+  background: var(--lderly-mint-strong);
+  box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.12);
+}
+
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  border: 1px solid rgba(52, 211, 153, 0.38);
+  animation: lderly-pulse 1.8s ease-out infinite;
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  animation: lderly-shimmer 1.7s ease-in-out infinite;
+}
+
+.premium-title {
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.soft-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+}
+
+@keyframes lderly-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.72);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes lderly-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 button,

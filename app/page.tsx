@@ -39,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle
 } from "../components/ui/dialog";
+import { Skeleton } from "../components/ui/skeleton";
 import { AuthService, SessionUser } from "../services/authService";
 import {
   BookingRequestDetails,
@@ -1633,18 +1634,26 @@ export default function CustomerApp() {
 
   if (!authReady || !session) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#06130f] px-6 text-white">
-        <div className="text-center">
-          <p className="text-sm uppercase tracking-[0.28em] text-emerald-200">
-            LDERLY
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold">Opening Home</h1>
-          <Link
-            href="/signin"
-            className="mt-6 inline-flex rounded-full bg-white px-5 py-3 font-semibold text-[#07130f]"
-          >
-            Sign in
-          </Link>
+      <main className="lderly-shell">
+        <div className="lderly-content mx-auto flex min-h-dvh max-w-md items-center px-5 text-white">
+          <section className="glass-panel w-full rounded-[2rem] p-5">
+            <p className="text-sm uppercase tracking-[0.28em] text-emerald-200">LDERLY</p>
+            <h1 className="premium-title mt-3 text-3xl font-semibold">Opening Home</h1>
+            <div className="mt-6 space-y-3">
+              <Skeleton className="h-24 w-full rounded-[1.5rem]" />
+              <div className="grid grid-cols-3 gap-2">
+                <Skeleton className="h-16 rounded-2xl" />
+                <Skeleton className="h-16 rounded-2xl" />
+                <Skeleton className="h-16 rounded-2xl" />
+              </div>
+            </div>
+            <Link
+              href="/signin"
+              className="motion-lift mt-6 inline-flex rounded-full bg-white px-5 py-3 font-semibold text-[#07130f]"
+            >
+              Sign in
+            </Link>
+          </section>
         </div>
       </main>
     );
@@ -1699,20 +1708,19 @@ export default function CustomerApp() {
   }
 
   return (
-    <main className="min-h-dvh overflow-x-hidden bg-[#06130f] text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
-      <div className="relative z-10 mx-auto min-h-dvh max-w-md px-4 pb-28 pt-5 sm:max-w-lg">
+    <main className="lderly-shell">
+      <div className="lderly-content mx-auto min-h-dvh max-w-md px-4 pb-28 pt-5 sm:max-w-lg">
         <header className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-emerald-200">
               LDERLY
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Home</h1>
+            <h1 className="premium-title mt-1 text-3xl font-semibold tracking-tight">Home</h1>
           </div>
           {hasCareSubscription && (
             <button
               onClick={requestImmediateCare}
-              className="rounded-full bg-red-500 px-4 py-3 text-sm font-semibold shadow-xl shadow-red-500/25"
+              className="motion-lift rounded-full bg-red-500 px-4 py-3 text-sm font-semibold shadow-xl shadow-red-500/25"
             >
               Immediate
             </button>
@@ -1720,7 +1728,7 @@ export default function CustomerApp() {
         </header>
 
         {paymentMessage && (
-          <div className="mt-4 rounded-2xl border border-emerald-200/15 bg-emerald-200/10 px-4 py-3 text-sm text-emerald-50">
+          <div className="trust-surface mt-4 rounded-2xl px-4 py-3 text-sm text-emerald-50">
             {paymentMessage}
           </div>
         )}
@@ -2306,16 +2314,16 @@ function RealtimeCareStrip({
     : `Ready to arrange care for ${recipient.shortName}`;
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3 backdrop-blur-xl">
+    <section className="glass-panel mt-4 overflow-hidden rounded-[1.5rem] p-3">
       <div className="flex items-center gap-3">
-        <RealtimePulse />
+        <span className="live-dot shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100">
             Realtime care system
           </p>
           <p className="mt-1 truncate text-sm text-white/70">{status}</p>
         </div>
-        <span className="rounded-full bg-emerald-300 px-3 py-1 text-xs font-semibold text-[#06130f]">
+        <span className="rounded-full bg-gradient-to-r from-emerald-200 to-teal-200 px-3 py-1 text-xs font-semibold text-[#06130f]">
           {activeCare ? "Live" : "Ready"}
         </span>
       </div>
@@ -2331,9 +2339,9 @@ function PrimaryCareCta({
   onBook: () => void;
 }) {
   return (
-    <section className="mt-5 rounded-[2rem] bg-gradient-to-br from-emerald-200 via-white to-amber-100 p-5 text-[#06130f] shadow-2xl shadow-black/20">
+    <section className="premium-card motion-lift mt-5 rounded-[2rem] p-5">
       <p className="text-sm font-semibold text-emerald-800">Primary action</p>
-      <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+      <h2 className="premium-title mt-2 text-3xl font-semibold tracking-tight">
         Get care for {recipient.shortName}
       </h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -2341,7 +2349,7 @@ function PrimaryCareCta({
       </p>
       <button
         onClick={onBook}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+        className="motion-lift mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white shadow-xl shadow-emerald-950/20"
       >
         Continue
         <ChevronRight className="h-5 w-5" />
@@ -2367,7 +2375,7 @@ function QuickActions({
     <section className="mt-5 grid grid-cols-2 gap-3">
       <button
         onClick={activeCare ? onTrack : onBook}
-        className="rounded-[1.5rem] bg-white/10 p-4 text-left"
+        className="glass-panel motion-lift rounded-[1.5rem] p-4 text-left"
       >
         {activeCare ? (
           <MapPinned className="h-5 w-5 text-emerald-200" />
@@ -2383,7 +2391,7 @@ function QuickActions({
       </button>
       <button
         onClick={onRebook}
-        className="rounded-[1.5rem] bg-white/10 p-4 text-left"
+        className="glass-panel motion-lift rounded-[1.5rem] p-4 text-left"
       >
         <Repeat2 className="h-5 w-5 text-emerald-200" />
         <p className="mt-3 font-semibold">{experience.rebookLabel}</p>
@@ -2401,7 +2409,7 @@ function CareConfidence({
   health: HealthSnapshot | null;
 }) {
   return (
-    <section className="mt-5 rounded-[1.5rem] bg-white/10 p-4">
+    <section className="trust-surface mt-5 rounded-[1.5rem] p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm text-white/50">Daily Care Score</p>
@@ -2549,7 +2557,7 @@ function FamilyReassuranceSystem({
             </h3>
             <p className="mt-2 text-sm leading-6 text-white/55">{familyLine}</p>
           </div>
-          <RealtimePulse />
+          <span className="live-dot mt-2 shrink-0" aria-hidden="true" />
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
           <TrustSignal label="Caregiver" value={hasLiveCare ? "Live" : "Ready"} />
@@ -3100,15 +3108,6 @@ function AccessibilityCareControls({ recipient }: { recipient: Recipient }) {
         <div className="rounded-2xl bg-white/10 p-3">Family alerts</div>
       </div>
     </section>
-  );
-}
-
-function RealtimePulse() {
-  return (
-    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-300/15">
-      <span className="absolute h-8 w-8 animate-ping rounded-full bg-emerald-300/30" />
-      <span className="relative h-3 w-3 rounded-full bg-emerald-200" />
-    </div>
   );
 }
 
@@ -3754,11 +3753,11 @@ function JourneyExperience({
 
       {hasActiveService && !paymentPending && (
         <>
-      <div className="rounded-[2rem] bg-white p-5 text-[#06130f]">
+      <div className="premium-card rounded-[2rem] p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-emerald-700">Live care</p>
-            <h2 className="mt-2 text-2xl font-semibold">
+            <h2 className="premium-title mt-2 text-2xl font-semibold">
               {status === "idle" ? "No active care" : careStatus}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -3832,7 +3831,7 @@ function JourneyExperience({
 
       <CustomerCareFunnel booking={booking} status={status} />
 
-      <section className="mt-5 rounded-[1.5rem] border border-emerald-200/15 bg-white p-4 text-[#06130f]">
+      <section className="premium-card mt-5 rounded-[1.5rem] p-4">
         <p className="text-sm font-semibold text-emerald-700">Care security</p>
         {booking?.status === "arrived" ? (
           <>
@@ -3892,7 +3891,7 @@ function JourneyExperience({
         <LiveMap journey={activeMapJourney} />
       </div>
 
-      <section className="mt-6 rounded-[1.5rem] bg-white/10 p-4">
+      <section className="glass-panel mt-6 rounded-[1.5rem] p-4">
         <p className="font-semibold">Care progress</p>
         <div className="mt-4 grid grid-cols-6 gap-1">
           {journeySteps.map((step, index) => (
@@ -3966,7 +3965,7 @@ function PaymentPendingCare({
   onCompletePayment: () => void;
 }) {
   return (
-    <section className="rounded-[2rem] bg-white p-5 text-[#06130f]">
+    <section className="premium-card rounded-[2rem] p-5">
       <p className="text-sm font-semibold text-amber-700">Payment pending</p>
       <h2 className="mt-2 text-2xl font-semibold">Complete payment to start care</h2>
       <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -3985,7 +3984,7 @@ function PaymentPendingCare({
       </div>
       <button
         onClick={onCompletePayment}
-        className="mt-5 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
+        className="motion-lift mt-5 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white"
       >
         Complete payment
       </button>

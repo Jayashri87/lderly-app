@@ -19,6 +19,7 @@ import LiveMap from "../../components/LiveMap";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 import { AuthService, SessionUser } from "../../services/authService";
 import { BookingService, CareBooking } from "../../services/bookingService";
 import {
@@ -577,10 +578,10 @@ export default function OpsApp() {
 
   if (!session || session.role !== "admin") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#071018] px-5 text-white">
-        <section className="w-full max-w-md rounded-[2rem] bg-white p-6 text-[#071018]">
+      <main className="lderly-shell flex min-h-screen items-center justify-center px-5 text-white">
+        <section className="premium-card w-full max-w-md rounded-[2rem] p-6 text-[#071018]">
           <p className="text-sm font-semibold text-blue-700">LDERLY Ops</p>
-          <h1 className="mt-3 text-3xl font-semibold">Operations control center</h1>
+          <h1 className="premium-title mt-3 text-3xl font-semibold">Operations control center</h1>
           <p className="mt-2 text-sm text-slate-500">
             Monitor active care requests, assign caregivers, handle escalations, and track SLAs.
           </p>
@@ -608,7 +609,7 @@ export default function OpsApp() {
           )}
           <button
             onClick={enterOps}
-            className="mt-4 w-full rounded-full bg-[#071018] px-5 py-4 font-semibold text-white"
+            className="motion-lift mt-4 w-full rounded-full bg-[#071018] px-5 py-4 font-semibold text-white"
           >
             Enter Ops Panel
           </button>
@@ -634,6 +635,7 @@ export default function OpsApp() {
   const opsFreshness = opsKpis?.generatedAt
     ? `${Math.max(0, Math.round(((opsNow || opsKpis.generatedAt) - opsKpis.generatedAt) / 1000))}s ago`
     : "live";
+  const opsLoading = !opsKpis || !systemStatus;
   const bookingMapJourney: CareJourney | null =
     booking && booking.status !== "none"
       ? {
@@ -961,22 +963,22 @@ export default function OpsApp() {
   };
 
   return (
-    <main className="min-h-screen bg-[#071018] text-white">
-      <div className="mx-auto max-w-6xl px-4 py-6">
+    <main className="lderly-shell">
+      <div className="lderly-content mx-auto max-w-6xl px-4 py-6">
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-blue-200">LDERLY Ops</p>
-            <h1 className="mt-1 text-3xl font-semibold">Live operations</h1>
+            <h1 className="premium-title mt-1 text-3xl font-semibold">Live operations</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-blue-400 px-4 py-2 text-sm font-semibold text-[#071018]">
+            <div className="motion-lift rounded-full bg-gradient-to-r from-emerald-200 to-sky-200 px-4 py-2 text-sm font-semibold text-[#071018]">
               {slaMode === "breach"
                 ? "SLA breach"
                 : slaMode === "watch"
                   ? "SLA watch"
                   : "SLA healthy"}
             </div>
-            <div className="hidden rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/70 sm:block">
+            <div className="glass-panel hidden rounded-full px-4 py-2 text-sm font-semibold text-white/70 sm:block">
               Updated {opsFreshness}
             </div>
             <button
@@ -985,75 +987,87 @@ export default function OpsApp() {
                 setSession(null);
                 router.replace("/ops");
               }}
-              className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold"
+              className="motion-lift rounded-full bg-white/10 px-4 py-2 text-sm font-semibold"
             >
               Sign out
             </button>
           </div>
         </header>
         {opsActionMessage && (
-          <div className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/70">
+          <div className="glass-panel mt-4 rounded-2xl px-4 py-3 text-sm text-white/70">
             {opsActionMessage}
           </div>
         )}
 
-        <section className="mt-6 grid gap-3 md:grid-cols-4">
-          <OpsMetric
-            icon={BellRing}
-            label="Active bookings"
-            value={String(opsKpis?.activeBookings ?? (activeBooking ? 1 : 0))}
-          />
-          <OpsMetric
-            icon={AlertTriangle}
-            label="SLA watch"
-            value={
-              opsKpis?.slaBreached
-                ? "Breach"
-                : opsKpis?.slaWatch
-                  ? "Watch"
-                  : booking?.sla?.status === "breached"
-                ? "Breach"
-                : booking?.sla?.status === "watch"
-                  ? "Watch"
-                  : "0"
-            }
-          />
-          <OpsMetric
-            icon={Users}
-            label="Caregivers online"
-            value={String(opsKpis?.onlineCaretakers ?? caretakers.filter((item) => item.available).length)}
-          />
-          <OpsMetric
-            icon={BarChart3}
-            label="Support ops"
-            value={`${opsKpis?.supportOpen ?? 0}/${opsKpis?.complaintsOpen ?? 0}`}
-          />
-          <OpsMetric
-            icon={CalendarClock}
-            label="Shift check-ins"
-            value={String(opsKpis?.shiftAnalytics?.checkinsToday ?? 0)}
-          />
-          <OpsMetric
-            icon={ShieldCheck}
-            label="SLA healthy"
-            value={`${opsKpis?.slaAnalytics?.healthyRate ?? 100}%`}
-          />
-          <OpsMetric
-            icon={Sparkles}
-            label="Reliability"
-            value={`${caregiverIntel?.averageReliability ?? 0}%`}
-          />
-          <OpsMetric
-            icon={AlertTriangle}
-            label="Command"
-            value={emergencyCommand?.commandLevel?.toUpperCase() || "GREEN"}
-          />
-          <OpsMetric
-            icon={RotateCcw}
-            label="Recovery queue"
-            value={String(opsRecovery?.openSignals ?? 0)}
-          />
-        </section>
+        {opsLoading ? (
+          <section className="mt-6 grid gap-3 md:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="glass-panel rounded-[1.5rem] p-4">
+                <Skeleton className="h-5 w-5 rounded-full" />
+                <Skeleton className="mt-4 h-4 w-24" />
+                <Skeleton className="mt-3 h-8 w-16" />
+              </div>
+            ))}
+          </section>
+        ) : (
+          <section className="mt-6 grid gap-3 md:grid-cols-4">
+            <OpsMetric
+              icon={BellRing}
+              label="Active bookings"
+              value={String(opsKpis?.activeBookings ?? (activeBooking ? 1 : 0))}
+            />
+            <OpsMetric
+              icon={AlertTriangle}
+              label="SLA watch"
+              value={
+                opsKpis?.slaBreached
+                  ? "Breach"
+                  : opsKpis?.slaWatch
+                    ? "Watch"
+                    : booking?.sla?.status === "breached"
+                  ? "Breach"
+                  : booking?.sla?.status === "watch"
+                    ? "Watch"
+                    : "0"
+              }
+            />
+            <OpsMetric
+              icon={Users}
+              label="Caregivers online"
+              value={String(opsKpis?.onlineCaretakers ?? caretakers.filter((item) => item.available).length)}
+            />
+            <OpsMetric
+              icon={BarChart3}
+              label="Support ops"
+              value={`${opsKpis?.supportOpen ?? 0}/${opsKpis?.complaintsOpen ?? 0}`}
+            />
+            <OpsMetric
+              icon={CalendarClock}
+              label="Shift check-ins"
+              value={String(opsKpis?.shiftAnalytics?.checkinsToday ?? 0)}
+            />
+            <OpsMetric
+              icon={ShieldCheck}
+              label="SLA healthy"
+              value={`${opsKpis?.slaAnalytics?.healthyRate ?? 100}%`}
+            />
+            <OpsMetric
+              icon={Sparkles}
+              label="Reliability"
+              value={`${caregiverIntel?.averageReliability ?? 0}%`}
+            />
+            <OpsMetric
+              icon={AlertTriangle}
+              label="Command"
+              value={emergencyCommand?.commandLevel?.toUpperCase() || "GREEN"}
+            />
+            <OpsMetric
+              icon={RotateCcw}
+              label="Recovery queue"
+              value={String(opsRecovery?.openSignals ?? 0)}
+            />
+          </section>
+        )}
 
         <Card className="mt-6 rounded-[2rem] border-0 bg-white p-5 text-[#071018]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -2377,7 +2391,7 @@ function ReadinessChecklist({
 
 function StatusPill({ label, ready }: { label: string; ready: boolean }) {
   return (
-    <div className="rounded-2xl bg-white/10 p-3">
+    <div className="trust-surface rounded-2xl p-3">
       <p className="text-xs text-white/45">{label}</p>
       <p className={`mt-1 font-semibold ${ready ? "text-emerald-200" : "text-amber-200"}`}>
         {ready ? "Configured" : "Needs setup"}
@@ -2427,17 +2441,17 @@ function OpsMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-[1.5rem] bg-white/10 p-4">
+    <div className="glass-panel motion-lift rounded-[1.5rem] p-4">
       <Icon className="h-5 w-5 text-blue-200" />
       <p className="mt-3 text-sm text-white/50">{label}</p>
-      <p className="text-2xl font-semibold">{value}</p>
+      <p className="text-2xl font-semibold tracking-tight">{value}</p>
     </div>
   );
 }
 
 function SlaTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/10 p-3">
+    <div className="trust-surface rounded-2xl p-3">
       <p className="text-white/50">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
     </div>
@@ -2772,7 +2786,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[2rem] bg-white/10 p-5">
+    <section className="glass-panel rounded-[2rem] p-5">
       <div className="mb-4 flex items-center gap-2">
         <CalendarClock className="h-5 w-5 text-blue-200" />
         <h2 className="text-xl font-semibold">{title}</h2>
