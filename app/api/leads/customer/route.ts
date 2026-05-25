@@ -2,7 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAppCheck } from "../../../../server/apiSecurity";
 import { requireAuthAttempt } from "../../../../server/authGuards";
+import type { CustomerLead } from "../../../../server/customerLeadProvider";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 const normalizePhone = (value: string) => {
   const trimmed = value.trim();
@@ -65,8 +67,7 @@ export async function POST(request: NextRequest) {
     const leadRef = adminDb.ref(`customerLeads/${leadId}`);
     const existing = await leadRef.get();
     const previous = existing.val() as { createdAt?: number; touchCount?: number } | null;
-
-    await leadRef.update({
+    const lead: CustomerLead = {
       id: leadId,
       name,
       email,
@@ -79,6 +80,19 @@ export async function POST(request: NextRequest) {
       touchCount: (previous?.touchCount || 0) + 1,
       createdAt: previous?.createdAt || timestamp,
       updatedAt: timestamp
+    };
+
+    await leadRef.update(lead);
+
+    const googleSheets = await GoogleWorkspaceProvider.appendLeadToSheet(lead);
+    await leadRef.child("integrations/googleSheets").update({
+      provider: "google_workspace",
+      status: googleSheets.ok ? "synced" : "not_synced",
+      syncedAt: googleSheets.ok ? timestamp : null,
+      updatedAt: timestamp,
+      ...(googleSheets.ok
+        ? { range: googleSheets.id || "", details: googleSheets.details || {} }
+        : { error: googleSheets.error, httpStatus: googleSheets.status })
     });
   }
 

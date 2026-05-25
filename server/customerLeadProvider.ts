@@ -3,6 +3,7 @@ import { getAdminDatabase } from "./firebaseAdmin";
 
 export type CustomerLeadStatus =
   | "new"
+  | "follow_up_requested"
   | "contacted"
   | "qualified"
   | "customer_created"

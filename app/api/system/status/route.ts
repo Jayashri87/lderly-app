@@ -7,6 +7,7 @@ import {
 } from "../../../../server/communicationProvider";
 import { featureFlagReadiness } from "../../../../server/featureFlags";
 import { hasFirebaseAdminConfig } from "../../../../server/firebaseAdmin";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 import { internalOpsReadiness } from "../../../../server/internalOpsProvider";
 import { hasGeocodingConfig } from "../../../../server/locationProvider";
 import {
@@ -27,6 +28,7 @@ const hasAnyEnv = (names: string[]) => names.some((name) => hasEnv(name));
 const rulesDeployed =
   process.env.FIREBASE_RULES_DEPLOYED === "true" ||
   existsSync(join(process.cwd(), ".firebase-rules-deployed.json"));
+const googleWorkspaceReadiness = GoogleWorkspaceProvider.readiness();
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +166,11 @@ export async function GET() {
       tanstackQueryProvider: true,
       posthogPrepared: true,
       microsoftClarityPrepared: true,
+      googleWorkspaceReadiness,
+      googleSheetsLeadSync: googleWorkspaceReadiness.sheetsLeadsConfigured,
+      googleCalendarOpsSync: googleWorkspaceReadiness.calendarOpsConfigured,
+      googleDriveReportStorage: googleWorkspaceReadiness.driveRootConfigured,
+      googleDocsMonthlyReports: googleWorkspaceReadiness.monthlyReportTemplateConfigured,
       lottiePrepared: true,
       sentrySdkPrepared: true,
       freeAiReassuranceApi: true,
@@ -209,6 +216,21 @@ export async function GET() {
         ...(hasEnv("NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID")
           ? []
           : ["Google Maps production Map ID"]),
+        ...(googleWorkspaceReadiness.configured
+          ? []
+          : ["Google Workspace service account for Sheets, Calendar, Drive, Docs"]),
+        ...(googleWorkspaceReadiness.sheetsLeadsConfigured
+          ? []
+          : ["Google Sheets lead spreadsheet ID"]),
+        ...(googleWorkspaceReadiness.calendarOpsConfigured
+          ? []
+          : ["Google Calendar ops calendar ID"]),
+        ...(googleWorkspaceReadiness.driveRootConfigured
+          ? []
+          : ["Google Drive root folder ID"]),
+        ...(googleWorkspaceReadiness.monthlyReportTemplateConfigured
+          ? []
+          : ["Google Docs monthly report template ID"]),
         ...(hasAnyEnv(["SENTRY_DSN", "NEXT_PUBLIC_POSTHOG_KEY", "NEXT_PUBLIC_MIXPANEL_TOKEN"])
           ? []
           : ["Sentry/PostHog/Mixpanel production monitoring keys"]),

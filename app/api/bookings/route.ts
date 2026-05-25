@@ -8,6 +8,7 @@ import {
   withMutationAudit
 } from "../../../server/apiSecurity";
 import { getAdminDatabase } from "../../../server/firebaseAdmin";
+import { GoogleWorkspaceProvider } from "../../../server/googleWorkspaceProvider";
 import { TrustedBooking } from "../../../server/trustedBooking";
 
 const activePathFor = (role: string, uid?: string, username?: string) => {
@@ -111,6 +112,22 @@ export async function POST(request: NextRequest) {
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  if (!idempotent.replayed) {
+    const calendarResult = await GoogleWorkspaceProvider.createOpsCalendarEvent(result.booking);
+    const database = getAdminDatabase();
+
+    if (database) {
+      await database.ref(`bookings/byId/${result.booking.id}/integrations/googleCalendar`).update({
+        provider: "google_workspace",
+        status: calendarResult.ok ? "synced" : "not_synced",
+        updatedAt: Date.now(),
+        ...(calendarResult.ok
+          ? { eventId: calendarResult.id || "", eventUrl: calendarResult.url || "" }
+          : { error: calendarResult.error, httpStatus: calendarResult.status })
+      });
+    }
   }
 
   return NextResponse.json(

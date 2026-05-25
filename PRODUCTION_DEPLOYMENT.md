@@ -47,6 +47,25 @@ Firebase Admin service account:
 - `FIREBASE_ADMIN_CLIENT_EMAIL`
 - `FIREBASE_ADMIN_PRIVATE_KEY`
 
+Google Workspace automation:
+
+- `GOOGLE_WORKSPACE_PROJECT_ID`
+- `GOOGLE_WORKSPACE_CLIENT_EMAIL`
+- `GOOGLE_WORKSPACE_PRIVATE_KEY`
+- `GOOGLE_SHEETS_LEADS_SPREADSHEET_ID`
+- `GOOGLE_CALENDAR_OPS_CALENDAR_ID`
+- `GOOGLE_DRIVE_ROOT_FOLDER_ID`
+- `GOOGLE_DOCS_MONTHLY_REPORT_TEMPLATE_ID`
+
+Google Workspace is optional and fails closed. When configured, customer registration leads sync to Google Sheets, care bookings create Google Calendar events, and monthly family reports copy a Google Docs template into Drive.
+
+Google setup requirements:
+
+1. Enable Google Sheets API, Google Calendar API, Google Drive API, and Google Docs API in Google Cloud.
+2. Create a service account and store its JSON values in Vercel env vars.
+3. Share the lead Sheet, ops Calendar, Drive folder, and Docs template with the service account email.
+4. Use these report template tokens in the Docs template: `{{MONTH}}`, `{{USER_ID}}`, `{{TOTAL_VISITS}}`, `{{WELLNESS_SIGNAL}}`, `{{FAMILY_HEADLINE}}`, `{{AI_NARRATIVE}}`, `{{TOP_NEXT_ACTIONS}}`, `{{HIGHLIGHTS}}`.
+
 Payment provider:
 
 - `RAZORPAY_KEY_ID`

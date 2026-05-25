@@ -1,4 +1,5 @@
 import { getAdminDatabase } from "./firebaseAdmin";
+import { GoogleWorkspaceProvider } from "./googleWorkspaceProvider";
 
 type ReportRecord = {
   id: string;
@@ -79,11 +80,29 @@ export const MonthlyReportProvider = {
       generatedAt: Date.now()
     };
 
+    const googleDoc = await GoogleWorkspaceProvider.createMonthlyReportDoc(monthlyReport);
+    const reportWithIntegrations = {
+      ...monthlyReport,
+      googleDocStatus: googleDoc.ok ? "synced" : "not_synced",
+      googleDocId: googleDoc.ok ? googleDoc.id || "" : "",
+      googleDocUrl: googleDoc.ok ? googleDoc.url || "" : "",
+      integrations: {
+        googleDocs: {
+          provider: "google_workspace",
+          status: googleDoc.ok ? "synced" : "not_synced",
+          updatedAt: Date.now(),
+          ...(googleDoc.ok
+            ? { docId: googleDoc.id || "", docUrl: googleDoc.url || "" }
+            : { error: googleDoc.error, httpStatus: googleDoc.status })
+        }
+      }
+    };
+
     await database.ref().update({
-      [`monthlyReports/byId/${id}`]: monthlyReport,
-      [`monthlyReports/byUser/${userId}/${monthKey}`]: monthlyReport
+      [`monthlyReports/byId/${id}`]: reportWithIntegrations,
+      [`monthlyReports/byUser/${userId}/${monthKey}`]: reportWithIntegrations
     });
 
-    return { ok: true as const, monthlyReport };
+    return { ok: true as const, monthlyReport: reportWithIntegrations };
   }
 };

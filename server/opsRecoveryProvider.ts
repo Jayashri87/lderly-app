@@ -321,7 +321,7 @@ export const OpsRecoveryProvider = {
           (signal) => signal.kind === "completion_verification_delayed"
         ).length,
         emergencyUnresolved: signals.filter((signal) => signal.kind === "emergency_unresolved").length,
-        signals: signals.slice(0, 25)
+        signals: signals.slice(0, 250)
       }
     };
   },
