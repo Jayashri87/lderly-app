@@ -16,6 +16,9 @@ import {
   Users
 } from "lucide-react";
 import LiveMap from "../../components/LiveMap";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 import { AuthService, SessionUser } from "../../services/authService";
 import { BookingService, CareBooking } from "../../services/bookingService";
 import {
@@ -964,7 +967,7 @@ export default function OpsApp() {
           />
         </section>
 
-        <section className="mt-6 rounded-[2rem] bg-white p-5 text-[#071018]">
+        <Card className="mt-6 rounded-[2rem] border-0 bg-white p-5 text-[#071018]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="flex items-center gap-2 text-sm font-semibold text-blue-700">
@@ -1010,12 +1013,12 @@ export default function OpsApp() {
               />
             ))}
             {customerLeads.length === 0 && (
-              <div className="rounded-3xl bg-slate-100 p-4 text-sm text-slate-500 xl:col-span-2">
+              <Card className="rounded-3xl border-0 bg-slate-100 p-4 text-sm text-slate-500 xl:col-span-2">
                 New callback requests will appear here after families submit name, phone, and email.
-              </div>
+              </Card>
             )}
           </div>
-        </section>
+        </Card>
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
           <div
@@ -1976,7 +1979,7 @@ function CustomerLeadCard({
     : "new";
 
   return (
-    <div className="rounded-3xl bg-slate-100 p-4">
+    <Card className="rounded-3xl border-0 bg-slate-100 p-4 text-[#071018]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-semibold">{lead.name}</p>
@@ -1984,9 +1987,9 @@ function CustomerLeadCard({
             {lead.source || "web"} - updated {updatedAgo}
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+        <Badge className={statusClass}>
           {lead.status.replaceAll("_", " ")}
-        </span>
+        </Badge>
       </div>
       <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
         <a
@@ -2026,39 +2029,39 @@ function CustomerLeadCard({
         {lead.notes && <p className="mt-2 text-slate-500">{lead.notes}</p>}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
-        <button
+        <Button
           onClick={onContacted}
-          className="rounded-full bg-white px-3 py-3 text-xs font-semibold text-[#071018]"
+          className="bg-white px-3 py-3 text-xs text-[#071018] hover:bg-slate-50"
         >
           Contacted
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onQualified}
-          className="rounded-full bg-blue-100 px-3 py-3 text-xs font-semibold text-blue-700"
+          className="bg-blue-100 px-3 py-3 text-xs text-blue-700 hover:bg-blue-200"
         >
           Qualified
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onCreateCustomer}
           disabled={lead.status === "customer_created"}
-          className="rounded-full bg-[#071018] px-3 py-3 text-xs font-semibold text-white disabled:bg-slate-300"
+          className="bg-[#071018] px-3 py-3 text-xs text-white hover:bg-[#14212b] disabled:bg-slate-300"
         >
           Create ID
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onNotReachable}
-          className="rounded-full bg-amber-100 px-3 py-3 text-xs font-semibold text-amber-700"
+          className="bg-amber-100 px-3 py-3 text-xs text-amber-700 hover:bg-amber-200"
         >
           No answer
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onArchive}
-          className="rounded-full bg-slate-200 px-3 py-3 text-xs font-semibold text-slate-600"
+          className="bg-slate-200 px-3 py-3 text-xs text-slate-600 hover:bg-slate-300"
         >
           Archive
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 

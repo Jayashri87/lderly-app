@@ -12,6 +12,10 @@ import {
   ShieldCheck
 } from "lucide-react";
 import LiveMap from "../../components/LiveMap";
+import { Alert } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
 import { AuthService, SessionUser } from "../../services/authService";
 import { BookingService, CareBooking } from "../../services/bookingService";
 import { CaretakerService } from "../../services/caretakerService";
@@ -618,25 +622,25 @@ export default function PartnerApp() {
               aria-label="Heart rate"
               className="rounded-2xl border border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
             />
-            <input
+            <Input
               value={bloodPressure}
               onChange={(event) => setBloodPressure(event.target.value)}
               aria-label="Blood pressure"
-              className="rounded-2xl border border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
+              className="border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
             />
-            <input
+            <Input
               value={oxygen}
               onChange={(event) => setOxygen(event.target.value)}
               inputMode="numeric"
               aria-label="Oxygen saturation"
-              className="rounded-2xl border border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
+              className="border-white/10 bg-white px-3 py-3 text-center font-semibold text-[#080b10]"
             />
           </div>
-          <input
+          <Input
             value={vitalsNote}
             onChange={(event) => setVitalsNote(event.target.value)}
             aria-label="Vitals note"
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-[#080b10]"
+            className="mt-2 border-white/10 bg-white px-4 py-3 text-sm text-[#080b10]"
           />
           <p className="mt-2 text-xs text-white/45">HR / BP / SpO2 are written to Firebase and risk alerts.</p>
         </section>
@@ -645,7 +649,7 @@ export default function PartnerApp() {
           <LiveMap journey={bookingMapJourney} />
         </div>
 
-        <section className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+        <Card className="mt-4 rounded-[1.5rem] p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-emerald-100">Live GPS</p>
@@ -665,36 +669,39 @@ export default function PartnerApp() {
             </span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
-            <button
+            <Button
               onClick={gpsWatchId === null ? startGpsWatch : stopGpsWatch}
               disabled={!hasActiveAssignment}
-              className="rounded-full bg-emerald-300 px-4 py-2 font-semibold text-[#080b10] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
+              variant="premium"
+              className="px-4 py-2 disabled:bg-white/15 disabled:text-white/45"
             >
               {gpsWatchId === null ? "Start live GPS" : "Stop live GPS"}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={updateGpsOnce}
               disabled={!hasActiveAssignment}
-              className="rounded-full bg-white/10 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+              variant="calm"
+              className="px-4 py-2"
             >
               Send current location
-            </button>
+            </Button>
             {["unsupported", "blocked", "simulated"].includes(gpsStatus) ? (
-              <button
+              <Button
                 onClick={sendSimulatedLocationFallback}
                 disabled={!hasActiveAssignment}
-                className="rounded-full bg-white/10 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+                variant="calm"
+                className="px-4 py-2"
               >
                 Send backup location
-              </button>
+              </Button>
             ) : null}
           </div>
           <p className="mt-3 text-xs text-white/40">
             Last update: {lastGpsAt ? new Date(lastGpsAt).toLocaleTimeString() : "Not sent yet"}
           </p>
-        </section>
+        </Card>
 
-        <section className="mt-6 rounded-[2rem] border border-emerald-200/15 bg-white/10 p-5">
+        <Card className="mt-6 rounded-[2rem] border-emerald-200/15 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-emerald-200">Before checkout</p>
@@ -737,15 +744,15 @@ export default function PartnerApp() {
             ))}
           </div>
           {completionBlockedReason ? (
-            <p className="mt-3 rounded-2xl bg-amber-200/10 px-4 py-3 text-sm text-amber-50">
+            <Alert variant="warning" className="mt-3">
               Checkout locked: {completionBlockedReason}.
-            </p>
+            </Alert>
           ) : (
-            <p className="mt-3 rounded-2xl bg-emerald-300/10 px-4 py-3 text-sm text-emerald-50">
+            <Alert variant="success" className="mt-3">
               Ready to complete session and create the visit report.
-            </p>
+            </Alert>
           )}
-        </section>
+        </Card>
 
         <section className="mt-6 grid grid-cols-2 gap-3">
           <ActionButton
@@ -937,20 +944,21 @@ export default function PartnerApp() {
               CaretakerService.setAvailability(session.uid, "offline", false);
             }}
           />
-          <button
+          <Button
             onClick={isJourneyAssignment ? completeJourney : completeBooking}
             disabled={!hasActiveAssignment || !canCompleteVisit}
             title={completionBlockedReason || "Complete session and report"}
-            className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 py-4 font-semibold text-[#080b10] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
+            variant="premium"
+            className="col-span-2 px-5 py-4 disabled:bg-white/15 disabled:text-white/45"
           >
             <FileText className="h-5 w-5" />
             {canCompleteVisit ? "Complete Session & Report" : completionBlockedReason}
-          </button>
+          </Button>
         </section>
         {actionMessage && (
-          <p className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/70">
+          <Alert className="mt-4">
             {actionMessage}
-          </p>
+          </Alert>
         )}
       </div>
     </main>
@@ -989,11 +997,12 @@ function ActionButton({
   disabledReason?: string;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
       disabled={disabled}
       title={disabled ? disabledReason : label}
-      className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-[1.5rem] bg-white/10 p-4 font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+      variant="calm"
+      className="h-auto min-h-24 flex-col rounded-[1.5rem] p-4 disabled:opacity-45"
     >
       <Icon className="h-6 w-6 text-emerald-200" />
       {label}
@@ -1002,6 +1011,6 @@ function ActionButton({
           {disabledReason}
         </span>
       ) : null}
-    </button>
+    </Button>
   );
 }

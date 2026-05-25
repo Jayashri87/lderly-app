@@ -18,6 +18,11 @@ import {
   Sparkles,
   UserRound
 } from "lucide-react";
+import { Alert } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 
 const lderlyContactNumber = "+91 99169 60524";
 const lderlyContactHref = "tel:+919916960524";
@@ -343,12 +348,12 @@ export default function SignInPage() {
           </motion.section>
         )}
 
-        {(showLeadForm || leadSubmitted) && <motion.section
+        {(showLeadForm || leadSubmitted) && <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="rounded-[2rem] bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20"
         >
+          <Card className="rounded-[2rem] border-0 bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20">
           {leadSubmitted ? (
             <div className="py-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
@@ -406,49 +411,49 @@ export default function SignInPage() {
               </p>
 
               <div className="mt-5 space-y-4">
-                <label className="block">
-                  <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <div>
+                  <Label className="flex items-center gap-2 text-slate-600">
                     <UserRound className="h-4 w-4" />
                     Your name
-                  </span>
-                  <input
+                  </Label>
+                  <Input
                     autoComplete="name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Your full name"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+                    className="mt-2 border-slate-200 bg-slate-50 text-[#06130f] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
                   />
-                </label>
+                </div>
 
-                <label className="block">
-                  <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <div>
+                  <Label className="flex items-center gap-2 text-slate-600">
                     <Phone className="h-4 w-4" />
                     Contact number
-                  </span>
-                  <input
+                  </Label>
+                  <Input
                     autoComplete="tel"
                     inputMode="tel"
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     placeholder="+91 99169 60524"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+                    className="mt-2 border-slate-200 bg-slate-50 text-[#06130f] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
                   />
-                </label>
+                </div>
 
-                <label className="block">
-                  <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <div>
+                  <Label className="flex items-center gap-2 text-slate-600">
                     <Mail className="h-4 w-4" />
                     Email ID
-                  </span>
-                  <input
+                  </Label>
+                  <Input
                     autoComplete="email"
                     inputMode="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="you@example.com"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+                    className="mt-2 border-slate-200 bg-slate-50 text-[#06130f] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
                   />
-                </label>
+                </div>
 
                 <div>
                   <span className="text-sm font-medium text-slate-600">Who needs care?</span>
@@ -509,14 +514,14 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              <button
+              <Button
                 onClick={submitLead}
                 disabled={leadBusy}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-6 w-full bg-[#06130f] px-5 py-4 text-white hover:bg-[#10241d]"
               >
                 {leadBusy ? "Submitting..." : "Request callback"}
                 <ArrowRight className="h-5 w-5" />
-              </button>
+              </Button>
 
               <a
                 href={lderlyContactHref}
@@ -537,10 +542,11 @@ export default function SignInPage() {
                 <Clock3 className="h-4 w-4" />
                 LDERLY team will contact you before account creation.
               </div>
-              {leadError && <p className="mt-4 text-sm text-amber-700">{leadError}</p>}
+              {leadError && <Alert variant="warning" className="mt-4 bg-amber-50 text-amber-700">{leadError}</Alert>}
             </>
           )}
-        </motion.section>}
+          </Card>
+        </motion.div>}
       </div>
     </main>
   );

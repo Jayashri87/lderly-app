@@ -13,6 +13,11 @@ import {
   ShieldCheck,
   UserRound
 } from "lucide-react";
+import { Alert } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import { AuthService } from "../../services/authService";
 
 const lderlyContactHref = "tel:+919916960524";
@@ -90,56 +95,57 @@ export default function CustomerLoginPage() {
           </Link>
         </header>
 
-        <motion.section
+        <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur sm:rounded-[2rem]"
         >
-          <motion.div
-            aria-hidden
-            animate={{ x: ["-12%", "22%", "-12%"], opacity: [0.16, 0.32, 0.16] }}
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-16 left-8 h-40 w-40 rounded-full bg-emerald-300/40 blur-3xl"
-          />
-          <div className="relative">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-300/15 text-emerald-100">
-              <ShieldCheck className="h-6 w-6" />
+          <Card className="relative overflow-hidden p-5 shadow-2xl shadow-black/25 sm:rounded-[2rem]">
+            <motion.div
+              aria-hidden
+              animate={{ x: ["-12%", "22%", "-12%"], opacity: [0.16, 0.32, 0.16] }}
+              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -top-16 left-8 h-40 w-40 rounded-full bg-emerald-300/40 blur-3xl"
+            />
+            <div className="relative">
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-300/15 text-emerald-100">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <h2 className="mt-5 text-4xl font-semibold tracking-tight">
+                Enter your care account.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-white/68">
+                Use the customer ID and password created by the LDERLY care team after registration.
+              </p>
             </div>
-            <h2 className="mt-5 text-4xl font-semibold tracking-tight">
-              Enter your care account.
-            </h2>
-            <p className="mt-4 text-base leading-7 text-white/68">
-              Use the customer ID and password created by the LDERLY care team after registration.
-            </p>
-          </div>
-        </motion.section>
+          </Card>
+        </motion.div>
 
-        <motion.section
+        <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="rounded-[2rem] bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20"
         >
+          <Card className="rounded-[2rem] border-0 bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20">
           <div className="space-y-4">
-            <label className="block">
-              <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <div>
+              <Label className="flex items-center gap-2 text-slate-600">
                 <UserRound className="h-4 w-4" />
                 Customer ID
-              </span>
-              <input
+              </Label>
+              <Input
                 autoComplete="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 placeholder="Customer ID"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-emerald-400"
+                className="mt-2 border-slate-200 bg-slate-50 text-[#06130f] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
               />
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            <div>
+              <Label className="flex items-center gap-2 text-slate-600">
                 <LockKeyhole className="h-4 w-4" />
                 Password
-              </span>
+              </Label>
               <div className="mt-2 flex items-center rounded-2xl border border-slate-200 bg-slate-50 pr-3 focus-within:border-emerald-400">
                 <input
                   autoComplete="current-password"
@@ -158,19 +164,19 @@ export default function CustomerLoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </label>
+            </div>
           </div>
 
-          {error && <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm text-amber-700">{error}</p>}
+          {error && <Alert variant="warning" className="mt-4 bg-amber-50 text-amber-700">{error}</Alert>}
 
-          <button
+          <Button
             onClick={login}
             disabled={busy}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 w-full bg-[#06130f] px-5 py-4 text-white hover:bg-[#10241d]"
           >
             {busy ? "Signing in..." : "Open customer app"}
             <ArrowRight className="h-5 w-5" />
-          </button>
+          </Button>
 
           <a
             href={lderlyContactHref}
@@ -186,7 +192,8 @@ export default function CustomerLoginPage() {
               Request registration callback
             </Link>
           </p>
-        </motion.section>
+          </Card>
+        </motion.div>
       </div>
     </main>
   );

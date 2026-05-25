@@ -29,7 +29,16 @@ import {
 import type { LucideIcon } from "lucide-react";
 import LiveMap from "../components/LiveMap";
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "../components/ui/dialog";
 import { AuthService, SessionUser } from "../services/authService";
 import {
   BookingRequestDetails,
@@ -3445,7 +3454,7 @@ function BookingFunnel({
 
           {step === "review" && (
             <FunnelScreen key="review">
-              <section className="rounded-[2rem] bg-white p-5 text-[#06130f]">
+              <Card className="rounded-[2rem] border-0 bg-white p-5 text-[#06130f]">
                 <h2 className="text-3xl font-semibold tracking-tight">
                   Review booking
                 </h2>
@@ -3483,14 +3492,14 @@ function BookingFunnel({
                     </div>
                   ))}
                 </div>
-                <button
+                <Button
                   onClick={onConfirm}
                   disabled={confirmBusy}
-                  className="mt-5 w-full rounded-full bg-[#06130f] px-5 py-4 font-semibold text-white disabled:cursor-wait disabled:bg-slate-400"
+                  className="mt-5 w-full bg-[#06130f] px-5 py-4 text-white hover:bg-[#10241d] disabled:cursor-wait disabled:bg-slate-400"
                 >
                   {confirmBusy ? "Preparing payment..." : "Confirm Care"}
-                </button>
-              </section>
+                </Button>
+              </Card>
             </FunnelScreen>
           )}
         </AnimatePresence>
@@ -3516,9 +3525,10 @@ function NeedCard({ need, onClick }: { need: CareNeed; onClick: () => void }) {
   const Icon = need.icon;
 
   return (
-    <button
+    <Button
       onClick={onClick}
-      className="flex w-full items-center gap-4 rounded-[1.5rem] bg-white p-4 text-left text-[#06130f]"
+      variant="default"
+      className="h-auto w-full justify-start gap-4 rounded-[1.5rem] bg-white p-4 text-left text-[#06130f] hover:bg-white/95"
     >
       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100">
         <Icon className="h-6 w-6 text-emerald-800" />
@@ -3528,7 +3538,7 @@ function NeedCard({ need, onClick }: { need: CareNeed; onClick: () => void }) {
         <p className="mt-1 text-sm text-slate-500">{need.subtitle}</p>
       </div>
       <ChevronRight className="h-5 w-5 text-slate-400" />
-    </button>
+    </Button>
   );
 }
 
@@ -3544,9 +3554,10 @@ function SelectRow({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-3xl p-4 text-left transition ${
+      variant="calm"
+      className={`h-auto w-full justify-between rounded-3xl p-4 text-left transition ${
         active ? "bg-white text-[#06130f]" : "bg-white/10 text-white"
       }`}
     >
@@ -3557,7 +3568,7 @@ function SelectRow({
         </p>
       </div>
       <ChevronRight className="h-5 w-5 opacity-60" />
-    </button>
+    </Button>
   );
 }
 
@@ -3998,22 +4009,9 @@ function PaymentTermsModal({
   onAgree: () => void;
 }) {
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-end bg-black/65 px-4 pb-4 backdrop-blur-sm sm:items-center sm:justify-center"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="payment-terms-title"
-    >
-      <motion.section
-        className="w-full max-w-md rounded-[2rem] bg-white p-5 text-[#06130f] shadow-2xl"
-        initial={{ y: 32, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 32, opacity: 0 }}
-      >
-        <div className="flex items-start gap-3">
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader className="flex-row items-start gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
             <ShieldCheck size={22} />
           </div>
@@ -4021,15 +4019,15 @@ function PaymentTermsModal({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
               Payment agreement
             </p>
-            <h2 id="payment-terms-title" className="mt-1 text-2xl font-semibold">
+            <DialogTitle className="mt-1">
               Review before payment
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
+            </DialogTitle>
+            <DialogDescription className="mt-2">
               You are paying {booking.payment.estimatedTotal} for {cleanServiceName(booking.serviceType)}.
               Care dispatch starts only after payment is verified.
-            </p>
+            </DialogDescription>
           </div>
-        </div>
+        </DialogHeader>
 
         <div className="mt-5 space-y-3 text-sm text-slate-600">
           {[
@@ -4060,22 +4058,23 @@ function PaymentTermsModal({
           </span>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <button
+        <DialogFooter className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-2">
+          <Button
             onClick={onCancel}
-            className="rounded-full bg-slate-100 px-4 py-4 font-semibold text-slate-700"
+            variant="default"
+            className="bg-slate-100 px-4 py-4 text-slate-700 hover:bg-slate-200"
           >
             Not now
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onAgree}
-            className="rounded-full bg-[#06130f] px-4 py-4 font-semibold text-white"
+            className="bg-[#06130f] px-4 py-4 text-white hover:bg-[#10241d]"
           >
             I agree & pay
-          </button>
-        </div>
-      </motion.section>
-    </motion.div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
