@@ -270,12 +270,65 @@ export const GoogleWorkspaceProvider = {
     };
   },
 
+  async appendMonthlyReportToSheet(report: MonthlyReportDocument): Promise<GoogleWorkspaceResult> {
+    const spreadsheetId =
+      process.env.GOOGLE_SHEETS_OPS_SPREADSHEET_ID?.trim() ||
+      process.env.GOOGLE_SHEETS_LEADS_SPREADSHEET_ID?.trim();
+
+    if (!spreadsheetId) {
+      return unavailable("GOOGLE_SHEETS_OPS_SPREADSHEET_ID");
+    }
+
+    const result = await googleFetch<{
+      updates?: { updatedRange?: string };
+    }>(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+        spreadsheetId
+      )}/values/${encodeURIComponent(
+        "Monthly Reports!A:L"
+      )}:append?valueInputOption=USER_ENTERED`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          values: [
+            [
+              new Date().toISOString(),
+              report.id,
+              report.userId,
+              report.month,
+              report.totalVisits,
+              report.wellnessSignal,
+              report.familyHeadline,
+              report.aiNarrative,
+              (report.topNextActions || []).join(" | "),
+              (report.highlights || []).map((highlight) => highlight.summary).join(" | "),
+              "sheet_fallback",
+              "Google Docs copy unavailable or not configured"
+            ].map(sheetValue)
+          ]
+        })
+      }
+    );
+
+    if (!result.ok) {
+      return { ok: false, provider: "google_workspace", status: result.status, error: result.error };
+    }
+
+    return {
+      ok: true,
+      provider: "google_workspace",
+      id: result.data.updates?.updatedRange,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+      details: { mode: "sheet_fallback", updatedRange: result.data.updates?.updatedRange }
+    };
+  },
+
   async createMonthlyReportDoc(report: MonthlyReportDocument): Promise<GoogleWorkspaceResult> {
     const templateId = process.env.GOOGLE_DOCS_MONTHLY_REPORT_TEMPLATE_ID?.trim();
     const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID?.trim();
 
     if (!templateId) {
-      return unavailable("GOOGLE_DOCS_MONTHLY_REPORT_TEMPLATE_ID");
+      return this.appendMonthlyReportToSheet(report);
     }
 
     const copyResult = await googleFetch<{
@@ -290,11 +343,19 @@ export const GoogleWorkspaceProvider = {
     });
 
     if (!copyResult.ok || !copyResult.data.id) {
+      const fallback = await this.appendMonthlyReportToSheet(report);
+
+      if (fallback.ok) {
+        return fallback;
+      }
+
       return {
         ok: false,
         provider: "google_workspace",
-        status: copyResult.ok ? 502 : copyResult.status,
-        error: copyResult.ok ? "Google Docs template copy did not return a document id" : copyResult.error
+        status: copyResult.ok ? fallback.status : copyResult.status,
+        error: copyResult.ok
+          ? `Google Docs template copy did not return a document id; Sheets fallback failed: ${fallback.error}`
+          : `${copyResult.error}; Sheets fallback failed: ${fallback.error}`
       };
     }
 
