@@ -200,11 +200,16 @@ The runbook summarizes:
 
 App Check readiness is exposed through `/api/system/status` and `/api/monitoring/snapshot`.
 
+The web app initializes Firebase App Check with reCAPTCHA Enterprise and automatically attaches `X-Firebase-AppCheck` to same-origin `/api/*` requests. Protected API middleware verifies that token when `LDERLY_ENFORCE_APP_CHECK=true`.
+
 Staged enforcement:
 
 1. Configure `NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY`.
-2. Validate web traffic and E2E flows.
-3. Set `LDERLY_ENFORCE_APP_CHECK=true` only after production clients are sending valid tokens.
+2. Confirm App Check request metrics in Firebase for Realtime Database, Storage, and custom API traffic.
+3. Validate customer, ops, and partner web E2E flows with valid App Check tokens.
+4. Add native App Check token forwarding for the Android caretaker app before enforcing APIs used by the APK.
+5. Set `LDERLY_ENFORCE_APP_CHECK=true` only after production clients are sending valid tokens.
+6. Enable Firebase Console enforcement for Realtime Database and Storage after metrics show legitimate traffic is verified.
 
 Upload safety:
 

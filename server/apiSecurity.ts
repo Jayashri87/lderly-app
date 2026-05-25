@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAppCheckToken } from "./appCheckProvider";
 import { requireRole } from "./authSession";
 import { getAdminDatabase } from "./firebaseAdmin";
 import { isRoleSessionActive } from "./sessionRegistry";
@@ -113,12 +114,30 @@ export const checkRateLimit = (
   };
 };
 
+export const requireAppCheck = async (request: NextRequest) => {
+  const result = await verifyAppCheckToken(request.headers.get("x-firebase-appcheck"));
+
+  if (!result.ok) {
+    return {
+      ok: false as const,
+      response: jsonError(result.error, result.status)
+    };
+  }
+
+  return {
+    ok: true as const,
+    appId: result.appId,
+    enforced: result.enforced
+  };
+};
+
 export const requireApiSession = async (
   request: NextRequest,
   roles: UserRole[],
   options: {
     rateLimit?: number;
     csrf?: boolean;
+    appCheck?: boolean;
   } = {}
 ): Promise<
   | {
@@ -142,6 +161,14 @@ export const requireApiSession = async (
 
   if (options.csrf !== false && !sameOriginCheck(request)) {
     return { ok: false, response: jsonError("Invalid request origin", 403) };
+  }
+
+  if (options.appCheck !== false) {
+    const appCheck = await requireAppCheck(request);
+
+    if (!appCheck.ok) {
+      return { ok: false, response: appCheck.response };
+    }
   }
 
   const rateLimit = checkRateLimit(

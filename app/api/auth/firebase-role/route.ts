@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAppCheck } from "../../../../server/apiSecurity";
 import {
   attachRoleSession,
   createSessionId,
@@ -27,6 +28,11 @@ const canAssignRole = (request: NextRequest, role: UserRole) => {
 };
 
 export async function POST(request: NextRequest) {
+  const appCheck = await requireAppCheck(request);
+  if (!appCheck.ok) {
+    return appCheck.response;
+  }
+
   const body = (await request.json()) as {
     idToken?: string;
     role?: unknown;

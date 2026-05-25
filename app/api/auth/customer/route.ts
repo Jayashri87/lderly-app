@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAppCheck } from "../../../../server/apiSecurity";
 import { attachRoleSession, createSessionId } from "../../../../server/authSession";
 import { registerRoleSession } from "../../../../server/sessionRegistry";
 import {
@@ -7,6 +8,11 @@ import {
 } from "../../../../server/authGuards";
 
 export async function POST(request: NextRequest) {
+  const appCheck = await requireAppCheck(request);
+  if (!appCheck.ok) {
+    return appCheck.response;
+  }
+
   const limited = requireAuthAttempt(request, "customer", 8);
   if (limited) {
     return limited;

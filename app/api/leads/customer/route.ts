@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAppCheck } from "../../../../server/apiSecurity";
 import { requireAuthAttempt } from "../../../../server/authGuards";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
 
@@ -21,6 +22,11 @@ const stableLeadIdFor = (email: string, phone: string) =>
     .slice(0, 18)}`;
 
 export async function POST(request: NextRequest) {
+  const appCheck = await requireAppCheck(request);
+  if (!appCheck.ok) {
+    return appCheck.response;
+  }
+
   const limited = requireAuthAttempt(request, "customer-lead", 12);
   if (limited) {
     return limited;
