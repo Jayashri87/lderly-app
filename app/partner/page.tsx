@@ -12,6 +12,8 @@ import {
   ShieldCheck
 } from "lucide-react";
 import LiveMap from "../../components/LiveMap";
+import { LiveActivityTimeline, LiveSystemPanel } from "../../components/system/LiveSystemPanel";
+import { SystemStatusPill } from "../../components/system/SystemStatusPill";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -521,12 +523,8 @@ export default function PartnerApp() {
             <h1 className="premium-title mt-1 text-3xl font-semibold">Today</h1>
           </div>
           <div className="flex items-center gap-2">
-            <div className="rounded-full bg-white/10 px-3 py-2 text-sm font-semibold">
-              KYC ready
-            </div>
-            <div className="rounded-full bg-emerald-300 px-3 py-2 text-sm font-semibold text-[#080b10]">
-              Online
-            </div>
+            <SystemStatusPill label="KYC ready" status="healthy" />
+            <SystemStatusPill label="Online" status="live" pulse />
             <button
               onClick={() => {
                 trackCaretakerAction("availability_offline");
@@ -548,6 +546,39 @@ export default function PartnerApp() {
             </button>
           </div>
         </header>
+
+        <LiveSystemPanel
+          eyebrow={hasActiveAssignment ? "Live assignment" : "Realtime standby"}
+          title={
+            hasActiveAssignment
+              ? "The visit is connected to family and ops"
+              : "Nearby care requests will appear here"
+          }
+          description={
+            hasActiveAssignment
+              ? "Accept, travel, start with customer OTP, record proof, and complete the visit from one operational flow."
+              : "Stay online. LDERLY will surface care offers with ETA, SLA, customer context, and proof requirements."
+          }
+          urgent={activeBooking?.matching?.priority === "critical"}
+          signals={[
+            {
+              label: "GPS",
+              value: gpsStatus === "tracking" ? "Sharing" : "Ready",
+              tone: gpsStatus === "tracking" ? "live" : "healthy"
+            },
+            {
+              label: "Workflow",
+              value: hasActiveAssignment ? bookingStatus.replaceAll("_", " ") : "Standing by",
+              tone: hasActiveAssignment ? "live" : "idle"
+            },
+            {
+              label: "Proof",
+              value: `${completionChecklist.filter((item) => completedChecklist[item]).length}/${completionChecklist.length}`,
+              tone: canCompleteVisit ? "healthy" : "watch"
+            }
+          ]}
+          className="mt-6"
+        />
 
         <section className="premium-card mt-6 rounded-[2rem] p-5">
           <p className="text-sm font-semibold text-emerald-700">Current assignment</p>
@@ -642,6 +673,27 @@ export default function PartnerApp() {
             className="mt-4 w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-center text-lg font-semibold tracking-[0.28em] text-[#080b10] outline-none"
           />
         </section>
+
+        <LiveActivityTimeline
+          items={[
+            {
+              label: hasActiveAssignment ? "Assignment received" : "Waiting for dispatch",
+              time: hasActiveAssignment ? "active now" : "standby",
+              status: hasActiveAssignment ? bookingStatus.replaceAll("_", " ") : "online"
+            },
+            {
+              label: gpsStatus === "tracking" ? "Live GPS is updating" : "GPS ready before travel",
+              time: lastGpsAt ? new Date(lastGpsAt).toLocaleTimeString() : "not sent yet",
+              status: gpsStatus
+            },
+            {
+              label: "Family completion verification required",
+              time: "end of visit",
+              status: "payment release protected"
+            }
+          ]}
+          className="mt-4"
+        />
 
         <section className="glass-panel mt-4 rounded-[1.5rem] p-4">
           <p className="text-sm font-semibold text-emerald-100">Visit vitals</p>

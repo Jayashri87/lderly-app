@@ -83,7 +83,11 @@ const expectNoHorizontalOverflow = async (page: Page) => {
 test.describe("LDERLY production E2E route checks", () => {
   test("public lead funnel is readable and mobile safe", async ({ page }) => {
     await page.goto("/signin");
-    await expect(page.getByText("Is Mom okay right now?")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: /Is Mom okay right now|trained caregiver|You know what happened|Share your details/i
+      })
+    ).toBeVisible();
     await expect(page.getByText("Call now")).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });

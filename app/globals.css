@@ -6,14 +6,21 @@
   --lderly-focus: #a7f3d0;
   --lderly-ink: #06130f;
   --lderly-ink-soft: #0b2019;
+  --lderly-slate: #111827;
+  --lderly-zinc: #18181b;
   --lderly-mint: #a7f3d0;
   --lderly-mint-strong: #34d399;
+  --lderly-indigo: #a5b4fc;
   --lderly-gold: #f7d774;
   --lderly-danger: #ff3648;
   --lderly-glass: rgba(255, 255, 255, 0.1);
   --lderly-glass-strong: rgba(255, 255, 255, 0.16);
   --lderly-border: rgba(255, 255, 255, 0.14);
   --lderly-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+  --motion-micro: 180ms;
+  --motion-panel: 360ms;
+  --radius-card: 1.5rem;
+  --radius-panel: 2rem;
 }
 
 * {
@@ -37,6 +44,7 @@ body {
     sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  font-synthesis-weight: none;
 }
 
 .lderly-shell {
@@ -126,6 +134,44 @@ body {
   animation: lderly-pulse 1.8s ease-out infinite;
 }
 
+.status-dot {
+  display: inline-flex;
+  height: 0.45rem;
+  width: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.18);
+}
+
+.emergency-dot {
+  position: relative;
+  display: inline-flex;
+  height: 0.72rem;
+  width: 0.72rem;
+  border-radius: 999px;
+  background: var(--lderly-danger);
+  box-shadow: 0 0 0 8px rgba(251, 54, 72, 0.12);
+}
+
+.emergency-dot::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: inherit;
+  border: 1px solid rgba(251, 54, 72, 0.5);
+  animation: lderly-pulse 1.25s ease-out infinite;
+}
+
+.emergency-surface {
+  border: 1px solid rgba(251, 54, 72, 0.34);
+  background:
+    radial-gradient(circle at 18% 8%, rgba(251, 54, 72, 0.22), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.07)),
+    rgba(80, 10, 22, 0.38);
+  box-shadow: 0 28px 90px rgba(251, 54, 72, 0.18);
+  backdrop-filter: blur(24px);
+}
+
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
@@ -144,6 +190,11 @@ body {
 .premium-title {
   letter-spacing: -0.01em;
   text-wrap: balance;
+}
+
+.copy-calm {
+  line-height: 1.68;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .soft-divider {
@@ -180,6 +231,11 @@ a {
   outline-offset: 3px;
 }
 
+:focus-visible {
+  outline: 3px solid var(--lderly-focus);
+  outline-offset: 3px;
+}
+
 button {
   cursor: pointer;
 }
@@ -200,5 +256,9 @@ button:disabled {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .motion-lift:hover {
+    transform: none;
   }
 }

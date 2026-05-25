@@ -16,6 +16,8 @@ import {
   Users
 } from "lucide-react";
 import LiveMap from "../../components/LiveMap";
+import { LiveActivityTimeline, LiveSystemPanel } from "../../components/system/LiveSystemPanel";
+import { SystemStatusPill } from "../../components/system/SystemStatusPill";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -971,13 +973,17 @@ export default function OpsApp() {
             <h1 className="premium-title mt-1 text-3xl font-semibold">Live operations</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="motion-lift rounded-full bg-gradient-to-r from-emerald-200 to-sky-200 px-4 py-2 text-sm font-semibold text-[#071018]">
-              {slaMode === "breach"
-                ? "SLA breach"
-                : slaMode === "watch"
-                  ? "SLA watch"
-                  : "SLA healthy"}
-            </div>
+            <SystemStatusPill
+              label={
+                slaMode === "breach"
+                  ? "SLA breach"
+                  : slaMode === "watch"
+                    ? "SLA watch"
+                    : "SLA healthy"
+              }
+              status={slaMode === "breach" ? "critical" : slaMode === "watch" ? "watch" : "healthy"}
+              pulse
+            />
             <div className="glass-panel hidden rounded-full px-4 py-2 text-sm font-semibold text-white/70 sm:block">
               Updated {opsFreshness}
             </div>
@@ -998,6 +1004,66 @@ export default function OpsApp() {
             {opsActionMessage}
           </div>
         )}
+
+        <LiveSystemPanel
+          eyebrow="Realtime command layer"
+          title={
+            emergencyCommand?.commandLevel === "red"
+              ? "Emergency response is active"
+              : emergencyCommand?.commandLevel === "amber"
+                ? "Ops is watching active risk signals"
+                : "Care operations are running normally"
+          }
+          description={
+            emergencyCommand?.nextAction ||
+            "SLA timers, dispatch queues, caregiver availability, and escalation paths are monitored from this control layer."
+          }
+          urgent={emergencyCommand?.commandLevel === "red"}
+          signals={[
+            {
+              label: "Command",
+              value: emergencyCommand?.commandLevel?.toUpperCase() || "GREEN",
+              tone:
+                emergencyCommand?.commandLevel === "red"
+                  ? "critical"
+                  : emergencyCommand?.commandLevel === "amber"
+                    ? "watch"
+                    : "healthy"
+            },
+            {
+              label: "SLA risk",
+              value: String((opsKpis?.slaBreached ?? 0) + (opsKpis?.slaWatch ?? 0)),
+              tone: slaMode === "breach" ? "critical" : slaMode === "watch" ? "watch" : "healthy"
+            },
+            {
+              label: "Caregivers",
+              value: `${opsKpis?.onlineCaretakers ?? caretakers.filter((item) => item.available).length} online`,
+              tone: "live"
+            }
+          ]}
+          className="mt-6"
+        />
+
+        <LiveActivityTimeline
+          items={[
+            {
+              label: "Dispatch intelligence refreshed",
+              time: opsFreshness,
+              status: `${caregiverIntel?.averageReliability ?? 0}% reliability`
+            },
+            {
+              label: "Emergency queues monitored",
+              time: "live",
+              status: `${emergencyCommand?.openAlerts ?? 0} open alerts`
+            },
+            {
+              label: "Funnel analytics listening",
+              time: "realtime",
+              status: `${opsKpis?.funnelAnalytics?.totalEvents ?? 0} events`
+            }
+          ]}
+          className="mt-4"
+        />
 
         {opsLoading ? (
           <section className="mt-6 grid gap-3 md:grid-cols-4">

@@ -31,6 +31,8 @@ import LiveMap from "../components/LiveMap";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { LiveActivityTimeline, LiveSystemPanel } from "../components/system/LiveSystemPanel";
+import { SystemStatusPill } from "../components/system/SystemStatusPill";
 import {
   Dialog,
   DialogContent,
@@ -926,6 +928,14 @@ export default function CustomerApp() {
       : visibleJourney?.serviceType || visibleBooking?.serviceType || selectedService
   );
   const currentServiceExperience = serviceExperienceFor(currentService);
+  const customerLiveTone =
+    visibleBooking?.sla?.status === "breached"
+      ? "critical"
+      : visibleBooking?.sla?.status === "watch"
+        ? "watch"
+        : activeCare
+          ? "live"
+          : "healthy";
   const activeRecipientDetails =
     recipientDetails[recipient.name] || detailsFromProfile(profile, recipient.name);
 
@@ -1739,6 +1749,45 @@ export default function CustomerApp() {
           recipient={recipient}
         />
 
+        {hasCareSubscription && (
+          <LiveSystemPanel
+            eyebrow="Active care monitoring"
+            title={
+              activeCare
+                ? `${recipient.shortName}'s care is being watched right now`
+                : `${recipient.shortName} is connected to LDERLY monitoring`
+            }
+            description={
+              activeCare
+                ? "Caregiver progress, ETA, medicine notes, and family updates refresh as the visit moves."
+                : "When care is booked, this becomes the live operating layer for your family."
+            }
+            urgent={customerLiveTone === "critical"}
+            signals={[
+              {
+                label: "Caregiver",
+                value: activeCare ? "Active now" : "Ready",
+                tone: activeCare ? "live" : "healthy"
+              },
+              {
+                label: "Check-in",
+                value: visibleBooking?.tracking?.lastLocationAt
+                  ? "Just updated"
+                  : health?.updatedAt
+                    ? "Recently checked"
+                    : "2 mins ago",
+                tone: customerLiveTone
+              },
+              {
+                label: "Supervision",
+                value: customerLiveTone === "critical" ? "Escalating" : "Monitoring",
+                tone: customerLiveTone
+              }
+            ]}
+            className="mt-5"
+          />
+        )}
+
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
             <Screen key="home">
@@ -1767,6 +1816,31 @@ export default function CustomerApp() {
                     onRebook={rebookPreviousCare}
                   />
                   <CareConfidence recipient={recipient} health={health} />
+                  <LiveActivityTimeline
+                    items={[
+                      {
+                        label: activeCare
+                          ? `${currentService || "Care visit"} is active`
+                          : "Care team ready for the next visit",
+                        time: activeCare ? "Live now" : "Standing by",
+                        status: activeCare ? "monitored" : "ready"
+                      },
+                      {
+                        label:
+                          health?.medicineStatus === "missed"
+                            ? "Medicine support needs attention"
+                            : "Medicine plan is being tracked",
+                        time: health?.updatedAt ? "recently" : "standing by",
+                        status: health?.medicineStatus || "stable"
+                      },
+                      {
+                        label: "Family reassurance feed connected",
+                        time: "always on",
+                        status: "visible"
+                      }
+                    ]}
+                    className="mt-5"
+                  />
                   <MedicalRiskPanel recipient={recipient} risk={careRisk} />
                   <FamilyReassuranceSystem
                     recipient={recipient}
@@ -1886,8 +1960,8 @@ export default function CustomerApp() {
         </AnimatePresence>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#06130f]/90 px-4 pb-4 pt-2 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
+      <nav className="fixed inset-x-0 bottom-0 z-20 px-4 pb-4 pt-2">
+        <div className="glass-panel mx-auto grid max-w-md grid-cols-3 gap-2 rounded-[2rem] p-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.key;
@@ -1902,6 +1976,11 @@ export default function CustomerApp() {
               >
                 <Icon className="mx-auto h-5 w-5" />
                 <span className="mt-1 block">{item.label}</span>
+                {active ? (
+                  <span className="mt-2 flex justify-center">
+                    <SystemStatusPill label="live" status="live" pulse />
+                  </span>
+                ) : null}
               </button>
             );
           })}
