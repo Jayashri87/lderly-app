@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
         name: body.name!,
         userId: auth.session.uid || auth.session.username,
         role: auth.session.role,
-        bookingId: body.bookingId,
+        bookingId: body.bookingId || undefined,
         properties: body.properties || {}
       })
   );

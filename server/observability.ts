@@ -133,6 +133,26 @@ const recordValues = <T>(value: unknown) =>
 const recordEntries = <T>(value: unknown) =>
   Object.entries((value || {}) as Record<string, T>);
 
+const sanitizeFirebaseValue = (value: unknown): unknown => {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(sanitizeFirebaseValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entryValue]) => entryValue !== undefined)
+        .map(([entryKey, entryValue]) => [entryKey, sanitizeFirebaseValue(entryValue)])
+    );
+  }
+
+  return value;
+};
+
 export const Observability = {
   async captureEvent({
     name,
@@ -153,8 +173,8 @@ export const Observability = {
       name,
       userId,
       role,
-      bookingId,
-      properties,
+      ...(bookingId ? { bookingId } : {}),
+      properties: sanitizeFirebaseValue(properties) as Record<string, unknown>,
       createdAt: Date.now()
     };
     const dateKey = new Date(event.createdAt).toISOString().slice(0, 10);

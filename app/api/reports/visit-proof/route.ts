@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
   const result = await TrustProvider.visitProof(bookingId);
 
   if (!result.ok) {
+    if (result.status === 404) {
+      return NextResponse.json({ proof: null });
+    }
+
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
