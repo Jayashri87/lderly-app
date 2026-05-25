@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "verify:env": "node scripts/verify-production-env.mjs",
+    "audit:deps": "npm audit --audit-level=moderate",
     "audit:secrets": "node scripts/audit-secret-exposure.mjs",
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
@@ -16,36 +17,41 @@
     "e2e": "playwright test",
     "e2e:prod": "node scripts/run-e2e-prod.mjs",
     "e2e:headed": "playwright test --headed",
-    "ci:validate": "npm run audit:secrets && npm run lint && npm run build && npm run ci:smoke"
+    "ci:validate": "npm run audit:deps && npm run audit:secrets && npm run lint && npm run build && npm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
     "@react-google-maps/api": "^2.20.7",
-    "@sentry/nextjs": "^10.52.0",
-    "@tanstack/react-query": "^5.100.9",
+    "@sentry/nextjs": "^10.53.1",
+    "@tanstack/react-query": "^5.100.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "firebase": "^12.0.0",
-    "firebase-admin": "^13.9.0",
+    "firebase": "^12.13.0",
+    "firebase-admin": "^13.10.0",
     "framer-motion": "^11.18.2",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.511.0",
     "next": "^16.2.6",
-    "posthog-js": "^1.372.10",
+    "posthog-js": "^1.376.0",
     "radix-ui": "^1.4.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.5.0"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/node": "^20.19.41",
+    "@types/react": "^19.2.15",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.3.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.14",
+    "uuid": "11.1.1",
+    "protobufjs": "7.6.1"
   }
 }
