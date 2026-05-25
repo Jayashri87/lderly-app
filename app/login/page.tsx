@@ -74,9 +74,9 @@ export default function CustomerLoginPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#06130f] px-4 py-5 text-white">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.16),transparent_28%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-md flex-col gap-5">
+    <main className="min-h-dvh overflow-x-hidden bg-[#06130f] px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.16),transparent_28%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
+      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-2.5rem)] max-w-md flex-col gap-5">
         <header className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-emerald-200">LDERLY</p>
@@ -93,7 +93,7 @@ export default function CustomerLoginPage() {
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
+          className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur sm:rounded-[2rem]"
         >
           <motion.div
             aria-hidden

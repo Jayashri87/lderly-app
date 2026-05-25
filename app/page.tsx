@@ -1666,8 +1666,8 @@ export default function CustomerApp() {
   }
 
   return (
-    <main className="h-dvh overflow-y-auto overscroll-contain bg-[#06130f] text-white">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
+    <main className="min-h-dvh overflow-x-hidden bg-[#06130f] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
       <div className="relative z-10 mx-auto min-h-dvh max-w-md px-4 pb-28 pt-5 sm:max-w-lg">
         <header className="flex items-center justify-between">
           <div>
@@ -1985,8 +1985,8 @@ function Screen({ children }: { children: React.ReactNode }) {
 
 function RecipientGate({ onSelect }: { onSelect: (recipient: string) => void }) {
   return (
-    <main className="h-dvh overflow-y-auto overscroll-contain bg-[#06130f] text-white">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
+    <main className="min-h-dvh overflow-x-hidden bg-[#06130f] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-4 py-6 pb-10">
         <p className="text-xs uppercase tracking-[0.28em] text-emerald-200">
           LDERLY
@@ -2069,8 +2069,8 @@ function RecipientDetailsSetup({
   const canContinue = details.fullName.trim() && details.age.trim();
 
   return (
-    <main className="h-dvh overflow-y-auto overscroll-contain bg-[#06130f] text-white">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
+    <main className="min-h-dvh overflow-x-hidden bg-[#06130f] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.14),transparent_26%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
       <div className="relative z-10 mx-auto min-h-dvh max-w-md px-4 py-6 pb-28">
         <button onClick={onBack} className="rounded-full bg-white/10 px-4 py-2 text-sm">
           Back

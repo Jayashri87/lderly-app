@@ -141,9 +141,9 @@ export default function SignInPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#06130f] px-4 py-5 text-white">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.16),transparent_28%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-md flex-col gap-5">
+    <main className="min-h-dvh overflow-x-hidden bg-[#06130f] px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,.22),transparent_34%),radial-gradient(circle_at_85%_10%,rgba(251,191,36,.16),transparent_28%),linear-gradient(180deg,#06130f,#08110f_46%,#050706)]" />
+      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-2.5rem)] max-w-md flex-col gap-5">
         <motion.header
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -180,7 +180,7 @@ export default function SignInPage() {
             initial={{ opacity: 0, scale: 0.98, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative flex min-h-[68vh] flex-col justify-between overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
+            className="relative flex min-h-[560px] flex-col justify-between overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur sm:min-h-[640px] sm:rounded-[2rem]"
             onClick={(event) => {
               if (event.target === event.currentTarget) {
                 setAdPaused((paused) => !paused);
@@ -227,15 +227,15 @@ export default function SignInPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -16 }}
                 transition={{ duration: 0.55 }}
-                className="mt-12"
+                className="mt-9 sm:mt-12"
               >
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-100/80">
                   {adSlides[adIndex].eyebrow}
                 </p>
-                <h1 className="mt-4 text-5xl font-semibold leading-[1.02] tracking-tight">
+                <h1 className="mt-4 text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl">
                   {adSlides[adIndex].title}
                 </h1>
-                <p className="mt-5 text-base leading-7 text-white/68">
+                <p className="mt-5 text-sm leading-6 text-white/68 sm:text-base sm:leading-7">
                   {adSlides[adIndex].body}
                 </p>
                 <div className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold text-white">
@@ -277,21 +277,21 @@ export default function SignInPage() {
               <div className="mb-4 grid grid-cols-3 gap-2">
                 <button
                   onClick={showPreviousAd}
-                  className="flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
+                  className="flex min-h-12 items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </button>
                 <button
                   onClick={() => setAdPaused((paused) => !paused)}
-                  className="flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
+                  className="flex min-h-12 items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
                 >
                   {adPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                   {adPaused ? "Play" : "Pause"}
                 </button>
                 <button
                   onClick={showNextAd}
-                  className="flex items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
+                  className="flex min-h-12 items-center justify-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-3 text-xs font-semibold text-white"
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
@@ -319,7 +319,7 @@ export default function SignInPage() {
             initial={{ opacity: 0, scale: 0.98, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur"
+            className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.08] p-5 shadow-2xl shadow-black/25 backdrop-blur sm:rounded-[2rem]"
           >
             <motion.div
               aria-hidden
@@ -332,7 +332,7 @@ export default function SignInPage() {
                 <Sparkles className="h-4 w-4" />
                 Premium elderly care coordination
               </div>
-              <h1 className="mt-5 text-4xl font-semibold tracking-tight">
+              <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
                 Care for your parents, arranged with trust.
               </h1>
               <p className="mt-4 text-base leading-7 text-white/68">
