@@ -15,9 +15,20 @@ Public client variables:
 - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
 - `NEXT_PUBLIC_FIREBASE_DATABASE_URL`
 - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY`
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 - `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID`
+- `NEXT_PUBLIC_POSTHOG_KEY`
+- `NEXT_PUBLIC_POSTHOG_HOST`
+- `NEXT_PUBLIC_CLARITY_ID`
+- `NEXT_PUBLIC_MIXPANEL_TOKEN`
+- `NEXT_PUBLIC_SENTRY_DSN`
+- `NEXT_PUBLIC_VERCEL_ENV`
+
+Do not set `NEXT_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN` in production. It is only for local App Check debugging.
 
 Server-only app credentials:
 
@@ -50,6 +61,33 @@ WhatsApp/SMS provider:
 - `TWILIO_WHATSAPP_FROM`
 
 For `FIREBASE_ADMIN_PRIVATE_KEY`, keep newline escapes as `\n` when storing in an env dashboard.
+
+## Secrets And Environment Security
+
+Pre-launch rotation required:
+
+- Rotate the Vercel access token previously used during setup.
+- Rotate Razorpay key secret and webhook secret before taking real payments.
+- Rotate Firebase Admin service-account private key and delete the old service-account key.
+- Rotate role login passwords and `LDERLY_AUTH_SECRET`.
+- Rotate analytics/provider keys that were shared outside provider dashboards.
+- Restrict Google Maps API key by HTTP referrer and enabled APIs.
+
+Environment scoping:
+
+- Server-only secrets must exist only as Vercel encrypted environment variables.
+- Production secrets should be scoped to Production only unless a separate staging provider/resource is configured.
+- Preview and Development should use separate Firebase/Razorpay/Maps/test credentials.
+- Never create `NEXT_PUBLIC_*` variables for passwords, secrets, private keys, auth tokens, webhook secrets, or service-account material.
+
+Automated checks:
+
+```bash
+npm run audit:secrets
+npm run verify:env
+```
+
+`npm run audit:secrets` blocks committed secret patterns and unapproved browser-exposed env vars. `npm run verify:env` blocks production App Check debug tokens and secret-like `NEXT_PUBLIC_*` names.
 
 ## Verification
 

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "verify:env": "node scripts/verify-production-env.mjs",
+    "audit:secrets": "node scripts/audit-secret-exposure.mjs",
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
@@ -15,7 +16,7 @@
     "e2e": "playwright test",
     "e2e:prod": "node scripts/run-e2e-prod.mjs",
     "e2e:headed": "playwright test --headed",
-    "ci:validate": "npm run lint && npm run build && npm run ci:smoke"
+    "ci:validate": "npm run audit:secrets && npm run lint && npm run build && npm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
