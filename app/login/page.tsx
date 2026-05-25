@@ -88,10 +88,22 @@ export default function CustomerLoginPage() {
       await AuthService.continueWithGoogle("customer");
       router.replace("/");
     } catch (googleError) {
+      const code =
+        typeof googleError === "object" &&
+        googleError !== null &&
+        "code" in googleError
+          ? String((googleError as { code?: unknown }).code)
+          : "";
       const message =
-        googleError instanceof Error && googleError.message.includes("popup-closed")
+        code.includes("popup-closed")
           ? "Google login was closed before completion."
-          : "Google login is not available yet. Enable Google sign-in in Firebase and try again.";
+          : code.includes("operation-not-allowed")
+            ? "Google login is not enabled in Firebase yet. Enable Google under Firebase Authentication sign-in providers."
+            : code.includes("unauthorized-domain")
+              ? "This domain is not authorized in Firebase. Add lderly-app.vercel.app under Firebase Authentication authorized domains."
+              : code.includes("popup-blocked")
+                ? "The browser blocked the Google login popup. Allow popups for LDERLY and try again."
+                : `Google login could not start${code ? ` (${code})` : ""}. Check Firebase Authentication settings.`;
       setError(message);
     } finally {
       setGoogleBusy(false);
