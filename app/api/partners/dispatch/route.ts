@@ -10,6 +10,7 @@ import {
   PartnerMarketplace,
   type PartnerType
 } from "../../../../server/partnerMarketplace";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 const partnerTypes: PartnerType[] = [
   "ambulance",
@@ -64,6 +65,19 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendPartnerDispatchToOpsSheet({
+    dispatchId: result.dispatch.id,
+    bookingId: result.dispatch.bookingId,
+    partnerId: result.dispatch.partnerId,
+    partnerName: result.dispatch.partnerName,
+    partnerType: result.dispatch.partnerType,
+    zone: result.dispatch.zone,
+    reason: result.dispatch.reason,
+    status: result.dispatch.status,
+    etaMinutes: result.dispatch.etaMinutes,
+    actor: auth.session.role
+  });
 
   return NextResponse.json({ ok: true, dispatch: result.dispatch });
 }

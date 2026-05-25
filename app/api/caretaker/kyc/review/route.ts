@@ -9,6 +9,7 @@ import {
   isKycDocumentType,
   reviewKycDocument
 } from "../../../../../server/kycProvider";
+import { GoogleWorkspaceProvider } from "../../../../../server/googleWorkspaceProvider";
 
 const validStatuses = ["approved", "rejected", "needs_resubmission"] as const;
 
@@ -60,6 +61,14 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendKycReviewToOpsSheet({
+    caretakerId: body.caretakerId,
+    documentType,
+    status: result.review.status,
+    reviewerId: result.review.reviewerId,
+    note: result.review.note
+  });
 
   return NextResponse.json({ review: result.review });
 }

@@ -9,6 +9,7 @@ import {
   dispatchInternalOpsAlert,
   type InternalOpsAlertKind
 } from "../../../../server/internalOpsProvider";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 const alertKinds: InternalOpsAlertKind[] = [
   "ai_risk",
@@ -68,6 +69,19 @@ export async function POST(request: NextRequest) {
         severity: body.severity as "low" | "medium" | "high" | "critical" | undefined
       })
   );
+
+  if (result.ok) {
+    await GoogleWorkspaceProvider.appendOpsAlertToOpsSheet({
+      alertId: result.alert.id,
+      kind: result.alert.kind,
+      title: result.alert.title,
+      message: result.alert.message,
+      bookingId: result.alert.bookingId,
+      severity: result.alert.severity,
+      channel: result.alert.channel,
+      status: result.alert.status
+    });
+  }
 
   return NextResponse.json(result);
 }

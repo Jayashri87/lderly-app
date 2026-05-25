@@ -10,6 +10,7 @@ import {
   SubscriptionProvider,
   type SubscriptionCadence
 } from "../../../server/subscriptionProvider";
+import { GoogleWorkspaceProvider } from "../../../server/googleWorkspaceProvider";
 
 const cadences: SubscriptionCadence[] = ["monthly", "weekly"];
 
@@ -72,6 +73,20 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendSubscriptionToOpsSheet({
+    subscriptionId: result.subscription.id,
+    userId: result.subscription.userId,
+    recipientName: result.subscription.recipientName,
+    packageId: result.subscription.packageId,
+    cadence: result.subscription.cadence,
+    serviceTypes: result.subscription.serviceTypes,
+    amountLabel: result.subscription.amountLabel,
+    status: result.subscription.status,
+    nextBillingAt: result.subscription.nextBillingAt,
+    nextVisitWindow: result.subscription.nextVisitWindow,
+    actor: auth.session.role
+  });
 
   return NextResponse.json({ ok: true, subscription: result.subscription });
 }

@@ -10,6 +10,7 @@ import {
   CareQualityProvider,
   type MedicationStatus
 } from "../../../../server/careQualityProvider";
+import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 
 const medicationStatuses: MedicationStatus[] = ["completed", "due", "missed", "skipped"];
 
@@ -74,6 +75,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
+    await GoogleWorkspaceProvider.appendMedicationToOpsSheet({
+      event: "schedule",
+      userId,
+      recipientName: result.schedule.recipientName,
+      scheduleId: result.schedule.id,
+      medicines: result.schedule.medicines,
+      actor: auth.session.role
+    });
+
     return NextResponse.json({ ok: true, schedule: result.schedule });
   }
 
@@ -110,6 +120,17 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  await GoogleWorkspaceProvider.appendMedicationToOpsSheet({
+    event: "adherence",
+    userId,
+    scheduleId: result.adherence.scheduleId,
+    medicineName: result.adherence.medicineName,
+    status: result.adherence.status,
+    note: result.adherence.note,
+    bookingId: result.adherence.bookingId,
+    actor: auth.session.role
+  });
 
   return NextResponse.json({ ok: true, adherence: result.adherence });
 }

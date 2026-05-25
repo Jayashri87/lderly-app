@@ -33,7 +33,14 @@ type OpsSheetName =
   | "Refunds"
   | "Invoices"
   | "Caregiver Attendance"
-  | "Care Risk";
+  | "Care Risk"
+  | "Medication"
+  | "Payouts"
+  | "Subscriptions"
+  | "Partner Dispatch"
+  | "KYC Reviews"
+  | "Push Notifications"
+  | "Ops Alerts";
 
 type PaymentSyncEvent = {
   booking: CareBooking;
@@ -135,6 +142,92 @@ type CareRiskSyncEvent = {
   openIncidents?: number;
   signals?: string[];
   recommendations?: string[];
+};
+
+type MedicationSyncEvent = {
+  event: "schedule" | "adherence";
+  userId: string;
+  recipientName?: string;
+  scheduleId?: string;
+  medicineName?: string;
+  medicines?: Array<{ name: string; dosage: string; time: string; instructions?: string }>;
+  status?: string;
+  note?: string;
+  bookingId?: string;
+  actor?: string;
+};
+
+type PayoutSyncEvent = {
+  payoutId?: string;
+  bookingId: string;
+  caretakerId?: string;
+  caretakerName?: string;
+  grossAmount?: number;
+  basePayout?: number;
+  incentiveAmount?: number;
+  totalPayout?: number;
+  status?: string;
+  reconciliationStatus?: string;
+  provider?: string;
+};
+
+type SubscriptionSyncEvent = {
+  subscriptionId?: string;
+  userId: string;
+  recipientName: string;
+  packageId: string;
+  cadence: string;
+  serviceTypes?: string[];
+  amountLabel?: string;
+  status?: string;
+  nextBillingAt?: number;
+  nextVisitWindow?: string;
+  actor?: string;
+};
+
+type PartnerDispatchSyncEvent = {
+  dispatchId?: string;
+  bookingId?: string;
+  partnerId?: string;
+  partnerName?: string;
+  partnerType: string;
+  zone?: string;
+  reason?: string;
+  status?: string;
+  etaMinutes?: number;
+  actor?: string;
+};
+
+type KycReviewSyncEvent = {
+  caretakerId: string;
+  documentType: string;
+  status: string;
+  reviewerId?: string;
+  note?: string;
+};
+
+type PushNotificationSyncEvent = {
+  dispatchId?: string;
+  userId: string;
+  title: string;
+  body: string;
+  status?: string;
+  mode?: string;
+  attempted?: number;
+  sent?: number;
+  failed?: number;
+  actor?: string;
+};
+
+type OpsAlertSyncEvent = {
+  alertId?: string;
+  kind: string;
+  title: string;
+  message: string;
+  bookingId?: string;
+  severity?: string;
+  channel?: string;
+  status?: string;
 };
 
 const scopes = [
@@ -533,6 +626,129 @@ export const GoogleWorkspaceProvider = {
         event.openIncidents || 0,
         (event.signals || []).join(" | "),
         (event.recommendations || []).join(" | ")
+      ]
+    ]);
+  },
+
+  async appendMedicationToOpsSheet(event: MedicationSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Medication", [
+      [
+        new Date().toISOString(),
+        event.event,
+        event.userId,
+        event.recipientName || "",
+        event.scheduleId || "",
+        event.medicineName || (event.medicines || []).map((medicine) => medicine.name).join(" | "),
+        (event.medicines || [])
+          .map((medicine) => `${medicine.name} ${medicine.dosage} ${medicine.time}`)
+          .join(" | "),
+        event.status || "",
+        event.note || "",
+        event.bookingId || "",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendPayoutToOpsSheet(event: PayoutSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Payouts", [
+      [
+        new Date().toISOString(),
+        event.payoutId || "",
+        event.bookingId,
+        event.caretakerId || "",
+        event.caretakerName || "",
+        event.grossAmount || 0,
+        event.basePayout || 0,
+        event.incentiveAmount || 0,
+        event.totalPayout || 0,
+        event.status || "",
+        event.reconciliationStatus || "",
+        event.provider || ""
+      ]
+    ]);
+  },
+
+  async appendSubscriptionToOpsSheet(event: SubscriptionSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Subscriptions", [
+      [
+        new Date().toISOString(),
+        event.subscriptionId || "",
+        event.userId,
+        event.recipientName,
+        event.packageId,
+        event.cadence,
+        (event.serviceTypes || []).join(" | "),
+        event.amountLabel || "",
+        event.status || "",
+        event.nextBillingAt ? new Date(event.nextBillingAt).toISOString() : "",
+        event.nextVisitWindow || "",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendPartnerDispatchToOpsSheet(event: PartnerDispatchSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Partner Dispatch", [
+      [
+        new Date().toISOString(),
+        event.dispatchId || "",
+        event.bookingId || "",
+        event.partnerId || "",
+        event.partnerName || "",
+        event.partnerType,
+        event.zone || "",
+        event.reason || "",
+        event.status || "",
+        event.etaMinutes || "",
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendKycReviewToOpsSheet(event: KycReviewSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("KYC Reviews", [
+      [
+        new Date().toISOString(),
+        event.caretakerId,
+        event.documentType,
+        event.status,
+        event.reviewerId || "",
+        event.note || ""
+      ]
+    ]);
+  },
+
+  async appendPushNotificationToOpsSheet(event: PushNotificationSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Push Notifications", [
+      [
+        new Date().toISOString(),
+        event.dispatchId || "",
+        event.userId,
+        event.title,
+        event.body,
+        event.status || "",
+        event.mode || "",
+        event.attempted || 0,
+        event.sent || 0,
+        event.failed || 0,
+        event.actor || ""
+      ]
+    ]);
+  },
+
+  async appendOpsAlertToOpsSheet(event: OpsAlertSyncEvent): Promise<GoogleWorkspaceResult> {
+    return appendRows("Ops Alerts", [
+      [
+        new Date().toISOString(),
+        event.alertId || "",
+        event.kind,
+        event.title,
+        event.message,
+        event.bookingId || "",
+        event.severity || "",
+        event.channel || "",
+        event.status || ""
       ]
     ]);
   },
