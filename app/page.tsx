@@ -1711,22 +1711,6 @@ export default function CustomerApp() {
           </div>
         )}
 
-        <AnimatePresence>
-          {paymentTermsBooking && (
-            <PaymentTermsModal
-              booking={paymentTermsBooking}
-              onCancel={() => {
-                trackProductEvent("payment_terms_dismissed", {
-                  bookingId: paymentTermsBooking.id,
-                  service: paymentTermsBooking.serviceType
-                });
-                setPaymentTermsBooking(null);
-              }}
-              onAgree={acceptPaymentTermsAndPay}
-            />
-          )}
-        </AnimatePresence>
-
         <RealtimeCareStrip
           activeCare={Boolean(activeCare)}
           service={currentService}
@@ -1986,6 +1970,21 @@ export default function CustomerApp() {
       )}
 
       {careOnWay && <CareOnWay recipient={recipient} />}
+      <AnimatePresence>
+        {paymentTermsBooking && (
+          <PaymentTermsModal
+            booking={paymentTermsBooking}
+            onCancel={() => {
+              trackProductEvent("payment_terms_dismissed", {
+                bookingId: paymentTermsBooking.id,
+                service: paymentTermsBooking.serviceType
+              });
+              setPaymentTermsBooking(null);
+            }}
+            onAgree={acceptPaymentTermsAndPay}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }
