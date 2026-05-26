@@ -204,6 +204,11 @@ const bookingPayload = () => {
   };
 };
 
+const rejectionBookingPayload = () => ({
+  ...bookingPayload(),
+  id: `care-flow-reject-${Date.now()}`
+});
+
 const expectStatus = (booking, status, label) => {
   if (booking.status !== status) {
     throw new Error(`${label}: expected ${status}, received ${booking.status}`);
@@ -244,6 +249,33 @@ const main = async () => {
   );
   if (!caretakerRead.json.booking?.dispatch?.offers?.["demo-caretaker"]) {
     throw new Error("Caretaker could not read their dispatch offer");
+  }
+
+  const rejectionCreateResult = await request(
+    "/api/bookings",
+    {
+      method: "POST",
+      body: JSON.stringify({ booking: rejectionBookingPayload() })
+    },
+    customer.cookie
+  );
+  const rejectedBooking = (
+    await request(
+      `/api/bookings/${encodeURIComponent(rejectionCreateResult.json.booking.id)}/reject`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason: "Care-flow rejection coverage" })
+      },
+      caretaker.cookie
+    )
+  ).json.booking;
+
+  if (rejectedBooking.dispatch?.offers?.["demo-caretaker"]?.status !== "rejected") {
+    throw new Error("Caretaker rejection did not update the dispatch offer");
+  }
+
+  if (rejectedBooking.status === "cancelled" || rejectedBooking.status === "completed") {
+    throw new Error(`Rejected offer moved customer booking to invalid status: ${rejectedBooking.status}`);
   }
 
   booking = (

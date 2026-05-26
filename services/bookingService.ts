@@ -1130,6 +1130,15 @@ export const BookingService = {
     );
   },
 
+  async rejectDispatchOffer(reason = "Caregiver unavailable") {
+    const booking = readLocalBooking();
+
+    return confirmedBookingAction(
+      `/api/bookings/${encodeURIComponent(booking.id)}/reject`,
+      { reason }
+    );
+  },
+
   startWithCustomerOtp(otp: string) {
     const booking = readLocalBooking();
 

@@ -1839,7 +1839,7 @@ export default function CustomerApp() {
             caregiverIsActive
               ? "Caregiver active now"
               : caregiverHasAccepted
-                ? "Caregiver accepted"
+                ? "Caregiver confirmed"
                 : visibleBooking && visibleBooking.status !== "none"
                   ? "Finding the right caregiver"
                   : "LDERLY monitoring is ready"
@@ -1856,7 +1856,7 @@ export default function CustomerApp() {
           status={customerLiveTone}
           signals={[
             { label: "ETA", value: caregiverHasAccepted ? `${visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? 8} min` : "Pending" },
-            { label: "Check-in", value: caregiverIsActive ? "Live" : caregiverHasAccepted ? "Accepted" : "Not started" },
+            { label: "Check-in", value: caregiverIsActive ? "Live" : caregiverHasAccepted ? "Confirmed" : "Not started" },
             { label: "Trust", value: "Supervised" }
           ]}
           className="mt-4"

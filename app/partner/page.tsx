@@ -267,6 +267,7 @@ export default function PartnerApp() {
   const journeyStatus = activeJourney?.status || "idle";
   const canAcceptCare =
     isJourneyAssignment || bookingStatus === "searching" || bookingStatus === "assigned";
+  const canRejectCare = isBookingAssignment && (bookingStatus === "searching" || bookingStatus === "assigned");
   const canGoEnRoute =
     isJourneyAssignment || bookingStatus === "accepted";
   const canMarkArrived =
@@ -905,6 +906,18 @@ export default function PartnerApp() {
                 return isJourneyAssignment
                   ? JourneyService.updateStatus("accepted")
                   : BookingService.acceptDispatchOffer();
+              });
+            }}
+          />
+          <ActionButton
+            label="Reject"
+            icon={AlertTriangle}
+            disabled={!hasActiveAssignment || !canRejectCare}
+            disabledReason={!hasActiveAssignment ? "No active assignment" : "Only open care offers can be rejected"}
+            onClick={() => {
+              runAssignmentAction("Rejected", () => {
+                trackCaretakerAction("rejected_booking");
+                return BookingService.rejectDispatchOffer("Caregiver unavailable from partner app");
               });
             }}
           />
