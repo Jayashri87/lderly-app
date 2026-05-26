@@ -866,7 +866,12 @@ export default function OpsApp() {
   };
   const runCommandAction = async (
     item: CommandQueueItem,
-    action: "acknowledge" | "resolve_incident" | "escalate_booking" | "resolve_alert"
+    action:
+      | "acknowledge"
+      | "resolve_incident"
+      | "escalate_booking"
+      | "advance_emergency"
+      | "resolve_alert"
   ) => {
     trackProductEvent("ops_command_center_action", {
       action,
@@ -1257,7 +1262,12 @@ export default function OpsApp() {
                   key={`${item.type}-${item.id}`}
                   item={item}
                   onAcknowledge={() => runCommandAction(item, "acknowledge")}
-                  onEscalate={() => runCommandAction(item, "escalate_booking")}
+                  onEscalate={() =>
+                    runCommandAction(
+                      item,
+                      item.type === "emergency" ? "advance_emergency" : "escalate_booking"
+                    )
+                  }
                   onResolve={() =>
                     runCommandAction(
                       item,
@@ -2580,7 +2590,7 @@ function CommandQueueCard({
       : item.risk === "high"
         ? "bg-amber-100 text-amber-700"
         : "bg-white/10 text-white";
-  const canEscalate = item.type === "booking";
+  const canEscalate = item.type === "booking" || item.type === "emergency";
   const canResolve = item.type === "incident" || item.type === "alert";
 
   return (
@@ -2614,7 +2624,7 @@ function CommandQueueCard({
           disabled={!canEscalate}
           className="rounded-full bg-red-100 px-3 py-3 text-xs font-semibold text-red-700 disabled:bg-slate-100 disabled:text-slate-400"
         >
-          Escalate
+          {item.type === "emergency" ? "Advance" : "Escalate"}
         </button>
         <button
           onClick={onResolve}

@@ -360,7 +360,12 @@ export const EmergencyCommandCenter = {
     note,
     actor
   }: {
-    action: "acknowledge" | "resolve_incident" | "escalate_booking" | "resolve_alert";
+    action:
+      | "acknowledge"
+      | "resolve_incident"
+      | "escalate_booking"
+      | "advance_emergency"
+      | "resolve_alert";
     targetType: "alert" | "booking" | "emergency" | "incident";
     targetId: string;
     note?: string;
@@ -411,6 +416,41 @@ export const EmergencyCommandCenter = {
         title: "Booking escalated by command center",
         message: note || `Ops escalated booking ${targetId}`,
         bookingId: targetId,
+        severity: "critical"
+      });
+
+      actionRecord.note = `${actionRecord.note}${
+        alertResult.alert?.id ? ` alert:${alertResult.alert.id}` : ""
+      }`;
+    }
+
+    if (action === "advance_emergency" && targetType === "emergency") {
+      const emergencySnapshot = await database.ref(`emergencyEscalations/byId/${targetId}`).get();
+      const emergency = emergencySnapshot.val() as EmergencyRecord | null;
+      const stages = emergency?.stages || [];
+      const activeIndex = stages.findIndex((stage) => stage.status === "active");
+      const nextIndex = activeIndex >= 0 ? activeIndex + 1 : 0;
+      const nextStage = stages[nextIndex]?.stage || "ops_team";
+
+      if (activeIndex >= 0) {
+        updates[`emergencyEscalations/byId/${targetId}/stages/${activeIndex}/status`] = "done";
+      }
+
+      if (stages[nextIndex]) {
+        updates[`emergencyEscalations/byId/${targetId}/stages/${nextIndex}/status`] = "active";
+        updates[`emergencyEscalations/byId/${targetId}/stages/${nextIndex}/dueAt`] = now + 5 * 60 * 1000;
+      }
+
+      updates[`emergencyEscalations/byId/${targetId}/status`] = "active";
+      updates[`emergencyEscalations/byId/${targetId}/currentStage`] = nextStage;
+      updates[`emergencyEscalations/byId/${targetId}/updatedAt`] = now;
+      updates[`operations/emergencyQueue/critical/${targetId}`] = true;
+
+      const alertResult = await dispatchInternalOpsAlert({
+        kind: "emergency",
+        title: "Emergency response advanced",
+        message: note || `Ops advanced emergency ${targetId} to ${nextStage}`,
+        bookingId: emergency?.bookingId || targetId,
         severity: "critical"
       });
 

@@ -23,7 +23,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ snapshot: result.snapshot });
 }
 
-const actions = ["acknowledge", "resolve_incident", "escalate_booking", "resolve_alert"];
+const actions = [
+  "acknowledge",
+  "resolve_incident",
+  "escalate_booking",
+  "advance_emergency",
+  "resolve_alert"
+];
 const targetTypes = ["alert", "booking", "emergency", "incident"];
 
 export async function POST(request: NextRequest) {
@@ -68,6 +74,7 @@ export async function POST(request: NextRequest) {
           | "acknowledge"
           | "resolve_incident"
           | "escalate_booking"
+          | "advance_emergency"
           | "resolve_alert",
         targetType: body.targetType as "alert" | "booking" | "emergency" | "incident",
         targetId: body.targetId || "",
