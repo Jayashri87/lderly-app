@@ -18,10 +18,12 @@ import {
 import LiveMap from "../../components/LiveMap";
 import { LiveActivityTimeline, LiveSystemPanel } from "../../components/system/LiveSystemPanel";
 import { SystemStatusPill } from "../../components/system/SystemStatusPill";
+import { LiveOperationalDock } from "../../components/realtime/LiveOperationalDock";
+import { EmergencyResponseCard } from "../../components/emergency/EmergencyResponseCard";
+import { DashboardSkeletonGrid } from "../../components/system/SystemSkeletons";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
-import { Skeleton } from "../../components/ui/skeleton";
 import { AuthService, SessionUser } from "../../services/authService";
 import { BookingService, CareBooking } from "../../services/bookingService";
 import {
@@ -1065,15 +1067,21 @@ export default function OpsApp() {
           className="mt-4"
         />
 
+        <LiveOperationalDock
+          title="Operations heartbeat"
+          subtitle="Dispatch, SLA, emergency, support, and analytics systems are being observed."
+          status={slaMode === "breach" ? "critical" : slaMode === "watch" ? "watch" : "live"}
+          signals={[
+            { label: "Bookings", value: String(opsKpis?.activeBookings ?? 0) },
+            { label: "SLA", value: slaMode },
+            { label: "Alerts", value: String(emergencyCommand?.openAlerts ?? 0) }
+          ]}
+          className="mt-4"
+        />
+
         {opsLoading ? (
-          <section className="mt-6 grid gap-3 md:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="glass-panel rounded-[1.5rem] p-4">
-                <Skeleton className="h-5 w-5 rounded-full" />
-                <Skeleton className="mt-4 h-4 w-24" />
-                <Skeleton className="mt-3 h-8 w-16" />
-              </div>
-            ))}
+          <section className="mt-6">
+            <DashboardSkeletonGrid count={9} />
           </section>
         ) : (
           <section className="mt-6 grid gap-3 md:grid-cols-4">
@@ -1189,6 +1197,28 @@ export default function OpsApp() {
         </Card>
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+          <EmergencyResponseCard
+            active={emergencyCommand?.commandLevel === "red"}
+            title={
+              emergencyCommand?.commandLevel === "red"
+                ? "Emergency command is active"
+                : emergencyCommand?.commandLevel === "amber"
+                  ? "Ops is watching elevated risk"
+                  : "Emergency response chain is ready"
+            }
+            description={
+              emergencyCommand?.nextAction ||
+              "Customer, family, ops, ambulance, and hospital escalation paths stay visible for critical events."
+            }
+            steps={[
+              { label: "Customer / caregiver signal received", status: (emergencyCommand?.emergencyCount ?? 0) > 0 ? "done" : "next" },
+              { label: "Ops ownership assigned", status: emergencyCommand?.commandLevel === "red" ? "active" : "next" },
+              { label: "Ambulance fallback routing", status: "next" },
+              { label: "Hospital escalation ready", status: "next" }
+            ]}
+            className="xl:col-span-2"
+          />
+
           <div
             className={`rounded-[2rem] p-5 ${
               emergencyCommand?.commandLevel === "red"

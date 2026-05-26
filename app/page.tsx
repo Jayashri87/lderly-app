@@ -33,6 +33,8 @@ import { Button } from "../components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { LiveActivityTimeline, LiveSystemPanel } from "../components/system/LiveSystemPanel";
 import { SystemStatusPill } from "../components/system/SystemStatusPill";
+import { LiveOperationalDock } from "../components/realtime/LiveOperationalDock";
+import { EmergencyResponseCard } from "../components/emergency/EmergencyResponseCard";
 import {
   Dialog,
   DialogContent,
@@ -1787,6 +1789,22 @@ export default function CustomerApp() {
             className="mt-5"
           />
         )}
+
+        <LiveOperationalDock
+          title={activeCare ? "Caregiver active now" : "LDERLY monitoring is ready"}
+          subtitle={
+            activeCare
+              ? "Family reassurance, ETA, and service proof are connected."
+              : "Book care and live operational updates will stay visible here."
+          }
+          status={customerLiveTone}
+          signals={[
+            { label: "ETA", value: activeCare ? `${visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? 8} min` : "Ready" },
+            { label: "Check-in", value: activeCare ? "Live" : "Idle" },
+            { label: "Trust", value: "Supervised" }
+          ]}
+          className="mt-4"
+        />
 
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
@@ -3832,6 +3850,32 @@ function JourneyExperience({
 
       {hasActiveService && !paymentPending && (
         <>
+      <EmergencyResponseCard
+        active={booking?.matching?.priority === "critical" || booking?.sla?.status === "breached"}
+        title={
+          booking?.matching?.priority === "critical" || booking?.sla?.status === "breached"
+            ? "Emergency escalation is being coordinated"
+            : "Emergency path is ready if needed"
+        }
+        description={
+          booking?.matching?.priority === "critical" || booking?.sla?.status === "breached"
+            ? "Ops is reviewing the active care state and keeping the response chain visible."
+            : "Immediate Assistance stays one tap away with family, ops, ambulance, and hospital routing."
+        }
+        steps={[
+          { label: "Family alert channel ready", status: "done" },
+          {
+            label:
+              booking?.matching?.priority === "critical" || booking?.sla?.status === "breached"
+                ? "Ops team reviewing"
+                : "Ops team standing by",
+            status: booking?.matching?.priority === "critical" || booking?.sla?.status === "breached" ? "active" : "next"
+          },
+          { label: "Responder route available", status: "next" },
+          { label: "Hospital fallback visible", status: "next" }
+        ]}
+        className="mb-5"
+      />
       <div className="premium-card rounded-[2rem] p-5">
         <div className="flex items-center justify-between gap-4">
           <div>

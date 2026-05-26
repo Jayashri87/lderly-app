@@ -14,6 +14,8 @@ import {
 import LiveMap from "../../components/LiveMap";
 import { LiveActivityTimeline, LiveSystemPanel } from "../../components/system/LiveSystemPanel";
 import { SystemStatusPill } from "../../components/system/SystemStatusPill";
+import { LiveOperationalDock } from "../../components/realtime/LiveOperationalDock";
+import { EmergencyResponseCard } from "../../components/emergency/EmergencyResponseCard";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -579,6 +581,41 @@ export default function PartnerApp() {
           ]}
           className="mt-6"
         />
+
+        <LiveOperationalDock
+          title={hasActiveAssignment ? "Visit workflow is live" : "Partner app is listening"}
+          subtitle={
+            hasActiveAssignment
+              ? "ETA, GPS, proof, OTP, and completion states are connected."
+              : "Nearby requests will arrive with one clear primary action."
+          }
+          status={activeBooking?.matching?.priority === "critical" ? "critical" : hasActiveAssignment ? "live" : "healthy"}
+          signals={[
+            { label: "GPS", value: gpsStatus === "tracking" ? "Live" : "Ready" },
+            { label: "OTP", value: bookingStatus === "arrived" ? "Needed" : "Queued" },
+            { label: "Proof", value: `${completionChecklist.filter((item) => completedChecklist[item]).length}/${completionChecklist.length}` }
+          ]}
+          className="mt-4"
+        />
+
+        {hasActiveAssignment && (
+          <EmergencyResponseCard
+            active={activeBooking?.matching?.priority === "critical"}
+            title={
+              activeBooking?.matching?.priority === "critical"
+                ? "Critical visit support is active"
+                : "Safety chain is ready during this visit"
+            }
+            description="Panic SOS, unsafe location reporting, ops escalation, and family visibility stay available throughout the assignment."
+            steps={[
+              { label: "Care request assigned", status: "done" },
+              { label: "Caregiver safety monitored", status: activeBooking?.matching?.priority === "critical" ? "active" : "done" },
+              { label: "Ops escalation available", status: "next" },
+              { label: "Family update path ready", status: "next" }
+            ]}
+            className="mt-4"
+          />
+        )}
 
         <section className="premium-card mt-6 rounded-[2rem] p-5">
           <p className="text-sm font-semibold text-emerald-700">Current assignment</p>
