@@ -4193,8 +4193,11 @@ function PaymentTermsModal({
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent showCloseButton={false} className="max-w-lg gap-0 p-0">
-        <DialogHeader className="text-left">
+      <DialogContent
+        showCloseButton={false}
+        className="grid max-h-[92dvh] max-w-lg grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+      >
+        <DialogHeader className="min-h-0 text-left">
           <div className="flex items-start gap-3 p-5 pb-3 sm:p-6 sm:pb-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
               <ShieldCheck size={22} />
@@ -4214,7 +4217,7 @@ function PaymentTermsModal({
           </div>
         </DialogHeader>
 
-        <div className="max-h-[43dvh] space-y-2 overflow-y-auto px-5 pb-3 pt-2 text-sm leading-6 text-slate-600 sm:px-6">
+        <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain px-5 pb-4 pt-2 text-sm leading-6 text-slate-600 sm:px-6">
           {[
             "Caregiver assignment, ETA, and visit tracking start after successful payment.",
             "Cancellation and refund handling follows the LDERLY refund policy and depends on dispatch status.",
@@ -4229,7 +4232,7 @@ function PaymentTermsModal({
           ))}
         </div>
 
-        <div className="sticky bottom-0 border-t border-slate-100 bg-white/95 p-5 pt-4 backdrop-blur sm:p-6 sm:pt-4">
+        <div className="border-t border-slate-100 bg-white/95 p-5 pt-4 shadow-[0_-18px_45px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6 sm:pt-4">
           <div className="rounded-2xl border border-slate-200 p-3 text-sm leading-6 text-slate-700">
             <span>
               By continuing to payment, I agree to the{" "}
@@ -4248,13 +4251,13 @@ function PaymentTermsModal({
             <Button
               onClick={onCancel}
               variant="default"
-              className="bg-slate-100 px-4 py-4 text-slate-700 hover:bg-slate-200"
+              className="w-full bg-slate-100 px-4 py-4 text-slate-700 hover:bg-slate-200"
             >
               Not now
             </Button>
             <Button
               onClick={onAgree}
-              className="bg-[#06130f] px-4 py-4 text-white hover:bg-[#10241d]"
+              className="w-full bg-[#06130f] px-4 py-4 text-white hover:bg-[#10241d]"
             >
               I agree & pay
             </Button>
