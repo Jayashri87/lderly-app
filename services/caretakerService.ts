@@ -1,4 +1,4 @@
-import { onValue, ref, set } from "firebase/database";
+import { onValue, ref } from "firebase/database";
 import { db } from "../firebase";
 import { CareLocation, CaretakerMatchProfile } from "./bookingService";
 
@@ -190,20 +190,6 @@ const postCaretakerLocation = async (
   return response.json();
 };
 
-const seedRemoteCaretakers = async (caretakers: CaretakerProfile[]) => {
-  if (!db) {
-    return;
-  }
-
-  const database = db;
-
-  await Promise.all(
-    caretakers.map((caretaker) =>
-      set(ref(database, `caretakers/${caretaker.uid}`), caretaker)
-    )
-  ).catch(() => undefined);
-};
-
 export const CaretakerService = {
   subscribe(callback: (caretakers: CaretakerProfile[]) => void) {
     callback(readLocalCaretakers());
@@ -235,7 +221,6 @@ export const CaretakerService = {
 
   seedDefaults() {
     writeLocalCaretakers(seedCaretakers);
-    seedRemoteCaretakers(seedCaretakers);
   },
 
   setAvailability(

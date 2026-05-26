@@ -921,9 +921,33 @@ export default function CustomerApp() {
     (!journey || journey.status === "idle" || (booking?.updatedAt ?? 0) >= journey.updatedAt);
   const visibleJourney = bookingIsFreshestActiveCare ? null : journey;
   const visibleBooking = booking;
+  const bookingLiveStatuses = new Set([
+    "accepted",
+    "en_route",
+    "arrived",
+    "in_progress",
+    "completed",
+    "payment_settled",
+    "report_generated"
+  ]);
+  const caregiverActiveStatuses = new Set(["en_route", "arrived", "in_progress"]);
+  const journeyLiveStatuses = new Set([
+    "accepted",
+    "en_route",
+    "arrived",
+    "in_progress",
+    "completed",
+    "escalated"
+  ]);
   const activeCare =
-    (visibleJourney && visibleJourney.status !== "idle") ||
-    (visibleBooking && visibleBooking.status !== "none");
+    (visibleJourney ? journeyLiveStatuses.has(visibleJourney.status) : false) ||
+    (visibleBooking ? bookingLiveStatuses.has(visibleBooking.status) : false);
+  const caregiverIsActive =
+    (visibleJourney ? caregiverActiveStatuses.has(visibleJourney.status) : false) ||
+    (visibleBooking ? caregiverActiveStatuses.has(visibleBooking.status) : false);
+  const caregiverHasAccepted =
+    (visibleJourney ? journeyLiveStatuses.has(visibleJourney.status) : false) ||
+    (visibleBooking ? bookingLiveStatuses.has(visibleBooking.status) : false);
   const hasCareSubscription = careSubscriptionStarted;
   const currentService = cleanServiceName(
     bookingIsFreshestActiveCare
@@ -1782,8 +1806,14 @@ export default function CustomerApp() {
             signals={[
               {
                 label: "Caregiver",
-                value: activeCare ? "Active now" : "Ready",
-                tone: activeCare ? "live" : "healthy"
+                value: caregiverIsActive
+                  ? "Active now"
+                  : caregiverHasAccepted
+                    ? "Accepted"
+                    : visibleBooking && visibleBooking.status !== "none"
+                      ? "Being assigned"
+                      : "Ready",
+                tone: caregiverHasAccepted ? "live" : "healthy"
               },
               {
                 label: "Check-in",
@@ -1805,16 +1835,28 @@ export default function CustomerApp() {
         )}
 
         <LiveOperationalDock
-          title={activeCare ? "Caregiver active now" : "LDERLY monitoring is ready"}
+          title={
+            caregiverIsActive
+              ? "Caregiver active now"
+              : caregiverHasAccepted
+                ? "Caregiver accepted"
+                : visibleBooking && visibleBooking.status !== "none"
+                  ? "Finding the right caregiver"
+                  : "LDERLY monitoring is ready"
+          }
           subtitle={
-            activeCare
+            caregiverIsActive
               ? "Family reassurance, ETA, and service proof are connected."
+              : caregiverHasAccepted
+                ? "The visit has moved into live coordination."
+                : visibleBooking && visibleBooking.status !== "none"
+                  ? "Ops is coordinating assignment before live tracking starts."
               : "Book care and live operational updates will stay visible here."
           }
           status={customerLiveTone}
           signals={[
-            { label: "ETA", value: activeCare ? `${visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? 8} min` : "Ready" },
-            { label: "Check-in", value: activeCare ? "Live" : "Idle" },
+            { label: "ETA", value: caregiverHasAccepted ? `${visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? 8} min` : "Pending" },
+            { label: "Check-in", value: caregiverIsActive ? "Live" : caregiverHasAccepted ? "Accepted" : "Not started" },
             { label: "Trust", value: "Supervised" }
           ]}
           className="mt-4"

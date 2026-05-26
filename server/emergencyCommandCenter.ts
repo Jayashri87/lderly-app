@@ -1,5 +1,6 @@
 import { getAdminDatabase } from "./firebaseAdmin";
 import { dispatchInternalOpsAlert } from "./internalOpsProvider";
+import { filterProductionRecords } from "./productionHygiene";
 
 const countRecord = (value: unknown) =>
   value && typeof value === "object" ? Object.keys(value as Record<string, unknown>).length : 0;
@@ -179,14 +180,13 @@ export const EmergencyCommandCenter = {
 
     const emergencyIds = queueIds(emergencyQueueSnapshot.val());
     const incidentIds = queueIds(incidentQueueSnapshot.val());
-    const bookings = normalizeBookings(activeBookingsSnapshot.val());
-    const emergencies = normalizeEmergencies(emergencyRecordsSnapshot.val()).filter(
-      (item) => emergencyIds.has(item.id) || item.status === "active"
-    );
-    const incidents = normalizeIncidents(incidentRecordsSnapshot.val()).filter(
-      (item) => incidentIds.has(item.id) || item.status === "open"
-    );
-    const internalAlerts = normalizeAlerts(internalAlertsSnapshot.val());
+    const bookings = filterProductionRecords(normalizeBookings(activeBookingsSnapshot.val()));
+    const emergencies = filterProductionRecords(
+      normalizeEmergencies(emergencyRecordsSnapshot.val())
+    ).filter((item) => emergencyIds.has(item.id) || item.status === "active");
+    const incidents = filterProductionRecords(normalizeIncidents(incidentRecordsSnapshot.val()))
+      .filter((item) => incidentIds.has(item.id) || item.status === "open");
+    const internalAlerts = filterProductionRecords(normalizeAlerts(internalAlertsSnapshot.val()));
     const criticalBookings = bookings.filter(
       (booking) =>
         booking.matching?.priority === "critical" ||

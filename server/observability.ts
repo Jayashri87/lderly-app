@@ -1,6 +1,7 @@
 import { getAdminDatabase } from "./firebaseAdmin";
 import type { UserRole } from "../services/authService";
 import { appCheckReadiness } from "./appCheckProvider";
+import { filterProductionRecords } from "./productionHygiene";
 
 export type AnalyticsEvent = {
   id: string;
@@ -234,8 +235,8 @@ export const Observability = {
       database.ref("analytics/events/byName").get(),
       database.ref("analytics/events/byDate").get()
     ]);
-    const bookings = recordValues<BookingMetricRecord>(bookingsSnapshot.val());
-    const caretakers = recordEntries<CaretakerMetricRecord>(caretakersSnapshot.val());
+    const bookings = filterProductionRecords(recordValues<BookingMetricRecord>(bookingsSnapshot.val()));
+    const caretakers = filterProductionRecords(recordEntries<CaretakerMetricRecord>(caretakersSnapshot.val()));
     const supportTickets = recordValues<SupportMetricRecord>(supportSnapshot.val());
     const complaints = recordValues<ComplaintMetricRecord>(complaintsSnapshot.val());
     const refunds = recordValues<RefundMetricRecord>(refundsSnapshot.val());

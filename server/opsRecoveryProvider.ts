@@ -1,6 +1,7 @@
 import type { CareBooking } from "../services/bookingService";
 import { getAdminDatabase } from "./firebaseAdmin";
 import { dispatchInternalOpsAlert } from "./internalOpsProvider";
+import { filterProductionRecords } from "./productionHygiene";
 import { TrustedBooking } from "./trustedBooking";
 
 type RecoveryKind =
@@ -284,10 +285,10 @@ export const OpsRecoveryProvider = {
       database.ref("bookings/byId").get(),
       database.ref("emergencyEscalations/byId").get()
     ]);
-    const bookingSignals = normalizeBookings(bookingsSnapshot.val())
+    const bookingSignals = filterProductionRecords(normalizeBookings(bookingsSnapshot.val()))
       .map(signalForBooking)
       .filter(Boolean) as RecoverySignal[];
-    const emergencySignals = normalizeEmergencies(emergenciesSnapshot.val())
+    const emergencySignals = filterProductionRecords(normalizeEmergencies(emergenciesSnapshot.val()))
       .map(signalForEmergency)
       .filter(Boolean) as RecoverySignal[];
     const signals = [...bookingSignals, ...emergencySignals].sort(
