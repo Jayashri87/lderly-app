@@ -23,6 +23,13 @@ const runtimeNoStoreHeaders = [
   {
     key: "X-LDERLY-Cache-Policy",
     value: "runtime-routes-no-store"
+  },
+  {
+    key: "X-LDERLY-Build",
+    value:
+      process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+      process.env.NEXT_PUBLIC_LDERLY_BUILD_ID ||
+      "local"
   }
 ];
 
@@ -50,6 +57,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/ops",
+        headers: runtimeNoStoreHeaders
+      },
+      {
+        source: "/offline",
         headers: runtimeNoStoreHeaders
       },
       {

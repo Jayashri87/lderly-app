@@ -236,6 +236,7 @@ export default function PartnerApp() {
     });
     await BookingService.updateStatus("completed");
     ReportService.createFromBooking(activeBooking, health);
+    setActionMessage("Session completed. Family verification and payment release are now queued.");
   };
 
   const completeJourney = () => {
@@ -251,6 +252,7 @@ export default function PartnerApp() {
     });
     JourneyService.updateStatus("completed");
     ReportService.createFromJourney(activeJourney, health);
+    setActionMessage("Session completed. Visit report has been prepared for family review.");
   };
 
   const trackCaretakerAction = (action: string) => {
