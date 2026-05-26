@@ -1,14 +1,16 @@
+import { amber, indigo, jade, red, slate } from "@radix-ui/colors";
+
 export const designTokens = {
   color: {
-    ink: "#06130f",
-    inkSoft: "#0b2019",
+    ink: slate.slate12,
+    inkSoft: slate.slate11,
     surface: "rgba(255,255,255,0.1)",
     surfaceStrong: "rgba(255,255,255,0.16)",
-    emerald: "#34d399",
-    emeraldSoft: "#a7f3d0",
-    indigo: "#a5b4fc",
-    amber: "#fbbf24",
-    emergency: "#fb3648",
+    emerald: jade.jade9,
+    emeraldSoft: jade.jade4,
+    indigo: indigo.indigo8,
+    amber: amber.amber9,
+    emergency: red.red9,
     warmWhite: "#f8faf7"
   },
   radius: {

@@ -8,6 +8,7 @@ out/
 # production
 build/
 dist/
+storybook-static/
 
 # local env and secrets
 .env

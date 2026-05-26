@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   Bell,
   Check,
@@ -1479,17 +1480,30 @@ export default function CustomerApp() {
       service: nextBooking.serviceType,
       amount: nextBooking.payment.estimatedTotal
     });
+    toast.loading("Opening secure payment", {
+      id: `payment-${nextBooking.id}`,
+      description: "Care dispatch starts after payment verification."
+    });
 
     const paymentVerified = await openRazorpayCheckout(nextBooking);
 
     if (paymentVerified) {
+      toast.success("Payment verified", {
+        id: `payment-${nextBooking.id}`,
+        description: "Care coordination is now starting."
+      });
       completePaidBookingFlow();
+    } else {
+      toast.dismiss(`payment-${nextBooking.id}`);
     }
   };
 
   const requestPaymentWithTerms = (nextBooking: CareBooking) => {
     setPaymentMessage("");
     setPaymentTermsBooking(nextBooking);
+    toast.message("Please review payment terms", {
+      description: "Refunds, OTP start, and visit proof are shown before checkout."
+    });
     trackProductEvent("payment_terms_presented", {
       bookingId: nextBooking.id,
       service: nextBooking.serviceType,
@@ -4137,26 +4151,28 @@ function PaymentTermsModal({
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader className="flex-row items-start gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
-            <ShieldCheck size={22} />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-              Payment agreement
-            </p>
-            <DialogTitle className="mt-1">
-              Review before payment
-            </DialogTitle>
-            <DialogDescription className="mt-2">
-              You are paying {booking.payment.estimatedTotal} for {cleanServiceName(booking.serviceType)}.
-              Care dispatch starts only after payment is verified.
-            </DialogDescription>
+      <DialogContent showCloseButton={false} className="max-w-lg gap-0 p-0">
+        <DialogHeader className="text-left">
+          <div className="flex items-start gap-3 p-5 pb-3 sm:p-6 sm:pb-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                Payment agreement
+              </p>
+              <DialogTitle className="mt-1">
+                Review before payment
+              </DialogTitle>
+              <DialogDescription className="mt-2">
+                You are paying {booking.payment.estimatedTotal} for {cleanServiceName(booking.serviceType)}.
+                Care dispatch starts only after payment is verified.
+              </DialogDescription>
+            </div>
           </div>
         </DialogHeader>
 
-        <div className="mt-5 space-y-3 text-sm text-slate-600">
+        <div className="max-h-[43dvh] space-y-2 overflow-y-auto px-5 pb-3 pt-2 text-sm leading-6 text-slate-600 sm:px-6">
           {[
             "Caregiver assignment, ETA, and visit tracking start after successful payment.",
             "Cancellation and refund handling follows the LDERLY refund policy and depends on dispatch status.",
@@ -4164,42 +4180,44 @@ function PaymentTermsModal({
             "Emergency assistance coordinates support but does not replace hospital or ambulance emergency services.",
             "Visit proof, caregiver notes, and payment records may be used for service verification and support."
           ].map((item) => (
-            <div key={item} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+            <div key={item} className="flex gap-3 rounded-2xl bg-slate-50 px-3 py-2.5">
               <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} />
               <p>{item}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
-          <span>
-            By continuing to payment, I agree to the{" "}
-            <Link href="/legal/terms" className="font-semibold text-[#06130f] underline">
-              Terms
-            </Link>
-            ,{" "}
-            <Link href="/legal/refunds" className="font-semibold text-[#06130f] underline">
-              Refund Policy
-            </Link>
-            , and payment authorization for this care request.
-          </span>
-        </div>
+        <div className="sticky bottom-0 border-t border-slate-100 bg-white/95 p-5 pt-4 backdrop-blur sm:p-6 sm:pt-4">
+          <div className="rounded-2xl border border-slate-200 p-3 text-sm leading-6 text-slate-700">
+            <span>
+              By continuing to payment, I agree to the{" "}
+              <Link href="/legal/terms" className="font-semibold text-[#06130f] underline">
+                Terms
+              </Link>
+              ,{" "}
+              <Link href="/legal/refunds" className="font-semibold text-[#06130f] underline">
+                Refund Policy
+              </Link>
+              , and payment authorization for this care request.
+            </span>
+          </div>
 
-        <DialogFooter className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-2">
-          <Button
-            onClick={onCancel}
-            variant="default"
-            className="bg-slate-100 px-4 py-4 text-slate-700 hover:bg-slate-200"
-          >
-            Not now
-          </Button>
-          <Button
-            onClick={onAgree}
-            className="bg-[#06130f] px-4 py-4 text-white hover:bg-[#10241d]"
-          >
-            I agree & pay
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2">
+            <Button
+              onClick={onCancel}
+              variant="default"
+              className="bg-slate-100 px-4 py-4 text-slate-700 hover:bg-slate-200"
+            >
+              Not now
+            </Button>
+            <Button
+              onClick={onAgree}
+              className="bg-[#06130f] px-4 py-4 text-white hover:bg-[#10241d]"
+            >
+              I agree & pay
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

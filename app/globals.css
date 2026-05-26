@@ -47,6 +47,29 @@ body {
   font-synthesis-weight: none;
 }
 
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lderly-focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .lderly-shell {
   position: relative;
   min-height: 100dvh;
@@ -83,6 +106,28 @@ body {
     rgba(255, 255, 255, 0.08);
   box-shadow: var(--lderly-shadow);
   backdrop-filter: blur(24px);
+}
+
+.magic-monitoring-frame {
+  position: relative;
+  isolation: isolate;
+}
+
+.magic-monitoring-frame::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(167, 243, 208, 0.38),
+    rgba(165, 180, 252, 0.18),
+    rgba(251, 191, 36, 0.16)
+  );
+  opacity: 0.45;
+  filter: blur(12px);
 }
 
 .premium-card {

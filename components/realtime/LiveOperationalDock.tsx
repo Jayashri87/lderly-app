@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { BellRing, Clock3, RadioTower } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { SystemStatusPill } from "../system/SystemStatusPill";
+import { useOperationalHeartbeat } from "./useOperationalHeartbeat";
 
 export type LiveDockSignal = {
   label: string;
@@ -24,12 +25,14 @@ export const LiveOperationalDock = memo(function LiveOperationalDock({
   status?: "healthy" | "live" | "watch" | "critical" | "idle";
   className?: string;
 }) {
+  const heartbeat = useOperationalHeartbeat();
+
   return (
     <motion.aside
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-      className={cn("glass-panel rounded-[1.5rem] p-3", className)}
+      className={cn("glass-panel magic-monitoring-frame rounded-[1.5rem] p-3", className)}
       aria-label="Live operational status"
     >
       <div className="flex items-start justify-between gap-3">
@@ -54,7 +57,7 @@ export const LiveOperationalDock = memo(function LiveOperationalDock({
       </div>
       <div className="mt-3 flex items-center gap-2 text-[11px] font-medium text-white/45">
         <Clock3 className="h-3.5 w-3.5" />
-        Realtime state refresh is active
+        {heartbeat.label}
         <BellRing className="ml-auto h-3.5 w-3.5" />
       </div>
     </motion.aside>
