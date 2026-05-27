@@ -1,21 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const protectedRoutes = ["/ops", "/partner"];
+const protectedRoutes: Record<string, "admin" | "caretaker"> = {
+  "/ops": "admin",
+  "/partner": "caretaker"
+};
 
-export function proxy(request: NextRequest) {
-  const response = NextResponse.next();
-  const hasSession = Boolean(request.cookies.get("lderly_session")?.value);
-  const pathname = request.nextUrl.pathname;
+type ProxySession = {
+  role?: string;
+  expiresAt?: number;
+};
 
-  if (protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
-    if (!hasSession) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/signin";
-      url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
-    }
+const encode = (value: string) =>
+  new TextEncoder().encode(value);
+
+const decodeBase64Url = (value: string) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+  return atob(padded);
+};
+
+const timingSafeEqual = (left: string, right: string) => {
+  if (left.length !== right.length) {
+    return false;
   }
 
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+};
+
+const sign = async (payload: string) => {
+  const secret = process.env.LDERLY_AUTH_SECRET || "";
+
+  if (!secret) {
+    return "";
+  }
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encode(payload));
+  const bytes = Array.from(new Uint8Array(signature));
+  const binary = String.fromCharCode(...bytes);
+
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+
+const readVerifiedSession = async (token?: string): Promise<ProxySession | null> => {
+  if (!token) {
+    return null;
+  }
+
+  const [encodedPayload, signature] = token.split(".");
+
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = await sign(encodedPayload);
+
+  if (!expectedSignature || !timingSafeEqual(signature, expectedSignature)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(decodeBase64Url(encodedPayload)) as ProxySession;
+
+    if (!payload.expiresAt || payload.expiresAt < Date.now()) {
+      return null;
+    }
+
+    return payload;
+  } catch {
+    return null;
+  }
+};
+
+const requiredRoleFor = (pathname: string) =>
+  Object.entries(protectedRoutes).find(
+    ([route]) => pathname === route || pathname.startsWith(`${route}/`)
+  )?.[1];
+
+const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -38,6 +110,33 @@ export function proxy(request: NextRequest) {
   response.headers.set("X-LDERLY-Cache-Policy", "runtime-routes-no-store");
 
   return response;
+};
+
+const redirectToSignin = (request: NextRequest, reason: string) => {
+  const url = request.nextUrl.clone();
+  url.pathname = "/signin";
+  url.searchParams.set("next", request.nextUrl.pathname);
+  url.searchParams.set("reason", reason);
+  return applySecurityHeaders(NextResponse.redirect(url));
+};
+
+export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const requiredRole = requiredRoleFor(pathname);
+
+  if (requiredRole) {
+    const session = await readVerifiedSession(request.cookies.get("lderly_session")?.value);
+
+    if (!session) {
+      return redirectToSignin(request, "session_required");
+    }
+
+    if (session.role !== requiredRole) {
+      return redirectToSignin(request, "role_required");
+    }
+  }
+
+  return applySecurityHeaders(NextResponse.next());
 }
 
 export const config = {

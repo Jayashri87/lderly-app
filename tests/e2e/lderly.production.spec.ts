@@ -52,6 +52,8 @@ const login = async (
       sameSite: "Lax"
     }
   ]);
+
+  return `${cookie.name}=${cookie.value}`;
 };
 
 const primeClientSession = async (page: Page, role: Role) => {
@@ -94,6 +96,38 @@ test.describe("LDERLY production E2E route checks", () => {
       data: { profile: { elderName: "Unauthorized" } }
     });
     expect(profileSave.status()).toBe(401);
+  });
+
+  test("disabled OTP endpoint does not issue customer sessions", async ({ request }) => {
+    const response = await request.post("/api/auth/customer/otp", {
+      data: {
+        phone: "+919916960524",
+        otp: "123456"
+      }
+    });
+
+    expect(response.status()).toBe(410);
+    expect(response.headers()["set-cookie"]).toBeFalsy();
+  });
+
+  test("role-specific pages reject the wrong signed role", async ({
+    request,
+    context,
+    page,
+    baseURL
+  }) => {
+    const appUrl = baseURL || "http://127.0.0.1:3000";
+
+    await login(request, context, "customer", appUrl);
+    await page.goto("/ops");
+    expect(page.url()).toContain("/signin");
+    expect(page.url()).toContain("reason=role_required");
+
+    await context.clearCookies();
+    await login(request, context, "admin", appUrl);
+    await page.goto("/partner");
+    expect(page.url()).toContain("/signin");
+    expect(page.url()).toContain("reason=role_required");
   });
 
   test("legal and payment policy pages are reachable", async ({ page }) => {
@@ -152,14 +186,18 @@ test.describe("LDERLY production E2E route checks", () => {
   });
 
   test("admin can read go-live readiness and system status", async ({ request, context, baseURL }) => {
-    await login(request, context, "admin", baseURL || "http://127.0.0.1:3000");
+    const cookie = await login(request, context, "admin", baseURL || "http://127.0.0.1:3000");
 
-    const status = await request.get("/api/system/status");
+    const status = await request.get("/api/system/status", {
+      headers: { cookie }
+    });
     expect(status.ok()).toBeTruthy();
     const statusJson = await status.json();
     expect(statusJson.productionReadiness.opsGoLiveReadinessApi).toBe(true);
 
-    const readiness = await request.get("/api/ops/readiness");
+    const readiness = await request.get("/api/ops/readiness", {
+      headers: { cookie }
+    });
     expect(readiness.ok()).toBeTruthy();
     const readinessJson = await readiness.json();
     expect(Array.isArray(readinessJson.snapshot.checks)).toBe(true);
