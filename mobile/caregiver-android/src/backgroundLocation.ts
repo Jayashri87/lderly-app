@@ -1,8 +1,10 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CaregiverApi, readSession } from "./api";
 
 const backgroundLocationTask = "LDERLY_CAREGIVER_BACKGROUND_LOCATION";
+const activeBookingKey = "lderly-active-background-booking-id";
 
 let activeBookingId: string | undefined;
 
@@ -24,10 +26,14 @@ TaskManager.defineTask(backgroundLocationTask, async ({ data, error }) => {
     return;
   }
 
-  await CaregiverApi.sendLocation(session, activeBookingId, {
+  const bookingId = activeBookingId || (await AsyncStorage.getItem(activeBookingKey)) || undefined;
+
+  await CaregiverApi.sendLocation(session, bookingId, {
     lat: latest.coords.latitude,
     lng: latest.coords.longitude,
-    accuracyMeters: latest.coords.accuracy ?? undefined
+    accuracyMeters: latest.coords.accuracy ?? undefined,
+    capturedAt: latest.timestamp,
+    source: "background"
   }).catch(() => undefined);
 });
 
@@ -56,6 +62,7 @@ export const CaregiverLocation = {
 
   async start(bookingId: string) {
     activeBookingId = bookingId;
+    await AsyncStorage.setItem(activeBookingKey, bookingId);
     const permissions = await this.requestPermissions();
 
     if (!permissions.ok) {
@@ -85,6 +92,7 @@ export const CaregiverLocation = {
 
   async stop() {
     activeBookingId = undefined;
+    await AsyncStorage.removeItem(activeBookingKey);
     const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
       backgroundLocationTask
     );
@@ -94,4 +102,3 @@ export const CaregiverLocation = {
     }
   }
 };
-

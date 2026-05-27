@@ -209,6 +209,11 @@ export default function PartnerApp() {
             lat: 12.985,
             lng: 77.61
           },
+          routePolyline: activeBooking.tracking?.routePolyline,
+          routeDistanceMeters: activeBooking.tracking?.routeDistanceMeters,
+          routeDurationSeconds: activeBooking.tracking?.routeDurationSeconds,
+          routeSource: activeBooking.tracking?.routeSource,
+          routeUpdatedAt: activeBooking.tracking?.routeUpdatedAt,
           lastLocationAt: activeBooking.tracking?.lastLocationAt,
           createdAt: activeBooking.createdAt,
           updatedAt: activeBooking.updatedAt,

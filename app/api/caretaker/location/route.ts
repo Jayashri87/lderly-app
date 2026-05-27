@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
     lat?: number;
     lng?: number;
     accuracyMeters?: number;
+    capturedAt?: number;
+    source?: "device" | "background";
   }>(request);
   const caretakerId =
     auth.session.role === "admin"
@@ -44,7 +46,8 @@ export async function POST(request: NextRequest) {
       status: "success",
       details: {
         actor: auth.session.role,
-        bookingId: body.bookingId || ""
+        bookingId: body.bookingId || "",
+        source: body.source || "device"
       }
     },
     () =>
@@ -53,7 +56,8 @@ export async function POST(request: NextRequest) {
         {
           lat: body.lat!,
           lng: body.lng!,
-          accuracyMeters: body.accuracyMeters
+          accuracyMeters: body.accuracyMeters,
+          capturedAt: body.capturedAt
         },
         body.bookingId
       )

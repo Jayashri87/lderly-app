@@ -96,6 +96,14 @@ test.describe("LDERLY production E2E route checks", () => {
       data: { profile: { elderName: "Unauthorized" } }
     });
     expect(profileSave.status()).toBe(401);
+
+    const routeEta = await request.post("/api/locations/route-eta", {
+      data: {
+        origin: { lat: 12.985, lng: 77.61 },
+        destination: { lat: 12.9716, lng: 77.5946 }
+      }
+    });
+    expect(routeEta.status()).toBe(401);
   });
 
   test("disabled OTP endpoint does not issue customer sessions", async ({ request }) => {
@@ -194,6 +202,21 @@ test.describe("LDERLY production E2E route checks", () => {
     expect(status.ok()).toBeTruthy();
     const statusJson = await status.json();
     expect(statusJson.productionReadiness.opsGoLiveReadinessApi).toBe(true);
+    expect(statusJson.productionReadiness.googleRoutesEtaApi).toBe(true);
+
+    const routeEta = await request.post("/api/locations/route-eta", {
+      headers: {
+        cookie,
+        origin: baseURL || "http://127.0.0.1:3000"
+      },
+      data: {
+        origin: { lat: 12.985, lng: 77.61 },
+        destination: { lat: 12.9716, lng: 77.5946 }
+      }
+    });
+    expect(routeEta.ok()).toBeTruthy();
+    const routeEtaJson = await routeEta.json();
+    expect(routeEtaJson.route.etaMinutes).toBeGreaterThan(0);
 
     const readiness = await request.get("/api/ops/readiness", {
       headers: { cookie }

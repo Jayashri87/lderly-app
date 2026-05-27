@@ -3821,6 +3821,11 @@ function JourneyExperience({
             lat: 12.985,
             lng: 77.61
           },
+          routePolyline: booking.tracking?.routePolyline,
+          routeDistanceMeters: booking.tracking?.routeDistanceMeters,
+          routeDurationSeconds: booking.tracking?.routeDurationSeconds,
+          routeSource: booking.tracking?.routeSource,
+          routeUpdatedAt: booking.tracking?.routeUpdatedAt,
           lastLocationAt: booking.tracking?.lastLocationAt,
           createdAt: booking.createdAt,
           updatedAt: booking.updatedAt,

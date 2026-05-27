@@ -35,6 +35,11 @@ export type CareJourney = {
     lat: number;
     lng: number;
   };
+  routePolyline?: string;
+  routeDistanceMeters?: number;
+  routeDurationSeconds?: number;
+  routeSource?: "google-routes" | "distance-fallback";
+  routeUpdatedAt?: number;
   lastLocationAt?: number;
   createdAt: number;
   updatedAt: number;

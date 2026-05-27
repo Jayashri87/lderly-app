@@ -9,7 +9,7 @@ import { featureFlagReadiness } from "../../../../server/featureFlags";
 import { hasFirebaseAdminConfig } from "../../../../server/firebaseAdmin";
 import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvider";
 import { internalOpsReadiness } from "../../../../server/internalOpsProvider";
-import { hasGeocodingConfig } from "../../../../server/locationProvider";
+import { hasGeocodingConfig, hasGoogleRoutesConfig } from "../../../../server/locationProvider";
 import {
   hasRazorpayConfig,
   hasRazorpayWebhookConfig,
@@ -200,6 +200,11 @@ export async function GET() {
       partnerDispatchApi: true,
       geocodingRoute: true,
       geocodingConfigured: hasGeocodingConfig,
+      googleRoutesEtaApi: true,
+      googleRoutesConfigured: hasGoogleRoutesConfig,
+      liveRoutePolylineMap: true,
+      smoothCaregiverMarkerMotion: true,
+      trafficAwareEtaRefresh: true,
       voiceNoteUploadRoute: true,
       voiceNoteStorageConfigured: hasVoiceNoteStorageConfig,
       firebaseRulesFile: true,
@@ -216,6 +221,7 @@ export async function GET() {
         ...(hasEnv("NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID")
           ? []
           : ["Google Maps production Map ID"]),
+        ...(hasGoogleRoutesConfig ? [] : ["Google Routes API key for traffic-aware ETA"]),
         ...(googleWorkspaceReadiness.configured
           ? []
           : ["Google Workspace service account for Sheets, Calendar, Drive, Docs"]),

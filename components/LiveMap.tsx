@@ -15,6 +15,17 @@ type LiveMapProps = {
   journey: CareJourney | null;
 };
 
+type RouteEtaResponse = {
+  route?: {
+    etaMinutes: number;
+    distanceKm: number;
+    distanceMeters: number;
+    durationSeconds: number;
+    encodedPolyline: string;
+    source: "google-routes" | "distance-fallback";
+  };
+};
+
 const defaultCenter = {
   lat: 12.9783,
   lng: 77.6023
@@ -23,6 +34,170 @@ const defaultCenter = {
 const googleMapsLibraries: Libraries = ["marker"];
 
 const formatCoord = (value: number) => value.toFixed(4);
+
+const decodePolyline = (encoded = ""): google.maps.LatLngLiteral[] => {
+  const points: google.maps.LatLngLiteral[] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({
+      lat: lat / 1e5,
+      lng: lng / 1e5
+    });
+  }
+
+  return points;
+};
+
+const interpolateLocation = (
+  from: google.maps.LatLngLiteral,
+  to: google.maps.LatLngLiteral,
+  progress: number
+) => ({
+  lat: from.lat + (to.lat - from.lat) * progress,
+  lng: from.lng + (to.lng - from.lng) * progress
+});
+
+const useAnimatedLocation = (target: google.maps.LatLngLiteral) => {
+  const [position, setPosition] = useState(target);
+  const positionRef = useRef(target);
+  const startedAtRef = useRef(0);
+
+  useEffect(() => {
+    const from = positionRef.current;
+    const to = {
+      lat: target.lat,
+      lng: target.lng
+    };
+    startedAtRef.current = Date.now();
+    let frame = 0;
+
+    const tick = () => {
+      const progress = Math.min(1, (Date.now() - startedAtRef.current) / 900);
+      const nextPosition = interpolateLocation(from, to, progress);
+      positionRef.current = nextPosition;
+      setPosition(nextPosition);
+
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [target.lat, target.lng]);
+
+  return position;
+};
+
+const useRouteEta = (journey: CareJourney | null) => {
+  const [route, setRoute] = useState<{
+    etaMinutes: number;
+    distanceKm: number;
+    encodedPolyline: string;
+    source: "google-routes" | "distance-fallback";
+    updatedAt: number;
+  } | null>(null);
+  const originLat = journey?.caretakerLocation?.lat;
+  const originLng = journey?.caretakerLocation?.lng;
+  const destinationLat = journey?.customerLocation?.lat;
+  const destinationLng = journey?.customerLocation?.lng;
+  const status = journey?.status;
+
+  useEffect(() => {
+    if (
+      typeof originLat !== "number" ||
+      typeof originLng !== "number" ||
+      typeof destinationLat !== "number" ||
+      typeof destinationLng !== "number"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const activeTracking = ["accepted", "en_route", "arrived", "in_progress"].includes(
+      status || ""
+    );
+    const refreshMs = activeTracking ? 15_000 : 45_000;
+    const origin = {
+      lat: originLat,
+      lng: originLng
+    };
+    const destination = {
+      lat: destinationLat,
+      lng: destinationLng
+    };
+
+    const refresh = async () => {
+      const response = await fetch("/api/locations/route-eta", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          origin,
+          destination
+        })
+      }).catch(() => null);
+
+      if (!response?.ok || cancelled) {
+        return;
+      }
+
+      const payload = (await response.json()) as RouteEtaResponse;
+      if (!payload.route || cancelled) {
+        return;
+      }
+
+      setRoute({
+        etaMinutes: payload.route.etaMinutes,
+        distanceKm: payload.route.distanceKm,
+        encodedPolyline: payload.route.encodedPolyline,
+        source: payload.route.source,
+        updatedAt: Date.now()
+      });
+    };
+
+    refresh();
+    const interval = window.setInterval(refresh, refreshMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [
+    destinationLat,
+    destinationLng,
+    originLat,
+    originLng,
+    status
+  ]);
+
+  return route;
+};
 
 const locationFreshnessFor = (journey: CareJourney | null) => {
   const timestamp = journey?.lastLocationAt || journey?.updatedAt || 0;
@@ -102,9 +277,15 @@ function GoogleLiveMap({ journey }: LiveMapProps) {
       lat: defaultCenter.lat + 0.01,
       lng: defaultCenter.lng + 0.01
     };
+  const animatedCaretakerLocation = useAnimatedLocation(caretakerLocation);
+  const liveRoute = useRouteEta(journey);
+  const encodedPolyline = liveRoute?.encodedPolyline || journey?.routePolyline || "";
+  const routePath = useMemo(() => decodePolyline(encodedPolyline), [encodedPolyline]);
+  const displayEta = liveRoute?.etaMinutes ?? journey?.eta ?? 0;
+  const routeSource = liveRoute?.source || journey?.routeSource || "distance-fallback";
   const center = {
-    lat: (customerLocation.lat + caretakerLocation.lat) / 2,
-    lng: (customerLocation.lng + caretakerLocation.lng) / 2
+    lat: (customerLocation.lat + animatedCaretakerLocation.lat) / 2,
+    lng: (customerLocation.lng + animatedCaretakerLocation.lng) / 2
   };
 
   if (loadError || !isLoaded) {
@@ -143,13 +324,13 @@ function GoogleLiveMap({ journey }: LiveMapProps) {
           tone="home"
         />
         <AdvancedMapMarker
-          position={caretakerLocation}
+          position={animatedCaretakerLocation}
           title={journey?.caretakerName || "Caretaker"}
           label="Care"
           tone="caretaker"
         />
         <PolylineF
-          path={[caretakerLocation, customerLocation]}
+          path={routePath.length > 1 ? routePath : [animatedCaretakerLocation, customerLocation]}
           options={{
             strokeColor: "#60a5fa",
             strokeOpacity: 0.9,
@@ -157,7 +338,7 @@ function GoogleLiveMap({ journey }: LiveMapProps) {
           }}
         />
       </GoogleMap>
-      <MapOverlay journey={journey} />
+      <MapOverlay journey={journey} eta={displayEta} routeSource={routeSource} />
     </MapFrame>
   );
 }
@@ -226,9 +407,17 @@ function AdvancedMapMarker({
   return null;
 }
 
-function MapOverlay({ journey }: LiveMapProps) {
+function MapOverlay({
+  journey,
+  eta,
+  routeSource
+}: LiveMapProps & {
+  eta?: number;
+  routeSource?: "google-routes" | "distance-fallback";
+}) {
   const freshness = locationFreshnessFor(journey);
   const routeMood = routeMoodFor(journey);
+  const sourceLabel = routeSource === "google-routes" ? "Live route" : "Distance ETA";
 
   return (
     <div className="pointer-events-none absolute inset-x-3 top-3 flex items-center justify-between gap-3">
@@ -244,7 +433,10 @@ function MapOverlay({ journey }: LiveMapProps) {
           {freshness.label}
         </div>
         <div className="rounded-full border border-white/10 bg-[#050816]/75 px-3 py-2 text-xs backdrop-blur-md">
-          ETA {journey?.eta || 0} min
+          ETA {eta ?? journey?.eta ?? 0} min
+        </div>
+        <div className="hidden rounded-full border border-white/10 bg-[#050816]/75 px-3 py-2 text-xs backdrop-blur-md sm:block">
+          {sourceLabel}
         </div>
       </div>
     </div>
@@ -269,6 +461,8 @@ function MapFrame({
   };
   const freshness = locationFreshnessFor(journey);
   const routeMood = routeMoodFor(journey);
+  const sourceLabel =
+    journey?.routeSource === "google-routes" ? "Google traffic-aware route" : "Distance fallback";
 
   return (
     <div className="space-y-3">
@@ -287,6 +481,9 @@ function MapFrame({
         </div>
         <div className={`mt-2 rounded-2xl px-3 py-2 font-semibold ${routeMood.tone}`}>
           {routeMood.label}
+        </div>
+        <div className="mt-2 rounded-2xl bg-white/10 px-3 py-2 font-semibold">
+          {sourceLabel}
         </div>
         <div className="mt-3 flex gap-2 text-amber-100">
           {mode !== "Google Maps" && <AlertTriangle className="h-4 w-4 shrink-0" />}
@@ -352,7 +549,7 @@ function FallbackVisual({ journey }: LiveMapProps) {
           top: `${72 - progress * 7}%`
         }}
       />
-      <MapOverlay journey={journey} />
+      <MapOverlay journey={journey} routeSource={journey?.routeSource} />
     </>
   );
 }

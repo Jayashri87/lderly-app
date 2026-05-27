@@ -156,7 +156,9 @@ export const CaregiverApi = {
         bookingId,
         lat: location.lat,
         lng: location.lng,
-        accuracyMeters: location.accuracyMeters
+        accuracyMeters: location.accuracyMeters,
+        capturedAt: location.capturedAt,
+        source: location.source
       })
     });
   },

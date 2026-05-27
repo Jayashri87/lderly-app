@@ -8,7 +8,7 @@ import type {
 } from "../services/bookingService";
 import type { UserRole } from "../services/authService";
 import { getAdminDatabase } from "./firebaseAdmin";
-import { enrichBookingLocation } from "./locationProvider";
+import { computeRouteEta, enrichBookingLocation } from "./locationProvider";
 
 type BookingActor = {
   role: UserRole;
@@ -1458,7 +1458,7 @@ export const TrustedBooking = {
       lat: location.lat,
       lng: location.lng,
       accuracyMeters: location.accuracyMeters || 0,
-      capturedAt: Date.now()
+      capturedAt: location.capturedAt || Date.now()
     };
     const updates: Record<string, unknown> = {
       [`caretakers/${caretakerId}/currentLocation`]: safeLocation,
@@ -1469,8 +1469,9 @@ export const TrustedBooking = {
       const bookingSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
       const booking = bookingSnapshot.val() as CareBooking | null;
       if (booking?.tracking) {
-        const distance = distanceKm(safeLocation, booking.tracking.customerLocation);
-        const eta = etaFromDistance(distance);
+        const routeEta = await computeRouteEta(safeLocation, booking.tracking.customerLocation);
+        const distance = routeEta.distanceKm;
+        const eta = routeEta.etaMinutes;
         const status = distance <= 0.15 && booking.status === "en_route" ? "arrived" : booking.status;
         const nextBooking = enrichBooking(
           {
@@ -1482,7 +1483,12 @@ export const TrustedBooking = {
               distanceKm: distance,
               etaMinutes: status === "arrived" ? 0 : eta,
               lastLocationAt: Date.now(),
-              routeStatus: status === "arrived" ? "arrived" : "tracking"
+              routeStatus: status === "arrived" ? "arrived" : "tracking",
+              routePolyline: routeEta.encodedPolyline || booking.tracking.routePolyline,
+              routeDistanceMeters: routeEta.distanceMeters,
+              routeDurationSeconds: routeEta.durationSeconds,
+              routeSource: routeEta.source,
+              routeUpdatedAt: Date.now()
             },
             timeline: [
               ...booking.timeline,

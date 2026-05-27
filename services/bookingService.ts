@@ -164,6 +164,11 @@ export type BookingTracking = {
   caretakerLocation: CareLocation;
   lastLocationAt: number;
   routeStatus: "pending" | "tracking" | "arrived" | "completed";
+  routePolyline?: string;
+  routeDistanceMeters?: number;
+  routeDurationSeconds?: number;
+  routeSource?: "google-routes" | "distance-fallback";
+  routeUpdatedAt?: number;
 };
 
 export type BookingSla = {

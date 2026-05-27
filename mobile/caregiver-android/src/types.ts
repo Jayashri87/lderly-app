@@ -78,4 +78,6 @@ export type LocationPoint = {
   lat: number;
   lng: number;
   accuracyMeters?: number;
+  capturedAt?: number;
+  source?: "device" | "background";
 };
