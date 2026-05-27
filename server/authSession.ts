@@ -96,7 +96,14 @@ export const getRoleSession = (request: NextRequest) => {
 export const requireRole = (request: NextRequest, roles: UserRole[]) => {
   const session = getRoleSession(request);
 
-  if (!session || !roles.includes(session.role)) {
+  if (!session) {
+    return null;
+  }
+
+  const hasRole = roles.includes(session.role);
+  const hasSuperAdminAccess = session.role === "superadmin" && roles.includes("admin");
+
+  if (!hasRole && !hasSuperAdminAccess) {
     return null;
   }
 

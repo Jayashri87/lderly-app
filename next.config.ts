@@ -37,6 +37,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: dirname(fileURLToPath(import.meta.url))
   },
+  images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 7
+  },
   async headers() {
     return [
       {
@@ -49,6 +53,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/login",
+        headers: runtimeNoStoreHeaders
+      },
+      {
+        source: "/superadmin",
         headers: runtimeNoStoreHeaders
       },
       {

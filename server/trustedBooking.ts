@@ -16,6 +16,11 @@ type BookingActor = {
   username?: string;
 };
 
+type LifecycleActor = "customer" | "caretaker" | "admin" | "system";
+
+const lifecycleActorFor = (role?: UserRole, fallback: LifecycleActor = "system"): LifecycleActor =>
+  role === "superadmin" ? "admin" : role || fallback;
+
 const transitionMap: Record<BookingStatus, BookingStatus[]> = {
   none: ["requested", "searching"],
   requested: ["searching", "assigned", "cancelled"],
@@ -61,7 +66,7 @@ const terminalStatuses: BookingStatus[] = [
 
 const lifecycleFor = (
   status: BookingStatus,
-  actor: "customer" | "caretaker" | "admin" | "system" = "system"
+  actor: LifecycleActor = "system"
 ) => {
   const allowedNextStatuses = transitionMap[status];
   const nextStatus = allowedNextStatuses[0] ?? status;
@@ -76,7 +81,7 @@ const lifecycleFor = (
 
 const enrichBooking = (
   booking: CareBooking,
-  actor: "customer" | "caretaker" | "admin" | "system" = "system"
+  actor: LifecycleActor = "system"
 ): CareBooking => {
   const timestamp = Date.now();
   const assignmentDueAt = booking.sla?.assignmentDueAt || booking.createdAt + 10 * 60 * 1000;
@@ -1092,7 +1097,7 @@ export const TrustedBooking = {
         completion,
         timeline: [...booking.timeline, { label: stepLabels[status], at: Date.now() }]
       },
-      actor?.role || "admin"
+      lifecycleActorFor(actor?.role, "admin")
     );
 
     const updates = bookingIndexes(nextBooking, booking);
@@ -1185,7 +1190,12 @@ export const TrustedBooking = {
       return { ok: false as const, status: 404, error: "Booking not found" };
     }
 
-    if (actor?.role !== "admin" && (actor?.role !== "customer" || actor.uid !== booking.customerId)) {
+    const effectiveActorRole = lifecycleActorFor(actor?.role, "customer");
+
+    if (
+      effectiveActorRole !== "admin" &&
+      (effectiveActorRole !== "customer" || actor?.uid !== booking.customerId)
+    ) {
       return { ok: false as const, status: 403, error: "Forbidden" };
     }
 
@@ -1215,7 +1225,7 @@ export const TrustedBooking = {
           }
         ]
       },
-      actor?.role || "customer"
+      effectiveActorRole
     );
     const updates = bookingIndexes(nextBooking, booking);
     if (nextBooking.caretakerId && verification.approved) {
@@ -1485,6 +1495,7 @@ export const TrustedBooking = {
               lastLocationAt: Date.now(),
               routeStatus: status === "arrived" ? "arrived" : "tracking",
               routePolyline: routeEta.encodedPolyline || booking.tracking.routePolyline,
+              routePath: routeEta.decodedPath || booking.tracking.routePath,
               routeDistanceMeters: routeEta.distanceMeters,
               routeDurationSeconds: routeEta.durationSeconds,
               routeSource: routeEta.source,

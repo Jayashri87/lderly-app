@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LDERLY VC Brief</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 16mm;
+      }
+
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --line: #dbe3ea;
+        --soft: #f8fafc;
+        --emerald: #059669;
+        --indigo: #4f46e5;
+        --amber: #d97706;
+        --rose: #e11d48;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: white;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.42;
+      }
+
+      .page {
+        min-height: 265mm;
+        page-break-after: always;
+        position: relative;
+      }
+
+      .page:last-child {
+        page-break-after: auto;
+      }
+
+      .eyebrow {
+        color: var(--emerald);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin-top: 18px;
+        font-size: 54px;
+        line-height: 0.96;
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        margin-bottom: 16px;
+        font-size: 30px;
+        line-height: 1.05;
+        letter-spacing: -0.015em;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 15px;
+      }
+
+      .lede {
+        max-width: 710px;
+        margin-top: 22px;
+        color: #334155;
+        font-size: 18px;
+      }
+
+      .hero {
+        display: grid;
+        min-height: 220px;
+        margin-top: 42px;
+        padding: 28px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 28px;
+        background:
+          radial-gradient(circle at 20% 5%, rgba(5, 150, 105, 0.18), transparent 32%),
+          radial-gradient(circle at 85% 22%, rgba(79, 70, 229, 0.16), transparent 30%),
+          linear-gradient(135deg, #0f172a, #111827 58%, #042f2e);
+        color: white;
+        box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 24px;
+        align-items: end;
+      }
+
+      .hero-card {
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.09);
+      }
+
+      .hero-card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 26px;
+        letter-spacing: -0.015em;
+      }
+
+      .hero-card span {
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 13px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 24px;
+      }
+
+      .card {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: white;
+      }
+
+      .card.soft {
+        background: var(--soft);
+      }
+
+      .metric {
+        display: block;
+        color: var(--indigo);
+        font-size: 28px;
+        font-weight: 850;
+        letter-spacing: -0.02em;
+      }
+
+      .caption {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .section {
+        margin-top: 34px;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      ul {
+        margin: 10px 0 0;
+        padding-left: 18px;
+      }
+
+      li {
+        margin: 8px 0;
+        color: #334155;
+        font-size: 14px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        margin: 4px 6px 4px 0;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pill.dark {
+        background: #eef2ff;
+        color: #4338ca;
+      }
+
+      .pill.warn {
+        background: #fffbeb;
+        color: #b45309;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .step {
+        min-height: 86px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+        font-size: 12px;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      .footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .quote {
+        margin-top: 18px;
+        padding: 18px;
+        border-left: 4px solid var(--emerald);
+        border-radius: 16px;
+        background: #f0fdf4;
+        color: #064e3b;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 0.85fr 1.15fr;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .roadmap {
+        display: grid;
+        gap: 12px;
+      }
+
+      .roadmap-item {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 14px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: white;
+      }
+
+      .stage {
+        color: var(--emerald);
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .callout {
+        padding: 20px;
+        border-radius: 24px;
+        background: #0f172a;
+        color: white;
+      }
+
+      .callout p {
+        color: rgba(255, 255, 255, 0.74);
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page">
+      <div class="eyebrow">Investor Brief · LDERLY</div>
+      <h1>India’s realtime elder care operating system.</h1>
+      <p class="lede">
+        LDERLY coordinates care for ageing parents through a customer app, caregiver app, and ops command center. The product is designed to reduce family anxiety in realtime: booking care, dispatching caregivers, tracking visits, managing emergencies, and giving families proof that their loved one is okay.
+      </p>
+
+      <div class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow" style="color:#86efac">Core promise</div>
+            <h2 style="margin-top:10px;margin-bottom:10px;color:white;font-size:36px;">Care arrives on demand. Family trust stays live.</h2>
+            <p style="color:rgba(255,255,255,.76);font-size:15px;">
+              Built as an operational platform, not a listing marketplace: family booking, caregiver dispatch, live location, OTP visit start, care updates, payment release, and ops escalation.
+            </p>
+          </div>
+          <div class="hero-card">
+            <strong>Active production app</strong>
+            <span>Next.js, Firebase, Vercel, Sentry, PostHog, Microsoft Clarity, Razorpay-ready, Google Maps / Routes integration, Android caregiver foundation.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card soft">
+          <span class="metric">3 apps</span>
+          <span class="caption">Customer, caregiver partner, admin/ops</span>
+        </div>
+        <div class="card soft">
+          <span class="metric">Live OS</span>
+          <span class="caption">Booking, dispatch, ETA, visit proof, escalation</span>
+        </div>
+        <div class="card soft">
+          <span class="metric">India-first</span>
+          <span class="caption">Family coordination, NRI reassurance, trusted local care</span>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>LDERLY · Confidential VC Brief</span>
+        <span>Production: lderly-app.vercel.app</span>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Problem + Market</div>
+      <h2>Families need continuous assurance, not another service directory.</h2>
+      <div class="split">
+        <div class="card">
+          <h3>The pain</h3>
+          <ul>
+            <li>Working professionals and NRI families cannot reliably monitor parents throughout the day.</li>
+            <li>Care services are fragmented across attendants, labs, pharmacies, doctors, emergency contacts, and family members.</li>
+            <li>Most elder care apps behave like static booking platforms, with weak live tracking and poor operational accountability.</li>
+            <li>Emergency response is usually manual, delayed, and difficult for families to verify remotely.</li>
+          </ul>
+        </div>
+        <div class="card soft">
+          <h3>Why now</h3>
+          <ul>
+            <li>India’s ageing population is growing while adult children are increasingly mobile and urban/NRI.</li>
+            <li>Families already trust app-led logistics for rides, food, payments, and delivery. Elder care is ready for the same operational layer.</li>
+            <li>Realtime location, push, payments, AI summaries, and low-cost cloud infrastructure make a care OS viable.</li>
+            <li>Trust, verification, and operational proof can become the moat.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="quote">
+        Product thesis: the winning elder care platform will not be a marketplace. It will be a realtime trust and operations layer for families.
+      </div>
+
+      <div class="section">
+        <h2>Target users</h2>
+        <div class="row">
+          <div class="card">
+            <h3>NRI families</h3>
+            <p class="small">Remote visibility, visit proof, monthly care summaries, emergency coordination, payments.</p>
+          </div>
+          <div class="card">
+            <h3>Working professionals</h3>
+            <p class="small">Quick care booking, live tracking, doctor/lab support, recurring care, family updates.</p>
+          </div>
+          <div class="card">
+            <h3>Seniors</h3>
+            <p class="small">Assistance, companionship, medicine support, hospital visit help, immediate assistance.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>LDERLY · Problem</span>
+        <span>2</span>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Product System</div>
+      <h2>Three coordinated apps on one backend.</h2>
+      <div class="flow">
+        <div class="step"><strong>Customer</strong>Books care for parent/self, pays, tracks caregiver, receives updates.</div>
+        <div class="step"><strong>Dispatch</strong>Ops monitors booking, risk, SLA, assignment, escalation.</div>
+        <div class="step"><strong>Caregiver</strong>Accepts assignment, shares location, starts via OTP, uploads care proof.</div>
+        <div class="step"><strong>Live Care</strong>Family sees ETA, visit progress, notes, medicines, vitals, reports.</div>
+        <div class="step"><strong>Completion</strong>Customer verifies, rating/rebook, payment release workflow.</div>
+      </div>
+
+      <div class="section split">
+        <div class="card">
+          <h3>Customer app</h3>
+          <ul>
+            <li>Lead registration and customer login</li>
+            <li>Care recipient flow: mother, father, self/others</li>
+            <li>Guided booking funnel by care need, service, duration, location</li>
+            <li>Payment terms modal and Razorpay checkout path</li>
+            <li>Realtime care tracking with live route ETA foundation</li>
+            <li>Trust UI: caregiver verification, visit proof, family updates</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Caregiver app</h3>
+          <ul>
+            <li>Partner login and assignment view</li>
+            <li>Accept/reject workflow hidden from customer until assigned</li>
+            <li>Mark en route, arrived, start visit, complete visit</li>
+            <li>OTP start verification</li>
+            <li>Vitals, medication, proof upload, incident and SOS workflows</li>
+            <li>Android native foundation for background GPS</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section card soft">
+        <h3>Admin / Ops command center</h3>
+        <p class="small">
+          Live bookings, caretaker assignment, SLA risk, emergency queue, escalation, audit logs, operational analytics, lead management, Google sync health, backup/recovery, support workflows, finance actions, and readiness checks.
+        </p>
+      </div>
+
+      <div class="footer">
+        <span>LDERLY · Product System</span>
+        <span>3</span>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Technology + Moat</div>
+      <h2>Operational infrastructure creates defensibility.</h2>
+      <div class="grid-2">
+        <div class="callout">
+          <h3 style="font-size:18px;">Current production stack</h3>
+          <p style="margin-top:8px;">Next.js 16, React 19, TypeScript, Tailwind v4, Firebase, Firebase Admin SDK, Vercel, Sentry, PostHog, Microsoft Clarity, Razorpay integration, Google Maps / Routes, Playwright E2E, Android caregiver foundation.</p>
+        </div>
+        <div class="card">
+          <h3>Technical capabilities already built</h3>
+          <span class="pill">Signed role sessions</span>
+          <span class="pill">Protected APIs</span>
+          <span class="pill">Firebase rules</span>
+          <span class="pill">Audit logs</span>
+          <span class="pill">Booking lifecycle</span>
+          <span class="pill">SLA analytics</span>
+          <span class="pill">Route ETA endpoint</span>
+          <span class="pill">Production E2E</span>
+          <span class="pill dark">Ops dashboard</span>
+          <span class="pill dark">Caregiver workflow</span>
+          <span class="pill dark">Customer funnel</span>
+          <span class="pill warn">Emergency flow</span>
+        </div>
+      </div>
+
+      <div class="section split">
+        <div class="card soft">
+          <h3>Why LDERLY is not just an app</h3>
+          <ul>
+            <li>It captures operational event history across customer, caregiver, ops, payment, emergency, and reporting flows.</li>
+            <li>It can build proprietary reliability scores, dispatch intelligence, caregiver performance signals, and family trust loops.</li>
+            <li>It connects multiple offline care workflows into one command system.</li>
+          </ul>
+        </div>
+        <div class="card soft">
+          <h3>Data moat potential</h3>
+          <ul>
+            <li>Caregiver punctuality, reliability, acceptance, and visit quality.</li>
+            <li>Care recipient routines, medicine adherence, vitals, mood, mobility, and escalation history.</li>
+            <li>Ops SLA patterns by geography, service type, time, and partner availability.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section card">
+        <h3>Investor framing</h3>
+        <p class="small">
+          LDERLY can compound from a care coordination app into a logistics-grade elder care network: verified caregivers, diagnostic partners, hospitals, ambulance links, pharmacy workflows, subscription care plans, and AI-generated family assurance.
+        </p>
+      </div>
+
+      <div class="footer">
+        <span>LDERLY · Technology</span>
+        <span>4</span>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Go-To-Market + Roadmap</div>
+      <h2>Start narrow, prove trust, scale the operating layer.</h2>
+
+      <div class="roadmap">
+        <div class="roadmap-item">
+          <div class="stage">Phase 1</div>
+          <div>
+            <h3>Controlled launch</h3>
+            <p class="small">Launch in a focused city/zone with curated caregivers, manual ops supervision, phone/WhatsApp-assisted onboarding, and high-touch service recovery.</p>
+          </div>
+        </div>
+        <div class="roadmap-item">
+          <div class="stage">Phase 2</div>
+          <div>
+            <h3>Subscription care</h3>
+            <p class="small">Recurring care plans, preferred caregiver, monthly reports for NRIs, medicine/lab/doctor visit bundles, and family collaboration.</p>
+          </div>
+        </div>
+        <div class="roadmap-item">
+          <div class="stage">Phase 3</div>
+          <div>
+            <h3>Partner network</h3>
+            <p class="small">Hospitals, labs, pharmacies, ambulance providers, physiotherapy, home nursing, and SLA-linked partner operations.</p>
+          </div>
+        </div>
+        <div class="roadmap-item">
+          <div class="stage">Phase 4</div>
+          <div>
+            <h3>AI care intelligence</h3>
+            <p class="small">Daily summaries, anomaly detection, missed medicine risk, caregiver note cleanup, ops risk alerts, and longitudinal elder care insights.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section split">
+        <div class="card">
+          <h3>Commercial model</h3>
+          <ul>
+            <li>On-demand booking fee per visit</li>
+            <li>Subscription care packages</li>
+            <li>Premium NRI monitoring plans</li>
+            <li>Partner referral or coordination revenue</li>
+            <li>Enterprise/family office elder care support</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Near-term asks</h3>
+          <ul>
+            <li>Field pilots with verified caregivers and ops playbook</li>
+            <li>Provider setup: Razorpay reconciliation, WhatsApp/MSG91/Exotel, App Check enforcement</li>
+            <li>Native caregiver GPS QA on Android devices</li>
+            <li>Operational hiring: dispatch, support, caregiver onboarding</li>
+            <li>City-level demand generation and NRI acquisition testing</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="quote">
+        Investment narrative: LDERLY is building the trust infrastructure for ageing India, starting with realtime family assurance and expanding into care operations, emergency coordination, and partner healthcare logistics.
+      </div>
+
+      <div class="footer">
+        <span>LDERLY · Roadmap</span>
+        <span>5</span>
+      </div>
+    </section>
+  </body>
+</html>

@@ -13,9 +13,10 @@ export function LderlyProviders({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,
-            gcTime: 5 * 60_000,
-            refetchOnWindowFocus: false,
+            staleTime: 5 * 60_000,
+            gcTime: 10 * 60_000,
+            refetchOnWindowFocus: "always",
+            refetchOnReconnect: "always",
             retry: 1
           },
           mutations: {
@@ -35,10 +36,15 @@ export function LderlyProviders({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const deviceMemory =
+      "deviceMemory" in navigator ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory) : 8;
+    const lowPowerDevice = navigator.hardwareConcurrency <= 4 || deviceMemory <= 4;
+
     if (
       typeof window === "undefined" ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-      window.matchMedia("(pointer: coarse)").matches
+      window.matchMedia("(pointer: coarse)").matches ||
+      lowPowerDevice
     ) {
       return undefined;
     }

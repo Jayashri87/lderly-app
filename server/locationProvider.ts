@@ -17,6 +17,8 @@ export type RouteEta = {
   distanceMeters: number;
   durationSeconds: number;
   encodedPolyline: string;
+  decodedPath: CareLocation[];
+  cacheSource: "redis" | "memory" | "fresh" | "none";
   source: "google-routes" | "distance-fallback";
   error?: string;
 };
@@ -93,6 +95,136 @@ const distanceKm = (from: CareLocation, to: CareLocation) => {
   return Number((earthKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
 };
 
+const routeMemoryCache = new Map<string, { route: RouteEta; expiresAt: number }>();
+const routeCacheTtlSeconds = 60;
+const routeCacheMaxEntries = 120;
+
+const routeCacheKeyFor = (origin: CareLocation, destination: CareLocation) =>
+  [
+    "route",
+    origin.lat.toFixed(5),
+    origin.lng.toFixed(5),
+    destination.lat.toFixed(5),
+    destination.lng.toFixed(5)
+  ].join(":");
+
+const decodePolyline = (encoded = ""): CareLocation[] => {
+  const points: CareLocation[] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({
+      lat: lat / 1e5,
+      lng: lng / 1e5
+    });
+  }
+
+  return points;
+};
+
+const redisRestConfig = () => {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.REDIS_REST_TOKEN;
+
+  return url && token ? { url: url.replace(/\/$/, ""), token } : null;
+};
+
+const readRedisRoute = async (key: string): Promise<RouteEta | null> => {
+  const config = redisRestConfig();
+  if (!config) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${config.url}/get/${encodeURIComponent(key)}`, {
+      headers: {
+        Authorization: `Bearer ${config.token}`
+      },
+      cache: "no-store"
+    });
+    const payload = (await response.json()) as { result?: string | null };
+    return payload.result ? ({ ...JSON.parse(payload.result), cacheSource: "redis" } as RouteEta) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeRedisRoute = async (key: string, route: RouteEta) => {
+  const config = redisRestConfig();
+  if (!config) {
+    return;
+  }
+
+  try {
+    await fetch(`${config.url}/set/${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        value: JSON.stringify({ ...route, cacheSource: "fresh" }),
+        ex: routeCacheTtlSeconds
+      }),
+      cache: "no-store"
+    });
+  } catch {
+    // Cache failure must not break care tracking.
+  }
+};
+
+const readMemoryRoute = (key: string) => {
+  const cached = routeMemoryCache.get(key);
+
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt < Date.now()) {
+    routeMemoryCache.delete(key);
+    return null;
+  }
+
+  return { ...cached.route, cacheSource: "memory" as const };
+};
+
+const writeMemoryRoute = (key: string, route: RouteEta) => {
+  routeMemoryCache.set(key, {
+    route: { ...route, cacheSource: "fresh" },
+    expiresAt: Date.now() + routeCacheTtlSeconds * 1000
+  });
+
+  if (routeMemoryCache.size > routeCacheMaxEntries) {
+    const oldestKey = routeMemoryCache.keys().next().value;
+    if (oldestKey) {
+      routeMemoryCache.delete(oldestKey);
+    }
+  }
+};
+
 const fallbackRouteEta = (
   origin: CareLocation,
   destination: CareLocation,
@@ -108,6 +240,8 @@ const fallbackRouteEta = (
     distanceMeters: Math.round(kms * 1000),
     durationSeconds: etaMinutes * 60,
     encodedPolyline: "",
+    decodedPath: [origin, destination],
+    cacheSource: "none",
     source: "distance-fallback",
     error
   };
@@ -123,6 +257,12 @@ export const computeRouteEta = async (
   destination: CareLocation
 ): Promise<RouteEta> => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const cacheKey = routeCacheKeyFor(origin, destination);
+  const cachedRoute = readMemoryRoute(cacheKey) || (await readRedisRoute(cacheKey));
+
+  if (cachedRoute) {
+    return cachedRoute;
+  }
 
   if (!apiKey) {
     return fallbackRouteEta(origin, destination, "Google Routes API key is not configured");
@@ -183,16 +323,25 @@ export const computeRouteEta = async (
     const durationSeconds = durationSecondsFromGoogle(route.duration);
     const distanceMeters = route.distanceMeters || fallbackRouteEta(origin, destination).distanceMeters;
     const etaMinutes = Math.max(1, Math.ceil((durationSeconds || 60) / 60));
+    const encodedPolyline = route.polyline?.encodedPolyline || "";
+    const decodedPath = encodedPolyline ? decodePolyline(encodedPolyline) : [origin, destination];
 
-    return {
+    const routeEta: RouteEta = {
       ok: true,
       etaMinutes,
       distanceKm: Number((distanceMeters / 1000).toFixed(2)),
       distanceMeters,
       durationSeconds,
-      encodedPolyline: route.polyline?.encodedPolyline || "",
+      encodedPolyline,
+      decodedPath,
+      cacheSource: "fresh",
       source: "google-routes"
     };
+
+    writeMemoryRoute(cacheKey, routeEta);
+    await writeRedisRoute(cacheKey, routeEta);
+
+    return routeEta;
   } catch (error) {
     return fallbackRouteEta(
       origin,

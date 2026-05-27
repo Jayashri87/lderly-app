@@ -41,6 +41,8 @@ export async function GET() {
     auth: {
       signedSessions: hasEnv("LDERLY_AUTH_SECRET"),
       adminCredentials: hasEnv("LDERLY_ADMIN_USERNAME") && hasEnv("LDERLY_ADMIN_PASSWORD"),
+      superAdminCredentials:
+        hasEnv("LDERLY_SUPERADMIN_USERNAME") && hasEnv("LDERLY_SUPERADMIN_PASSWORD"),
       caretakerCredentials:
         hasEnv("LDERLY_CARETAKER_USERNAME") && hasEnv("LDERLY_CARETAKER_PASSWORD"),
       customerCredentials:

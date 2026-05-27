@@ -23,6 +23,7 @@ export async function POST(
 
   const { bookingId } = await context.params;
   const body = await parseJsonBody<{ reason?: string }>(request);
+  const bookingActor = auth.session.role === "superadmin" ? "admin" : auth.session.role;
 
   if (!body?.reason || body.reason.trim().length < 3) {
     return jsonError("Cancellation reason is required", 400);
@@ -46,6 +47,7 @@ export async function POST(
               status: "success",
               details: {
                 actor: auth.session.role,
+                effectiveActor: bookingActor,
                 reason: body.reason
               }
             },
@@ -53,7 +55,7 @@ export async function POST(
               TrustedBooking.cancel(
                 bookingId,
                 {
-                  cancelledBy: auth.session.role,
+                  cancelledBy: bookingActor,
                   reason: body.reason!.trim()
                 },
                 auth.session

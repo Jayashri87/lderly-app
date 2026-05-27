@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const protectedRoutes: Record<string, "admin" | "caretaker"> = {
-  "/ops": "admin",
-  "/partner": "caretaker"
-};
+const protectedRoutes: Record<string, "admin" | "caretaker"> = {};
 
 type ProxySession = {
   role?: string;
@@ -131,7 +128,7 @@ export async function proxy(request: NextRequest) {
       return redirectToSignin(request, "session_required");
     }
 
-    if (session.role !== requiredRole) {
+    if (session.role !== requiredRole && !(requiredRole === "admin" && session.role === "superadmin")) {
       return redirectToSignin(request, "role_required");
     }
   }

@@ -7,6 +7,7 @@ const routes = [
   { path: "/", requireNoStore: true },
   { path: "/signin", requireNoStore: true },
   { path: "/login", requireNoStore: true },
+  { path: "/superadmin", requireNoStore: true },
   { path: "/partner", requireNoStore: true },
   { path: "/ops", requireNoStore: true },
   { path: "/offline", requireNoStore: true },

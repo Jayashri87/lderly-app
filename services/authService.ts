@@ -10,7 +10,7 @@ import { ref, set } from "firebase/database";
 import { auth } from "../firebase";
 import { db } from "../firebase";
 
-export type UserRole = "customer" | "caretaker" | "admin";
+export type UserRole = "customer" | "caretaker" | "admin" | "superadmin";
 
 export type SessionUser = {
   uid: string;
@@ -22,7 +22,8 @@ export type SessionUser = {
 const roleLabels: Record<UserRole, string> = {
   customer: "Customer",
   caretaker: "Caretaker",
-  admin: "Admin"
+  admin: "Admin",
+  superadmin: "Super Admin"
 };
 
 const toSessionUser = (user: User, role: UserRole): SessionUser => ({
@@ -55,7 +56,8 @@ const readStoredRole = (): UserRole => {
   const storedRole = window.localStorage.getItem(roleKey);
   return storedRole === "customer" ||
     storedRole === "caretaker" ||
-    storedRole === "admin"
+    storedRole === "admin" ||
+    storedRole === "superadmin"
     ? storedRole
     : activeRole;
 };

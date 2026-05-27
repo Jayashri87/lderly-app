@@ -16,6 +16,7 @@ import { LiveActivityTimeline, LiveSystemPanel } from "../../components/system/L
 import { SystemStatusPill } from "../../components/system/SystemStatusPill";
 import { LiveOperationalDock } from "../../components/realtime/LiveOperationalDock";
 import { EmergencyResponseCard } from "../../components/emergency/EmergencyResponseCard";
+import { PortalLoginSwitch } from "../../components/system/PortalLoginSwitch";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -210,6 +211,7 @@ export default function PartnerApp() {
             lng: 77.61
           },
           routePolyline: activeBooking.tracking?.routePolyline,
+          routePath: activeBooking.tracking?.routePath,
           routeDistanceMeters: activeBooking.tracking?.routeDistanceMeters,
           routeDurationSeconds: activeBooking.tracking?.routeDurationSeconds,
           routeSource: activeBooking.tracking?.routeSource,
@@ -483,6 +485,9 @@ export default function PartnerApp() {
           <p className="mt-2 text-sm text-slate-500">
             Accept bookings, navigate, update sessions, and complete reports.
           </p>
+          <div className="mt-5">
+            <PortalLoginSwitch compact />
+          </div>
           <div className="mt-6 space-y-3">
             <input
               autoComplete="username"

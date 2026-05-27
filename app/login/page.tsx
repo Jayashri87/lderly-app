@@ -19,6 +19,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { PortalLoginSwitch } from "../../components/system/PortalLoginSwitch";
 import { AuthService } from "../../services/authService";
 
 const lderlyContactHref = "tel:+919916960524";
@@ -126,6 +127,8 @@ export default function CustomerLoginPage() {
             Register
           </Link>
         </header>
+
+        <PortalLoginSwitch />
 
         <motion.div
           initial={{ opacity: 0, y: 18 }}

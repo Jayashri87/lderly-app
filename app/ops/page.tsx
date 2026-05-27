@@ -20,6 +20,7 @@ import { LiveActivityTimeline, LiveSystemPanel } from "../../components/system/L
 import { SystemStatusPill } from "../../components/system/SystemStatusPill";
 import { LiveOperationalDock } from "../../components/realtime/LiveOperationalDock";
 import { EmergencyResponseCard } from "../../components/emergency/EmergencyResponseCard";
+import { PortalLoginSwitch } from "../../components/system/PortalLoginSwitch";
 import { DashboardSkeletonGrid } from "../../components/system/SystemSkeletons";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -45,6 +46,7 @@ type SystemStatus = {
   auth: {
     signedSessions: boolean;
     adminCredentials: boolean;
+    superAdminCredentials: boolean;
     caretakerCredentials: boolean;
     customerCredentials: boolean;
   };
@@ -341,6 +343,9 @@ type CustomerLeadSnapshot = {
   leads: CustomerLead[];
 };
 
+const isOpsRole = (session: SessionUser | null) =>
+  session?.role === "admin" || session?.role === "superadmin";
+
 type GoogleSyncSnapshot = {
   generatedAt: number;
   readiness: {
@@ -407,14 +412,16 @@ export default function OpsApp() {
   }, []);
 
   useEffect(() => {
-    if (!session || session.role !== "admin") {
+    if (!session || (session.role !== "admin" && session.role !== "superadmin")) {
       return;
     }
 
+    const opsSession: SessionUser =
+      session.role === "superadmin" ? { ...session, role: "admin" } : session;
     const unsubscribers = [
-      JourneyService.subscribe(session, setJourney),
-      BookingService.subscribe(session, setBooking),
-      NotificationService.subscribe(session, setNotifications),
+      JourneyService.subscribe(opsSession, setJourney),
+      BookingService.subscribe(opsSession, setBooking),
+      NotificationService.subscribe(opsSession, setNotifications),
       CaretakerService.subscribe(setCaretakers)
     ];
 
@@ -431,7 +438,7 @@ export default function OpsApp() {
   };
 
   useEffect(() => {
-    if (!session || session.role !== "admin") {
+    if (!isOpsRole(session)) {
       return;
     }
 
@@ -580,7 +587,7 @@ export default function OpsApp() {
     return null;
   };
 
-  if (!session || session.role !== "admin") {
+  if (!isOpsRole(session)) {
     return (
       <main className="lderly-shell flex min-h-screen items-center justify-center px-5 text-white">
         <section className="premium-card w-full max-w-md rounded-[2rem] p-6 text-[#071018]">
@@ -589,6 +596,9 @@ export default function OpsApp() {
           <p className="mt-2 text-sm text-slate-500">
             Monitor active care requests, assign caregivers, handle escalations, and track SLAs.
           </p>
+          <div className="mt-5">
+            <PortalLoginSwitch compact />
+          </div>
           <div className="mt-6 space-y-3">
             <input
               autoComplete="username"
@@ -729,12 +739,13 @@ export default function OpsApp() {
         {
           label: "Role auth",
           ready: Boolean(
-            systemStatus.auth.signedSessions &&
+              systemStatus.auth.signedSessions &&
               systemStatus.auth.adminCredentials &&
+              systemStatus.auth.superAdminCredentials &&
               systemStatus.auth.caretakerCredentials &&
               systemStatus.auth.customerCredentials
           ),
-          reason: "Customer, caregiver, and ops access"
+          reason: "Customer, caregiver, admin, and owner access"
         }
       ]
     : [];
@@ -1653,6 +1664,7 @@ export default function OpsApp() {
             <div className="mt-5 grid gap-3 md:grid-cols-4">
               <StatusPill label="Signed sessions" ready={systemStatus.auth.signedSessions} />
               <StatusPill label="Admin login" ready={systemStatus.auth.adminCredentials} />
+              <StatusPill label="Super admin login" ready={systemStatus.auth.superAdminCredentials} />
               <StatusPill label="Caretaker login" ready={systemStatus.auth.caretakerCredentials} />
               <StatusPill label="Customer login" ready={systemStatus.auth.customerCredentials} />
             </div>

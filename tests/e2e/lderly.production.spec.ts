@@ -1,11 +1,12 @@
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 
-type Role = "customer" | "caretaker" | "admin";
+type Role = "customer" | "caretaker" | "admin" | "superadmin";
 
 const roleLabels: Record<Role, string> = {
   customer: "Customer",
   caretaker: "Caretaker",
-  admin: "Admin"
+  admin: "Admin",
+  superadmin: "Super Admin"
 };
 
 const envFor = (role: Role) => {
@@ -104,6 +105,9 @@ test.describe("LDERLY production E2E route checks", () => {
       }
     });
     expect(routeEta.status()).toBe(401);
+
+    const routeStream = await request.get("/api/locations/route-stream?bookingId=e2e-missing");
+    expect(routeStream.status()).toBe(401);
   });
 
   test("disabled OTP endpoint does not issue customer sessions", async ({ request }) => {
@@ -118,7 +122,7 @@ test.describe("LDERLY production E2E route checks", () => {
     expect(response.headers()["set-cookie"]).toBeFalsy();
   });
 
-  test("role-specific pages reject the wrong signed role", async ({
+  test("role-specific pages keep their own login surfaces for wrong signed roles", async ({
     request,
     context,
     page,
@@ -128,14 +132,12 @@ test.describe("LDERLY production E2E route checks", () => {
 
     await login(request, context, "customer", appUrl);
     await page.goto("/ops");
-    expect(page.url()).toContain("/signin");
-    expect(page.url()).toContain("reason=role_required");
+    await expect(page.getByRole("heading", { name: "Operations control center" })).toBeVisible();
 
     await context.clearCookies();
     await login(request, context, "admin", appUrl);
     await page.goto("/partner");
-    expect(page.url()).toContain("/signin");
-    expect(page.url()).toContain("reason=role_required");
+    await expect(page.getByRole("heading", { name: "Caregiver operations" })).toBeVisible();
   });
 
   test("legal and payment policy pages are reachable", async ({ page }) => {
@@ -154,6 +156,17 @@ test.describe("LDERLY production E2E route checks", () => {
       })
     ).toBeVisible();
     await expect(page.getByText("Call now")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Customer Family care app" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Partner Caregiver app" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Admin Ops panel" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Super Admin/i })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("super admin login page is reachable and mobile safe", async ({ page }) => {
+    await page.goto("/superadmin");
+    await expect(page.getByRole("heading", { name: "Super Admin login" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Open super admin ops/i })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 
@@ -187,6 +200,20 @@ test.describe("LDERLY production E2E route checks", () => {
   }) => {
     await login(request, context, "admin", baseURL || "http://127.0.0.1:3000");
     await primeClientSession(page, "admin");
+    await page.goto("/ops");
+    await expect(page.getByText("LDERLY Ops").first()).toBeVisible();
+    await expect(page.getByText("Sign out")).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("super admin can enter the ops command center when configured", async ({
+    request,
+    context,
+    page,
+    baseURL
+  }) => {
+    await login(request, context, "superadmin", baseURL || "http://127.0.0.1:3000");
+    await primeClientSession(page, "superadmin");
     await page.goto("/ops");
     await expect(page.getByText("LDERLY Ops").first()).toBeVisible();
     await expect(page.getByText("Sign out")).toBeVisible();

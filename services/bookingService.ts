@@ -165,6 +165,7 @@ export type BookingTracking = {
   lastLocationAt: number;
   routeStatus: "pending" | "tracking" | "arrived" | "completed";
   routePolyline?: string;
+  routePath?: CareLocation[];
   routeDistanceMeters?: number;
   routeDurationSeconds?: number;
   routeSource?: "google-routes" | "distance-fallback";

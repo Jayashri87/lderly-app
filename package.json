@@ -6,10 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "bundle:size": "node scripts/bundle-size-report.mjs",
+    "lighthouse": "node scripts/lighthouse-report.mjs",
+    "load:test": "node scripts/load-test.mjs",
     "lint": "eslint",
     "verify:env": "node scripts/verify-production-env.mjs",
     "audit:deps": "npm audit --audit-level=moderate",
     "audit:secrets": "node scripts/audit-secret-exposure.mjs",
+    "audit:performance": "node scripts/performance-budget-check.mjs",
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
     "health:routes": "node scripts/route-health-check.mjs",
     "cleanup:production-data": "node scripts/cleanup-production-data.mjs",
@@ -23,7 +27,7 @@
     "e2e:headed": "playwright test --headed",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
-    "ci:validate": "npm run audit:deps && npm run audit:secrets && npm run lint && npm run build && npm run ci:smoke"
+    "ci:validate": "npm run audit:deps && npm run audit:secrets && npm run audit:performance && npm run lint && npm run build && npm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",

@@ -13,7 +13,7 @@ import {
 import type { UserRole } from "../../../../services/authService";
 import { registerRoleSession } from "../../../../server/sessionRegistry";
 
-const validRoles = ["customer", "caretaker", "admin"] as const;
+const validRoles = ["customer", "caretaker", "admin", "superadmin"] as const;
 
 const isUserRole = (role: unknown): role is UserRole =>
   typeof role === "string" && validRoles.includes(role as UserRole);
@@ -24,7 +24,7 @@ const canAssignRole = (request: NextRequest, role: UserRole) => {
   }
 
   const session = getRoleSession(request);
-  return Boolean(session && session.role === role);
+  return Boolean(session && (session.role === role || session.role === "superadmin"));
 };
 
 export async function POST(request: NextRequest) {
