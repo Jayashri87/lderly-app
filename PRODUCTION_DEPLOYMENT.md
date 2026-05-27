@@ -113,9 +113,11 @@ npm run verify:env
 Run:
 
 ```bash
+npm run audit:secrets
 npm run verify:env
 npm run lint
 npm run build
+npm run health:routes
 npm run smoke:production
 ```
 
@@ -153,6 +155,13 @@ The smoke test validates:
 - ops maintenance cleanup removes expired locks, old replay records, and old recovery signals
 - backup manifest generation records critical RTDB export counts
 - notification retry policy updates queued/failed delivery attempts
+
+The route health check validates:
+
+- `/`, `/signin`, `/login`, `/partner`, `/ops`, `/offline`, and `/api/system/status` return healthy responses
+- runtime routes are protected from stale browser/CDN caching with `no-store`
+- `X-LDERLY-Build` is present and consistent across checked routes
+- `/api/system/status` returns the production readiness payload
 
 ## Automated Maintenance
 
@@ -299,6 +308,7 @@ The health snapshot includes:
 Before launch, run:
 
 ```bash
+npm run health:routes
 npm run e2e:prod
 ```
 

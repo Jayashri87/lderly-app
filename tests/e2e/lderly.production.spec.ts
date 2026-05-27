@@ -81,6 +81,29 @@ const expectNoHorizontalOverflow = async (page: Page) => {
 };
 
 test.describe("LDERLY production E2E route checks", () => {
+  test("protected APIs reject unauthenticated requests", async ({ request }) => {
+    const bookings = await request.get("/api/bookings");
+    expect(bookings.status()).toBe(401);
+
+    const statusUpdate = await request.post("/api/bookings/e2e-missing/status", {
+      data: { status: "en_route" }
+    });
+    expect(statusUpdate.status()).toBe(401);
+
+    const profileSave = await request.post("/api/profiles/care", {
+      data: { profile: { elderName: "Unauthorized" } }
+    });
+    expect(profileSave.status()).toBe(401);
+  });
+
+  test("legal and payment policy pages are reachable", async ({ page }) => {
+    for (const path of ["/legal/terms", "/legal/refunds", "/legal/privacy", "/legal/emergency"]) {
+      await page.goto(path);
+      await expect(page.getByText("LDERLY").first()).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("public lead funnel is readable and mobile safe", async ({ page }) => {
     await page.goto("/signin");
     await expect(

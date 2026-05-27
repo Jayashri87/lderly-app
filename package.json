@@ -11,6 +11,7 @@
     "audit:deps": "npm audit --audit-level=moderate",
     "audit:secrets": "node scripts/audit-secret-exposure.mjs",
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
+    "health:routes": "node scripts/route-health-check.mjs",
     "cleanup:production-data": "node scripts/cleanup-production-data.mjs",
     "deploy:rules": "node scripts/deploy-firebase-rules.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",

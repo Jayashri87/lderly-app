@@ -24,14 +24,23 @@ Run against production:
 npm run e2e:prod
 ```
 
+Run lightweight production route/cache health:
+
+```bash
+npm run health:routes
+```
+
 Optional custom URL:
 
 ```bash
 $env:E2E_BASE_URL="https://your-preview-url.vercel.app"; npx playwright test
+$env:ROUTE_HEALTH_BASE_URL="https://your-preview-url.vercel.app"; npm run health:routes
 ```
 
 The automated suite checks:
 
+- protected APIs reject unsigned callers
+- legal/payment policy pages are reachable
 - public lead funnel readability
 - mobile horizontal overflow
 - customer app authenticated shell
@@ -39,6 +48,14 @@ The automated suite checks:
 - ops portal authenticated shell
 - system status API
 - go-live readiness API
+
+The route health check verifies:
+
+- public app routes return 2xx
+- API status route returns production readiness JSON
+- runtime routes use `no-store`
+- `X-LDERLY-Build` is present and consistent across checked routes
+- HTML responses include the LDERLY app marker
 
 Required env values:
 
@@ -98,6 +115,8 @@ Launch only when:
 
 - `npm run lint` passes
 - `npm run build` passes
+- `npm run audit:secrets` passes
+- `npm run health:routes` passes
 - `npm run ci:smoke` passes
 - `npm run e2e:prod` passes on desktop and mobile emulation
 - LambdaTest manual real-device pass has no blocker bugs
