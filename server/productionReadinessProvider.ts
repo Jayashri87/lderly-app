@@ -11,6 +11,8 @@ type ReadinessCheck = {
 };
 
 const hasEnv = (name: string) => Boolean(process.env[name]);
+const appCheckConfigured = () => hasEnv("NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY");
+const appCheckEnforced = () => process.env.LDERLY_ENFORCE_APP_CHECK === "true";
 const rulesDeployed = () =>
   process.env.FIREBASE_RULES_DEPLOYED === "true" ||
   existsSync(join(process.cwd(), ".firebase-rules-deployed.json"));
@@ -102,6 +104,25 @@ export const ProductionReadinessProvider = {
         ready: hasEnv("SENTRY_DSN") || hasEnv("NEXT_PUBLIC_POSTHOG_KEY"),
         severity: "warning",
         detail: "Sentry or PostHog should be configured for production issue visibility."
+      },
+      {
+        id: "app-check-configured",
+        label: "Firebase App Check configured",
+        ready: appCheckConfigured(),
+        severity: "warning",
+        detail: appCheckConfigured()
+          ? "App Check site key is configured."
+          : "Configure Firebase App Check before public traffic."
+      },
+      {
+        id: "app-check-enforced",
+        label: "Firebase App Check API enforcement",
+        ready: appCheckConfigured() && appCheckEnforced(),
+        severity: "warning",
+        detail:
+          appCheckConfigured() && appCheckEnforced()
+            ? "Protected API routes require Firebase App Check tokens."
+            : "Set LDERLY_ENFORCE_APP_CHECK=true after validating client App Check tokens."
       }
     ];
     const blockers = checks.filter((check) => check.severity === "blocker" && !check.ready);

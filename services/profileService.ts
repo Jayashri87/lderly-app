@@ -150,6 +150,51 @@ const writeLocalProfile = (profile: CareProfile) => {
   localSubscribers.forEach((callback) => callback(profile));
 };
 
+const postProfileToBackend = async (profile: CareProfile) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    await fetch("/api/profiles/care", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId: profile.userId,
+        profile
+      })
+    });
+  } catch {
+    // Local optimistic profile remains available; ops can retry on the next profile save.
+  }
+};
+
+const postFamilyMemberToBackend = async (
+  userId: string,
+  member: Omit<FamilyMemberAccess, "id" | "updatedAt">
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    await fetch("/api/profiles/family", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId,
+        member
+      })
+    });
+  } catch {
+    // Keep optimistic local family access; protected API persistence is retried by future saves.
+  }
+};
+
 const saveProfile = (profile: CareProfile) => {
   const nextProfile = {
     ...profile,
@@ -157,6 +202,7 @@ const saveProfile = (profile: CareProfile) => {
   };
 
   writeLocalProfile(nextProfile);
+  void postProfileToBackend(nextProfile);
 
   if (!db || !clientDatabaseWritesEnabled()) {
     return;
@@ -275,6 +321,7 @@ export const ProfileService = {
     const profile = readLocalProfile(session);
     const id = `family-${now()}`;
 
+    void postFamilyMemberToBackend(session.uid, member);
     saveProfile({
       ...profile,
       userId: session.uid,
