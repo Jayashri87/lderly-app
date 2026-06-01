@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireApiSession } from "../../../../server/apiSecurity";
 import { getAdminDatabase } from "../../../../server/firebaseAdmin";
 import { computeRouteEta } from "../../../../server/locationProvider";
+import { canAccessBookingRealtime } from "../../../../server/realtimeAccess";
 import type { CareBooking, CareLocation } from "../../../../services/bookingService";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +15,9 @@ const sse = (event: string, data: unknown) =>
 const validLocation = (value: unknown): value is CareLocation =>
   Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as CareLocation).lat === "number" &&
-      typeof (value as CareLocation).lng === "number"
+    typeof value === "object" &&
+    typeof (value as CareLocation).lat === "number" &&
+    typeof (value as CareLocation).lng === "number"
   );
 
 const routeKeyFor = (caretaker?: CareLocation, customer?: CareLocation) =>
@@ -42,6 +43,17 @@ export async function GET(request: NextRequest) {
   const database = getAdminDatabase();
   if (!database) {
     return new Response("Firebase Admin is not configured", { status: 503 });
+  }
+
+  const initialSnapshot = await database.ref(`bookings/byId/${bookingId}`).get();
+  const initialBooking = initialSnapshot.val() as CareBooking | null;
+
+  if (!initialBooking) {
+    return new Response("Booking not found", { status: 404 });
+  }
+
+  if (!canAccessBookingRealtime(auth.session, initialBooking)) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   const stream = new ReadableStream({
@@ -85,6 +97,15 @@ export async function GET(request: NextRequest) {
 
       const onValue = (snapshot: unknown) => {
         const booking = (snapshot as { val: () => CareBooking | null }).val();
+        if (booking && !canAccessBookingRealtime(auth.session, booking)) {
+          safeEnqueue(sse("forbidden", { ok: false, error: "Tracking access revoked" }));
+          closed = true;
+          clearInterval(heartbeat);
+          bookingRef.off("value", onValue);
+          controller.close();
+          return;
+        }
+
         sendRoute(booking).catch((error) => {
           safeEnqueue(
             sse("error", {

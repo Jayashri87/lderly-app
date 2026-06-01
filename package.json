@@ -11,7 +11,7 @@
     "lighthouse": "node scripts/lighthouse-report.mjs",
     "load:test": "node scripts/load-test.mjs",
     "lint": "eslint",
-    "typecheck:packages": "pnpm --filter @lderly/shared-types run typecheck && pnpm --filter @lderly/validation-schemas run typecheck && pnpm --filter @lderly/analytics run typecheck",
+    "typecheck:packages": "pnpm --filter @lderly/shared-types run typecheck && pnpm --filter @lderly/validation-schemas run typecheck && pnpm --filter @lderly/analytics run typecheck && pnpm --filter @lderly/payment run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .prettierrc.json .github/**/*.yml .github/**/*.json scripts/apply-branch-protection.mjs",
     "prepare": "husky",
@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
+    "@lderly/payment": "workspace:*",
     "@radix-ui/colors": "^3.0.0",
     "@react-google-maps/api": "^2.20.7",
     "@sentry/nextjs": "^10.53.1",

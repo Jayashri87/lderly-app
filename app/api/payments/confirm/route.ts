@@ -11,7 +11,7 @@ import { GoogleWorkspaceProvider } from "../../../../server/googleWorkspaceProvi
 import {
   hasRazorpayConfig,
   isMockPaymentConfirmationAllowed,
-  verifyRazorpayPayment
+  validateRazorpayPaymentForBooking
 } from "../../../../server/paymentProvider";
 import { TrustedBooking } from "../../../../server/trustedBooking";
 import type { CareBooking } from "../../../../services/bookingService";
@@ -37,10 +37,7 @@ export async function POST(request: NextRequest) {
   const database = getAdminDatabase();
 
   if (!database) {
-    return NextResponse.json(
-      { error: "Firebase Admin is not configured" },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "Firebase Admin is not configured" }, { status: 503 });
   }
 
   const bookingSnapshot = await database.ref(`bookings/byId/${body.bookingId}`).get();
@@ -54,16 +51,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const signatureVerified =
-    hasRazorpayConfig
-      ? verifyRazorpayPayment({
-          orderId: body.razorpay_order_id,
-          paymentId: body.razorpay_payment_id,
-          signature: body.razorpay_signature || ""
-        })
-      : isMockPaymentConfirmationAllowed(body.razorpay_order_id);
+  const paymentValidation = hasRazorpayConfig
+    ? await validateRazorpayPaymentForBooking({
+        booking,
+        orderId: body.razorpay_order_id,
+        paymentId: body.razorpay_payment_id,
+        signature: body.razorpay_signature || ""
+      }).catch((error) => ({
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Razorpay payment verification failed"
+      }))
+    : {
+        ok: isMockPaymentConfirmationAllowed(body.razorpay_order_id),
+        error: "Mock payment confirmation is not allowed"
+      };
 
-  if (!signatureVerified) {
+  if (!paymentValidation.ok) {
     await withMutationAudit(
       request,
       {
@@ -71,7 +74,8 @@ export async function POST(request: NextRequest) {
         resource: booking.id,
         status: "failure",
         details: {
-          orderId: body.razorpay_order_id
+          orderId: body.razorpay_order_id,
+          reason: paymentValidation.error
         }
       },
       () =>
@@ -95,7 +99,7 @@ export async function POST(request: NextRequest) {
       actor: auth.session.role
     });
 
-    return jsonError("Invalid Razorpay signature", 400);
+    return jsonError(paymentValidation.error, 400);
   }
 
   const idempotent = await withIdempotency(
@@ -150,4 +154,3 @@ export async function POST(request: NextRequest) {
     { headers: idempotent.replayed ? { "x-idempotent-replay": "true" } : undefined }
   );
 }
-

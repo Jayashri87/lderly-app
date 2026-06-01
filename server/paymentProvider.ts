@@ -1,4 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+  parseInrToPaise,
+  validateRazorpayPaymentAgainstBooking,
+  verifyRazorpayOrderPaymentSignature,
+  type RazorpayPaymentRecord
+} from "@lderly/payment";
 import type { CareBooking } from "../services/bookingService";
 import {
   allowMockProviders,
@@ -26,16 +32,6 @@ export const hasRazorpayConfig = Boolean(razorpayKeyId && razorpayKeySecret);
 export const hasRazorpayWebhookConfig = Boolean(razorpayWebhookSecret);
 export const paymentMockFailClosed = mockProvidersFailClosed || hasRazorpayConfig;
 
-const parseInrAmount = (value: string) => {
-  const numeric = Number(value.replace(/[^0-9.]/g, ""));
-
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return 10000;
-  }
-
-  return Math.max(100, Math.round(numeric * 100));
-};
-
 export const createCheckout = async ({
   booking,
   origin
@@ -43,8 +39,12 @@ export const createCheckout = async ({
   booking: CareBooking;
   origin: string;
 }): Promise<CheckoutResult> => {
-  const amount = parseInrAmount(booking.payment.estimatedTotal);
+  const amount = parseInrToPaise(booking.payment.estimatedTotal);
   const currency = "INR" as const;
+
+  if (!amount) {
+    throw new Error("Booking amount is not ready for payment");
+  }
 
   if (!hasRazorpayConfig) {
     assertMockProviderAllowed("Razorpay checkout");
@@ -67,9 +67,9 @@ export const createCheckout = async ({
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(
-        `${razorpayKeyId}:${razorpayKeySecret}`
-      ).toString("base64")}`,
+      Authorization: `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+        "base64"
+      )}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -103,25 +103,18 @@ export const createCheckout = async ({
 };
 
 export const isMockPaymentConfirmationAllowed = (orderId: string) =>
-  !hasRazorpayConfig &&
-  allowMockProviders &&
-  orderId.startsWith("mock-razorpay-order-");
+  !hasRazorpayConfig && allowMockProviders && orderId.startsWith("mock-razorpay-order-");
 
 export const verifyRazorpayWebhook = (body: string, signature: string | null) => {
   if (!hasRazorpayWebhookConfig || !signature) {
     return false;
   }
 
-  const expected = createHmac("sha256", razorpayWebhookSecret)
-    .update(body)
-    .digest("hex");
+  const expected = createHmac("sha256", razorpayWebhookSecret).update(body).digest("hex");
   const provided = Buffer.from(signature);
   const expectedBuffer = Buffer.from(expected);
 
-  return (
-    provided.length === expectedBuffer.length &&
-    timingSafeEqual(provided, expectedBuffer)
-  );
+  return provided.length === expectedBuffer.length && timingSafeEqual(provided, expectedBuffer);
 };
 
 export const verifyRazorpayPayment = ({
@@ -133,18 +126,71 @@ export const verifyRazorpayPayment = ({
   paymentId: string;
   signature: string;
 }) => {
-  if (!razorpayKeySecret) {
-    return false;
+  return verifyRazorpayOrderPaymentSignature({
+    orderId,
+    paymentId,
+    signature,
+    keySecret: razorpayKeySecret
+  });
+};
+
+export const fetchRazorpayPayment = async (paymentId: string) => {
+  if (!hasRazorpayConfig) {
+    throw new Error("Razorpay is not configured");
   }
 
-  const expected = createHmac("sha256", razorpayKeySecret)
-    .update(`${orderId}|${paymentId}`)
-    .digest("hex");
-  const provided = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expected);
+  const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+        "base64"
+      )}`
+    }
+  });
 
-  return (
-    provided.length === expectedBuffer.length &&
-    timingSafeEqual(provided, expectedBuffer)
-  );
+  if (!response.ok) {
+    throw new Error(`Razorpay payment fetch failed: ${response.status}`);
+  }
+
+  return (await response.json()) as RazorpayPaymentRecord;
+};
+
+export const validateRazorpayPaymentForBooking = async ({
+  booking,
+  orderId,
+  paymentId,
+  signature
+}: {
+  booking: CareBooking;
+  orderId: string;
+  paymentId: string;
+  signature: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> => {
+  if (
+    !verifyRazorpayPayment({
+      orderId,
+      paymentId,
+      signature
+    })
+  ) {
+    return { ok: false, error: "Invalid Razorpay signature" };
+  }
+
+  if (booking.payment?.invoiceId && booking.payment.invoiceId !== orderId) {
+    return { ok: false, error: "Razorpay order does not match this booking" };
+  }
+
+  const expectedAmountPaise = parseInrToPaise(booking.payment.estimatedTotal);
+
+  if (!expectedAmountPaise) {
+    return { ok: false, error: "Booking amount is not ready for payment" };
+  }
+
+  const payment = await fetchRazorpayPayment(paymentId);
+
+  return validateRazorpayPaymentAgainstBooking({
+    payment,
+    expectedOrderId: orderId,
+    expectedAmountPaise
+  });
 };

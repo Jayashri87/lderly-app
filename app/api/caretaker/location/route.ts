@@ -5,7 +5,10 @@ import {
   requireApiSession,
   withMutationAudit
 } from "../../../../server/apiSecurity";
+import { getAdminDatabase } from "../../../../server/firebaseAdmin";
+import { canUpdateBookingLocation } from "../../../../server/realtimeAccess";
 import { TrustedBooking } from "../../../../server/trustedBooking";
+import type { CareBooking } from "../../../../services/bookingService";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiSession(request, ["caretaker", "admin"], { rateLimit: 180 });
@@ -36,6 +39,25 @@ export async function POST(request: NextRequest) {
     Math.abs(body.lng) > 180
   ) {
     return jsonError("Valid latitude and longitude are required", 400);
+  }
+
+  if (body.bookingId) {
+    const database = getAdminDatabase();
+
+    if (!database) {
+      return NextResponse.json({ error: "Firebase Admin is not configured" }, { status: 503 });
+    }
+
+    const bookingSnapshot = await database.ref(`bookings/byId/${body.bookingId}`).get();
+    const booking = bookingSnapshot.val() as CareBooking | null;
+
+    if (!booking) {
+      return jsonError("Booking not found", 404);
+    }
+
+    if (!canUpdateBookingLocation(auth.session, booking)) {
+      return jsonError("Forbidden", 403);
+    }
   }
 
   const result = await withMutationAudit(

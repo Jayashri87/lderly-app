@@ -16,6 +16,9 @@ importers:
       '@lderly/analytics':
         specifier: workspace:*
         version: link:packages/analytics
+      '@lderly/payment':
+        specifier: workspace:*
+        version: link:packages/payment
       '@lderly/shared-types':
         specifier: workspace:*
         version: link:packages/shared-types
@@ -177,6 +180,8 @@ importers:
       '@lderly/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+
+  packages/payment: {}
 
   packages/shared-types: {}
 
