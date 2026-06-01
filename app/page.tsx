@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { HeartPulse, Home, MapPinned, Pill, Sparkles, UserRound } from "lucide-react";
+import { HeartPulse, Pill, Sparkles, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LiveActivityTimeline, LiveSystemPanel } from "../components/system/LiveSystemPanel";
-import { SystemStatusPill } from "../components/system/SystemStatusPill";
 import { LiveOperationalDock } from "../components/realtime/LiveOperationalDock";
 import { Skeleton } from "../components/ui/skeleton";
 import { AuthService, SessionUser } from "../services/authService";
@@ -45,6 +44,7 @@ import {
   TrustedCaregiverProfile,
   VisitProofSystem
 } from "./customer/CustomerSections";
+import { CustomerNavigation } from "./customer/navigation/CustomerNavigation";
 
 type TabKey = "home" | "journey" | "profile";
 type BookingStep = "need" | "service" | "duration" | "time" | "location" | "review";
@@ -1517,15 +1517,6 @@ export default function CustomerApp() {
     setPaymentMessage("Thank you. Your rating helps keep caregiver quality high.");
   };
 
-  const navItems = useMemo(
-    () => [
-      { key: "home" as const, label: "Home", icon: Home },
-      { key: "journey" as const, label: "Care", icon: MapPinned },
-      { key: "profile" as const, label: "Profile", icon: UserRound }
-    ],
-    []
-  );
-
   if (!authReady || !session) {
     return (
       <main className="lderly-shell">
@@ -1875,32 +1866,10 @@ export default function CustomerApp() {
         </AnimatePresence>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 px-4 pb-4 pt-2">
-        <div className="glass-panel mx-auto grid max-w-md grid-cols-3 gap-2 rounded-[2rem] p-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = activeTab === item.key;
-
-            return (
-              <button
-                key={item.key}
-                onClick={() => selectTab(item.key, "bottom_nav")}
-                className={`rounded-2xl px-3 py-3 text-xs transition ${
-                  active ? "bg-white text-[#06130f]" : "text-white/55"
-                }`}
-              >
-                <Icon className="mx-auto h-5 w-5" />
-                <span className="mt-1 block">{item.label}</span>
-                {active ? (
-                  <span className="mt-2 flex justify-center">
-                    <SystemStatusPill label="live" status="live" pulse />
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <CustomerNavigation
+        activeTab={activeTab}
+        onTabChange={(tab) => selectTab(tab, "bottom_nav")}
+      />
 
       {bookingOpen && (
         <BookingFunnel
