@@ -15,6 +15,7 @@ storybook-static/
 .env.*
 !.env.example
 .local-secrets/
+.secrets/
 *.pem
 *.key
 *.p12

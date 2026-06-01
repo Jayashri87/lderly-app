@@ -2,6 +2,7 @@
   "name": "lderly-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.5.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +11,11 @@
     "lighthouse": "node scripts/lighthouse-report.mjs",
     "load:test": "node scripts/load-test.mjs",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .prettierrc.json .github/**/*.yml .github/**/*.json scripts/apply-branch-protection.mjs",
+    "prepare": "husky",
     "verify:env": "node scripts/verify-production-env.mjs",
-    "audit:deps": "npm audit --audit-level=moderate",
+    "audit:deps": "pnpm audit --audit-level=moderate",
     "audit:secrets": "node scripts/audit-secret-exposure.mjs",
     "audit:performance": "node scripts/performance-budget-check.mjs",
     "audit:rules": "node scripts/audit-firebase-rules.mjs",
@@ -27,7 +31,8 @@
     "e2e:headed": "playwright test --headed",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
-    "ci:validate": "npm run audit:deps && npm run audit:secrets && npm run audit:performance && npm run lint && npm run build && npm run ci:smoke"
+    "branch-protection:apply": "node scripts/apply-branch-protection.mjs",
+    "ci:validate": "pnpm run audit:deps && pnpm run audit:secrets && pnpm run audit:performance && pnpm run format:check && pnpm run lint && pnpm run build && pnpm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
@@ -64,6 +69,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
     "storybook": "^10.4.1",
     "tailwindcss": "^4.3.0",
     "typescript": "^5"
@@ -72,5 +80,13 @@
     "postcss": "8.5.14",
     "uuid": "11.1.1",
     "protobufjs": "7.6.1"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "eslint --fix"
+    ]
   }
 }

@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+dist
+storybook-static
+.vercel
+.secrets
+.local-secrets
+*.log
+*.zip
+pnpm-lock.yaml
+package-lock.json
