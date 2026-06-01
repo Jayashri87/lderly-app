@@ -96,7 +96,8 @@ export default function SuperAdminLoginPage() {
                 Govern the care operating system.
               </h2>
               <p className="mt-4 text-base leading-7 text-white/68">
-                Use this only for high-trust operational, security, and production administration work.
+                Use this only for high-trust operational, security, and production administration
+                work.
               </p>
             </div>
           </Card>
@@ -135,7 +136,7 @@ export default function SuperAdminLoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  className="grid h-10 w-10 place-items-center rounded-full text-slate-500"
+                  className="grid min-h-11 min-w-11 place-items-center rounded-full text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}

@@ -32,8 +32,10 @@ export function CustomerNavigation({ activeTab, onTabChange }: CustomerNavigatio
               onClick={() => onTabChange(item.key)}
               aria-current={active ? "page" : undefined}
               aria-label={label}
-              className={`rounded-2xl px-3 py-3 text-xs transition focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-[#06130f] ${
-                active ? "bg-white text-[#06130f]" : "text-white/55"
+              className={`min-h-12 rounded-2xl px-3 py-3 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06130f] ${
+                active
+                  ? "bg-white text-[#06130f]"
+                  : "text-white/75 hover:bg-white/10 hover:text-white"
               }`}
             >
               <Icon className="mx-auto h-5 w-5" aria-hidden="true" />

@@ -90,21 +90,18 @@ export default function CustomerLoginPage() {
       router.replace("/");
     } catch (googleError) {
       const code =
-        typeof googleError === "object" &&
-        googleError !== null &&
-        "code" in googleError
+        typeof googleError === "object" && googleError !== null && "code" in googleError
           ? String((googleError as { code?: unknown }).code)
           : "";
-      const message =
-        code.includes("popup-closed")
-          ? "Google login was closed before completion."
-          : code.includes("operation-not-allowed")
-            ? "Google login is not enabled in Firebase yet. Enable Google under Firebase Authentication sign-in providers."
-            : code.includes("unauthorized-domain")
-              ? "This domain is not authorized in Firebase. Add lderly-app.vercel.app under Firebase Authentication authorized domains."
-              : code.includes("popup-blocked")
-                ? "The browser blocked the Google login popup. Allow popups for LDERLY and try again."
-                : `Google login could not start${code ? ` (${code})` : ""}. Check Firebase Authentication settings.`;
+      const message = code.includes("popup-closed")
+        ? "Google login was closed before completion."
+        : code.includes("operation-not-allowed")
+          ? "Google login is not enabled in Firebase yet. Enable Google under Firebase Authentication sign-in providers."
+          : code.includes("unauthorized-domain")
+            ? "This domain is not authorized in Firebase. Add lderly-app.vercel.app under Firebase Authentication authorized domains."
+            : code.includes("popup-blocked")
+              ? "The browser blocked the Google login popup. Allow popups for LDERLY and try again."
+              : `Google login could not start${code ? ` (${code})` : ""}. Check Firebase Authentication settings.`;
       setError(message);
     } finally {
       setGoogleBusy(false);
@@ -130,10 +127,7 @@ export default function CustomerLoginPage() {
 
         <PortalLoginSwitch />
 
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="relative overflow-hidden p-5 shadow-2xl shadow-black/25 sm:rounded-[2rem]">
             <motion.div
               aria-hidden
@@ -161,90 +155,94 @@ export default function CustomerLoginPage() {
           transition={{ delay: 0.08 }}
         >
           <Card className="rounded-[2rem] border-0 bg-white p-5 text-[#06130f] shadow-2xl shadow-black/20">
-          <Button
-            onClick={loginWithGoogle}
-            disabled={googleBusy || busy}
-            variant="calm"
-            className="mb-5 w-full border border-slate-200 bg-white px-5 py-4 text-[#06130f] hover:bg-slate-50"
-          >
-            <Mail className="h-5 w-5 text-emerald-700" />
-            {googleBusy ? "Opening Google..." : "Continue with Gmail"}
-          </Button>
+            <Button
+              onClick={loginWithGoogle}
+              disabled={googleBusy || busy}
+              variant="calm"
+              className="mb-5 w-full border border-slate-200 bg-white px-5 py-4 text-[#06130f] hover:bg-slate-50"
+            >
+              <Mail className="h-5 w-5 text-emerald-700" />
+              {googleBusy ? "Opening Google..." : "Continue with Gmail"}
+            </Button>
 
-          <div className="mb-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              or
-            </span>
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <Label className="flex items-center gap-2 text-slate-600">
-                <UserRound className="h-4 w-4" />
-                Customer ID
-              </Label>
-              <Input
-                autoComplete="username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Customer ID"
-                className="mt-2 border-slate-200 bg-slate-50 text-[#06130f] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
-              />
+            <div className="mb-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                or
+              </span>
+              <span className="h-px flex-1 bg-slate-200" />
             </div>
 
-            <div>
-              <Label className="flex items-center gap-2 text-slate-600">
-                <LockKeyhole className="h-4 w-4" />
-                Password
-              </Label>
-              <div className="mt-2 flex items-center rounded-2xl border border-slate-200 bg-slate-50 pr-3 focus-within:border-emerald-400">
-                <input
-                  autoComplete="current-password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Password"
-                  className="min-w-0 flex-1 rounded-2xl bg-transparent px-4 py-4 text-base outline-none"
+            <div className="space-y-4">
+              <div>
+                <Label className="flex items-center gap-2 text-slate-600">
+                  <UserRound className="h-4 w-4" />
+                  Customer ID
+                </Label>
+                <Input
+                  autoComplete="username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="Customer ID"
+                  className="mt-2 border-slate-200 bg-slate-50 text-[#06130f] placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  className="grid h-10 w-10 place-items-center rounded-full text-slate-500"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+              </div>
+
+              <div>
+                <Label className="flex items-center gap-2 text-slate-600">
+                  <LockKeyhole className="h-4 w-4" />
+                  Password
+                </Label>
+                <div className="mt-2 flex items-center rounded-2xl border border-slate-200 bg-slate-50 pr-3 focus-within:border-emerald-400">
+                  <input
+                    autoComplete="current-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Password"
+                    className="min-w-0 flex-1 rounded-2xl bg-transparent px-4 py-4 text-base outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="grid min-h-11 min-w-11 place-items-center rounded-full text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {error && <Alert variant="warning" className="mt-4 bg-amber-50 text-amber-700">{error}</Alert>}
+            {error && (
+              <Alert variant="warning" className="mt-4 bg-amber-50 text-amber-700">
+                {error}
+              </Alert>
+            )}
 
-          <Button
-            onClick={login}
-            disabled={busy}
-            className="mt-6 w-full bg-[#06130f] px-5 py-4 text-white hover:bg-[#10241d]"
-          >
-            {busy ? "Signing in..." : "Open customer app"}
-            <ArrowRight className="h-5 w-5" />
-          </Button>
+            <Button
+              onClick={login}
+              disabled={busy}
+              className="mt-6 w-full bg-[#06130f] px-5 py-4 text-white hover:bg-[#10241d]"
+            >
+              {busy ? "Signing in..." : "Open customer app"}
+              <ArrowRight className="h-5 w-5" />
+            </Button>
 
-          <a
-            href={lderlyContactHref}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-4 font-semibold text-[#06130f]"
-          >
-            <Phone className="h-5 w-5 text-emerald-700" />
-            Need help? Call {lderlyContactNumber}
-          </a>
+            <a
+              href={lderlyContactHref}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-4 font-semibold text-[#06130f]"
+            >
+              <Phone className="h-5 w-5 text-emerald-700" />
+              Need help? Call {lderlyContactNumber}
+            </a>
 
-          <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-            New to LDERLY?{" "}
-            <Link href="/signin" className="font-semibold text-[#06130f] underline">
-              Request registration callback
-            </Link>
-          </p>
+            <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+              New to LDERLY?{" "}
+              <Link href="/signin" className="font-semibold text-[#06130f] underline">
+                Request registration callback
+              </Link>
+            </p>
           </Card>
         </motion.div>
       </div>

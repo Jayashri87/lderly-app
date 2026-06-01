@@ -52,7 +52,7 @@ export function PortalLoginSwitch({ compact = false }: { compact?: boolean }) {
             key={portal.href}
             href={portal.href}
             className={[
-              "group flex min-h-16 items-center gap-3 rounded-2xl px-3 py-3 text-left transition",
+              "group flex min-h-16 items-center gap-3 rounded-2xl px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06130f]",
               compact
                 ? active
                   ? "bg-[#06130f] text-white shadow-lg shadow-black/10"
@@ -82,11 +82,11 @@ export function PortalLoginSwitch({ compact = false }: { compact?: boolean }) {
                 className={
                   compact
                     ? active
-                      ? "block text-xs text-white/55"
+                      ? "block text-xs text-white/75"
                       : "block text-xs text-slate-500"
                     : active
                       ? "block text-xs text-slate-500"
-                      : "block text-xs text-white/45"
+                      : "block text-xs text-white/65"
                 }
               >
                 {portal.description}

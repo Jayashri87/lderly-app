@@ -15,26 +15,26 @@ npx playwright install
 Run against local dev:
 
 ```bash
-npm run e2e
+pnpm run e2e
 ```
 
 Run against production:
 
 ```bash
-npm run e2e:prod
+pnpm run e2e:prod
 ```
 
 Run lightweight production route/cache health:
 
 ```bash
-npm run health:routes
+pnpm run health:routes
 ```
 
 Optional custom URL:
 
 ```bash
-$env:E2E_BASE_URL="https://your-preview-url.vercel.app"; npx playwright test
-$env:ROUTE_HEALTH_BASE_URL="https://your-preview-url.vercel.app"; npm run health:routes
+$env:E2E_BASE_URL="https://your-preview-url.vercel.app"; pnpm exec playwright test
+$env:ROUTE_HEALTH_BASE_URL="https://your-preview-url.vercel.app"; pnpm run health:routes
 ```
 
 The automated suite checks:
@@ -96,6 +96,30 @@ Manual checks:
 - no broken scrolling
 - session survives refresh
 
+## Accessibility QA
+
+Keyboard checks:
+
+- `Tab` reaches every visible button, link, input, dialog close action, and bottom navigation item.
+- `Shift + Tab` moves backward without trapping focus outside active modals.
+- `Enter` or `Space` activates focused buttons.
+- Focus is visibly outlined on dark and light surfaces.
+- Bottom navigation targets are at least 44 x 44 CSS pixels.
+
+Screen reader checks:
+
+- Customer bottom navigation announces as "Main navigation".
+- Active bottom tab announces the current page.
+- Icon-only controls announce a clear action such as "Show password", "Call caregiver", or "Message caregiver".
+- Payment terms modal announces heading and action buttons in order.
+- Form inputs announce their visible labels and validation messages.
+
+Contrast checks:
+
+- Inactive navigation text remains readable on the dark glass background.
+- Secondary helper text is not used for critical instructions.
+- Disabled states are visibly disabled but still legible enough to explain why the action is unavailable.
+
 ## Critical Failure Scenarios
 
 Run these before paid launch:
@@ -113,12 +137,12 @@ Run these before paid launch:
 
 Launch only when:
 
-- `npm run lint` passes
-- `npm run build` passes
-- `npm run audit:secrets` passes
-- `npm run health:routes` passes
-- `npm run ci:smoke` passes
-- `npm run e2e:prod` passes on desktop and mobile emulation
+- `pnpm run lint` passes
+- `pnpm run build` passes
+- `pnpm run audit:secrets` passes
+- `pnpm run health:routes` passes
+- `pnpm run ci:smoke` passes
+- `pnpm run e2e:prod` passes on desktop and mobile emulation
 - LambdaTest manual real-device pass has no blocker bugs
 - `/api/ops/readiness` has zero blockers
 
