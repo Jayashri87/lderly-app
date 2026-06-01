@@ -9,6 +9,9 @@ node_modules
 *.sqlite-wal
 *-firebase-adminsdk-*.json
 .firebase-rules-deployed.json
+reports
+share
+assets/marketing
 dev-server*.out.log
 dev-server*.err.log
 preview-*.out.log

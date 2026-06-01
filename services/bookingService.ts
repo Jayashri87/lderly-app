@@ -113,6 +113,9 @@ export type BookingRequestDetails = {
   location: {
     label: string;
     detail: string;
+    latitude?: number;
+    longitude?: number;
+    placeId?: string;
   };
   pricing: {
     careEstimate: string;
@@ -346,34 +349,34 @@ const createDefaultBooking = (): CareBooking => ({
     status: "pending",
     invoiceId: ""
   },
-    familyUpdates: {
-      inApp: "queued",
-      whatsapp: "pending",
-      sms: "pending",
-      voiceNote: "not_requested",
-      recipients: []
-    },
-    serviceReport: {
-      reportType: "general_care",
-      requiredSections: ["Summary"],
-      uploadSlots: []
-    },
-    tracking: {
-      etaMinutes: 0,
-      distanceKm: 0,
-      destinationLabel: "Care location",
-      customerLocation: defaultCustomerLocation,
-      caretakerLocation: defaultCaretakerLocation,
-      lastLocationAt: now(),
-      routeStatus: "pending"
-    },
-    sla: {
-      assignmentDueAt: now() + 10 * 60 * 1000,
-      arrivalDueAt: now() + 45 * 60 * 1000,
-      status: "healthy",
-      breachReason: ""
-    },
-    timeline: [{ label: "No active booking", at: now() }]
+  familyUpdates: {
+    inApp: "queued",
+    whatsapp: "pending",
+    sms: "pending",
+    voiceNote: "not_requested",
+    recipients: []
+  },
+  serviceReport: {
+    reportType: "general_care",
+    requiredSections: ["Summary"],
+    uploadSlots: []
+  },
+  tracking: {
+    etaMinutes: 0,
+    distanceKm: 0,
+    destinationLabel: "Care location",
+    customerLocation: defaultCustomerLocation,
+    caretakerLocation: defaultCaretakerLocation,
+    lastLocationAt: now(),
+    routeStatus: "pending"
+  },
+  sla: {
+    assignmentDueAt: now() + 10 * 60 * 1000,
+    arrivalDueAt: now() + 45 * 60 * 1000,
+    status: "healthy",
+    breachReason: ""
+  },
+  timeline: [{ label: "No active booking", at: now() }]
 });
 
 let localBooking = createDefaultBooking();
@@ -457,7 +460,12 @@ const reportPlanFor = (serviceType: string): ServiceReportPlan => {
   if (service.includes("hospital")) {
     return {
       reportType: "hospital_attender",
-      requiredSections: ["Admission/support status", "Doctor round", "Meals/water", "Discharge notes"],
+      requiredSections: [
+        "Admission/support status",
+        "Doctor round",
+        "Meals/water",
+        "Discharge notes"
+      ],
       uploadSlots: ["Hospital bill", "Discharge summary", "Prescription"]
     };
   }
@@ -465,7 +473,12 @@ const reportPlanFor = (serviceType: string): ServiceReportPlan => {
   if (service.includes("medicine") || service.includes("recovery")) {
     return {
       reportType: "medicine_help",
-      requiredSections: ["Prescription", "Medicine availability", "Pickup/delivery", "Dosage timing"],
+      requiredSections: [
+        "Prescription",
+        "Medicine availability",
+        "Pickup/delivery",
+        "Dosage timing"
+      ],
       uploadSlots: ["Prescription", "Medicine bill", "Medicine photo"]
     };
   }
@@ -600,8 +613,7 @@ const enrichBooking = (
   actor: SessionUser["role"] | "system" = "system"
 ): CareBooking => {
   const city = booking.matching?.city || "Bengaluru";
-  const zone =
-    booking.matching?.zone || zoneFromLocation(booking.requestDetails?.location.detail);
+  const zone = booking.matching?.zone || zoneFromLocation(booking.requestDetails?.location.detail);
   const scheduledFor = booking.scheduledFor || now();
   const requestPrice = booking.requestDetails?.pricing;
 
@@ -629,8 +641,7 @@ const enrichBooking = (
       zone
     },
     payment: {
-      estimatedTotal:
-        booking.payment?.estimatedTotal || requestPrice?.estimatedTotal || "Pending",
+      estimatedTotal: booking.payment?.estimatedTotal || requestPrice?.estimatedTotal || "Pending",
       careEstimate: booking.payment?.careEstimate || requestPrice?.careEstimate || "Pending",
       coordinationFee:
         booking.payment?.coordinationFee || requestPrice?.coordinationFee || "Included",
@@ -680,11 +691,9 @@ const writeBookingIndexes = async (booking: CareBooking) => {
   };
 
   if (safeBooking.caretakerId) {
-    indexUpdates[`caretakers/${safeBooking.caretakerId}/activeBookingId`] =
-      safeBooking.id;
-    indexUpdates[
-      `operations/bookingsByCaretaker/${safeBooking.caretakerId}/${safeBooking.id}`
-    ] = true;
+    indexUpdates[`caretakers/${safeBooking.caretakerId}/activeBookingId`] = safeBooking.id;
+    indexUpdates[`operations/bookingsByCaretaker/${safeBooking.caretakerId}/${safeBooking.id}`] =
+      true;
   }
 
   await Promise.all([
@@ -699,10 +708,7 @@ const saveBooking = (booking: CareBooking) => {
   writeBookingIndexes(safeBooking).catch(() => writeLocalBooking(safeBooking));
 };
 
-const postTrustedBookingAction = async (
-  path: string,
-  body: Record<string, unknown>
-) => {
+const postTrustedBookingAction = async (path: string, body: Record<string, unknown>) => {
   if (typeof window === "undefined") {
     return null;
   }
@@ -800,8 +806,7 @@ const statusLabel: Record<BookingStatus, string> = {
   cancelled: "Booking cancelled"
 };
 
-const canTransition = (from: BookingStatus, to: BookingStatus) =>
-  transitionMap[from]?.includes(to);
+const canTransition = (from: BookingStatus, to: BookingStatus) => transitionMap[from]?.includes(to);
 
 const readCaretakerProfiles = async () => {
   if (!db) {
@@ -836,17 +841,11 @@ const scoreCaretaker = (booking: CareBooking, caretaker: CaretakerMatchProfile) 
     caretaker.languages.includes(language)
   ).length;
   const zoneScore = caretaker.zone === booking.matching.zone ? 2 : 0;
-  const capacityScore =
-    caretaker.activeAssignments < caretaker.maxAssignments ? 2 : -10;
+  const capacityScore = caretaker.activeAssignments < caretaker.maxAssignments ? 2 : -10;
   const trustScore = (caretaker.verified ? 1 : 0) + (caretaker.trained ? 1 : 0);
 
   return (
-    skillMatches * 4 +
-    languageMatches +
-    zoneScore +
-    capacityScore +
-    trustScore +
-    caretaker.rating
+    skillMatches * 4 + languageMatches + zoneScore + capacityScore + trustScore + caretaker.rating
   );
 };
 
@@ -912,8 +911,7 @@ export const BookingService = {
         activeBookingPath = `bookings/byId/${bookingId}`;
 
         onValue(ref(database, activeBookingPath), (bookingSnapshot) => {
-          const booking =
-            (bookingSnapshot.val() as CareBooking | null) ?? readLocalBooking();
+          const booking = (bookingSnapshot.val() as CareBooking | null) ?? readLocalBooking();
           writeLocalBooking(enrichBooking(booking));
         });
       },
@@ -935,11 +933,7 @@ export const BookingService = {
     };
   },
 
-  createBooking(
-    session: SessionUser,
-    serviceType: string,
-    requestDetails?: BookingRequestDetails
-  ) {
+  createBooking(session: SessionUser, serviceType: string, requestDetails?: BookingRequestDetails) {
     const timestamp = now();
     const scheduledFor = requestDetails?.schedule.requestedFor ?? timestamp + 60 * 60 * 1000;
     const bookingNotes = requestDetails
@@ -1130,28 +1124,21 @@ export const BookingService = {
   async acceptDispatchOffer() {
     const booking = readLocalBooking();
 
-    return confirmedBookingAction(
-      `/api/bookings/${encodeURIComponent(booking.id)}/accept`,
-      {}
-    );
+    return confirmedBookingAction(`/api/bookings/${encodeURIComponent(booking.id)}/accept`, {});
   },
 
   async rejectDispatchOffer(reason = "Caregiver unavailable") {
     const booking = readLocalBooking();
 
-    return confirmedBookingAction(
-      `/api/bookings/${encodeURIComponent(booking.id)}/reject`,
-      { reason }
-    );
+    return confirmedBookingAction(`/api/bookings/${encodeURIComponent(booking.id)}/reject`, {
+      reason
+    });
   },
 
   startWithCustomerOtp(otp: string) {
     const booking = readLocalBooking();
 
-    return confirmedBookingAction(
-      `/api/bookings/${encodeURIComponent(booking.id)}/start`,
-      { otp }
-    );
+    return confirmedBookingAction(`/api/bookings/${encodeURIComponent(booking.id)}/start`, { otp });
   },
 
   verifyCompletion(approved = true, note = "") {
@@ -1253,10 +1240,10 @@ export const BookingService = {
 
   rateBooking(score: number, note = "Care completed well") {
     const booking = readLocalBooking();
-    return postTrustedBookingAction(
-      `/api/bookings/${encodeURIComponent(booking.id)}/rating`,
-      { score, note }
-    ).then((result) => {
+    return postTrustedBookingAction(`/api/bookings/${encodeURIComponent(booking.id)}/rating`, {
+      score,
+      note
+    }).then((result) => {
       if (result?.ok && result.booking) {
         writeLocalBooking(enrichBooking(result.booking));
         return;

@@ -69,9 +69,7 @@ const zoneFromText = (address: string) => {
   return "Central";
 };
 
-const cityFromComponents = (
-  components: Array<{ long_name: string; types: string[] }>
-) => {
+const cityFromComponents = (components: Array<{ long_name: string; types: string[] }>) => {
   const cityComponent = components.find((component) =>
     component.types.some((type) =>
       ["locality", "administrative_area_level_3", "postal_town"].includes(type)
@@ -88,10 +86,7 @@ const distanceKm = (from: CareLocation, to: CareLocation) => {
   const dLng = toRad(to.lng - from.lng);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(from.lat)) *
-      Math.cos(toRad(to.lat)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   return Number((earthKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
 };
 
@@ -166,7 +161,9 @@ const readRedisRoute = async (key: string): Promise<RouteEta | null> => {
       cache: "no-store"
     });
     const payload = (await response.json()) as { result?: string | null };
-    return payload.result ? ({ ...JSON.parse(payload.result), cacheSource: "redis" } as RouteEta) : null;
+    return payload.result
+      ? ({ ...JSON.parse(payload.result), cacheSource: "redis" } as RouteEta)
+      : null;
   } catch {
     return null;
   }
@@ -321,7 +318,8 @@ export const computeRouteEta = async (
     }
 
     const durationSeconds = durationSecondsFromGoogle(route.duration);
-    const distanceMeters = route.distanceMeters || fallbackRouteEta(origin, destination).distanceMeters;
+    const distanceMeters =
+      route.distanceMeters || fallbackRouteEta(origin, destination).distanceMeters;
     const etaMinutes = Math.max(1, Math.ceil((durationSeconds || 60) / 60));
     const encodedPolyline = route.polyline?.encodedPolyline || "";
     const decodedPath = encodedPolyline ? decodePolyline(encodedPolyline) : [origin, destination];
@@ -411,6 +409,36 @@ export const enrichBookingLocation = async (booking: CareBooking) => {
     booking.requestDetails?.location.label ||
     booking.matching.zone;
   const location = await resolveLocation(address);
+  const selectedLatitude = booking.requestDetails?.location.latitude;
+  const selectedLongitude = booking.requestDetails?.location.longitude;
+  const hasSelectedCoordinates =
+    typeof selectedLatitude === "number" &&
+    typeof selectedLongitude === "number" &&
+    Math.abs(selectedLatitude) <= 90 &&
+    Math.abs(selectedLongitude) <= 180;
+  const customerLocation = hasSelectedCoordinates
+    ? {
+        lat: selectedLatitude,
+        lng: selectedLongitude,
+        accuracyMeters: 20,
+        capturedAt: Date.now()
+      }
+    : typeof location.latitude === "number" && typeof location.longitude === "number"
+      ? {
+          lat: location.latitude,
+          lng: location.longitude,
+          accuracyMeters: 60,
+          capturedAt: Date.now()
+        }
+      : booking.tracking?.customerLocation;
+  const tracking = booking.tracking
+    ? {
+        ...booking.tracking,
+        destinationLabel:
+          location.address || address || booking.tracking.destinationLabel || "Care location",
+        customerLocation: customerLocation || booking.tracking.customerLocation
+      }
+    : undefined;
 
   return {
     ...booking,
@@ -418,6 +446,7 @@ export const enrichBookingLocation = async (booking: CareBooking) => {
       ...booking.matching,
       city: location.city,
       zone: location.zone
-    }
+    },
+    ...(tracking ? { tracking } : {})
   };
 };

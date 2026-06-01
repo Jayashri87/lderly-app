@@ -1,9 +1,4 @@
-import {
-  HeartPulse,
-  Pill,
-  Sparkles,
-  UserRound
-} from "lucide-react";
+import { HeartPulse, Pill, Sparkles, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CareBooking } from "../../services/bookingService";
 import type { CareJourney } from "../../services/journeyService";
@@ -93,6 +88,9 @@ export type TimeOption = {
 export type LocationOption = {
   label: string;
   detail: string;
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
 };
 
 export type AiReassuranceInsight = {
@@ -285,7 +283,8 @@ export const careNeeds: CareNeed[] = [
         ]
       }
     ],
-    recommendation: "Choose this for appointments, hospital attender support, lab work, or report follow-up."
+    recommendation:
+      "Choose this for appointments, hospital attender support, lab work, or report follow-up."
   },
   {
     title: "Medicine help",
@@ -392,12 +391,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
               "Family update shared by the attender.",
               "Voice note ready from the attender."
             ],
-      summary: [
-        "Attender present",
-        "Doctor round noted",
-        "Meals supported",
-        "Family updated"
-      ],
+      summary: ["Attender present", "Doctor round noted", "Meals supported", "Family updated"],
       note: "Attender note: The hospital stay is being monitored and family updates are active.",
       profilePreference: "Hospital attender updates, discharge support, and family coordination",
       trackLabel: "Track Hospital Support",
@@ -441,12 +435,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
               "Report collection window will be tracked.",
               "Family update shared after the lab visit."
             ],
-      summary: [
-        "Appointment checked",
-        "Visit supported",
-        "Report tracked",
-        "Family updated"
-      ],
+      summary: ["Appointment checked", "Visit supported", "Report tracked", "Family updated"],
       note: "Caregiver note: Lab and report steps are being tracked for family visibility.",
       profilePreference: "Lab appointment, visit assistance, and report collection updates",
       trackLabel: "Track Lab Support",
@@ -490,12 +479,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
               "Prescription follow-up marked.",
               "Voice summary ready from the caregiver."
             ],
-      summary: [
-        "Appointment confirmed",
-        "Visit supported",
-        "Notes captured",
-        "Follow-up ready"
-      ],
+      summary: ["Appointment confirmed", "Visit supported", "Notes captured", "Follow-up ready"],
       note: "Caregiver note: Doctor visit details and follow-up points are ready for family review.",
       profilePreference: "Doctor visits, appointment support, and report follow-up",
       trackLabel: "Track Doctor Visit",
@@ -539,12 +523,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
               "Family update shared.",
               "Voice summary ready from the caregiver."
             ],
-      summary: [
-        "Schedule checked",
-        "Medicine supported",
-        "Timing shared",
-        "Recovery noted"
-      ],
+      summary: ["Schedule checked", "Medicine supported", "Timing shared", "Recovery noted"],
       note: "Caregiver note: Medicine support is aligned with the saved schedule.",
       profilePreference: "Medicine reminders, pickup, and recovery monitoring",
       trackLabel: "Track Medicine Help",
@@ -562,9 +541,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
   ) {
     const temple = service.includes("temple");
     const celebration =
-      service.includes("birthday") ||
-      service.includes("festival") ||
-      service.includes("occasion");
+      service.includes("birthday") || service.includes("festival") || service.includes("occasion");
 
     return {
       feedTitle: temple
@@ -598,12 +575,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
               "Mood looked positive during the visit.",
               "Voice note ready from the caregiver."
             ],
-      summary: [
-        "Visit completed",
-        "Walk supported",
-        "Mood positive",
-        "Family updated"
-      ],
+      summary: ["Visit completed", "Walk supported", "Mood positive", "Family updated"],
       note: "Caregiver note: The visit felt calm, familiar, and reassuring.",
       profilePreference: "Companionship, walks, temple visits, and family occasions",
       trackLabel: "Track Visit",
@@ -622,12 +594,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
         "Family update shared.",
         "Caregiver note added."
       ],
-      summary: [
-        "Support confirmed",
-        "Meal checked",
-        "Errand supported",
-        "Family updated"
-      ],
+      summary: ["Support confirmed", "Meal checked", "Errand supported", "Family updated"],
       note: "Caregiver note: Daily support was completed as requested.",
       profilePreference: "Meal support, errands, and home check-ins",
       trackLabel: "Track Daily Support",
@@ -647,9 +614,7 @@ export const serviceExperienceFor = (serviceType?: string) => {
 };
 
 export const cleanServiceName = (serviceType?: string) =>
-  (serviceType || "Care")
-    .split(" for ")[0]
-    .trim();
+  (serviceType || "Care").split(" for ")[0].trim();
 
 export const loadRazorpayScript = () =>
   new Promise<boolean>((resolve) => {
@@ -779,9 +744,10 @@ export const readStoredRecipientDetails = () => {
   }
 
   try {
-    return JSON.parse(
-      window.localStorage.getItem(recipientDetailsKey) || "{}"
-    ) as Record<string, RecipientDetails>;
+    return JSON.parse(window.localStorage.getItem(recipientDetailsKey) || "{}") as Record<
+      string,
+      RecipientDetails
+    >;
   } catch {
     window.localStorage.removeItem(recipientDetailsKey);
     return {} as Record<string, RecipientDetails>;
@@ -822,4 +788,3 @@ export const toCareRecipientProfile = (
   mobility: details.mobility.trim(),
   language: details.language.trim()
 });
-

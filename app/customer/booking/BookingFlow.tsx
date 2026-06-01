@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import LiveMap from "../../../components/LiveMap";
+import { GoogleAddressSelector } from "../../../components/GoogleAddressSelector";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
@@ -148,12 +149,8 @@ export function BookingFunnel({
           <div className="flex items-center gap-3">
             <Avatar recipient={recipient} />
             <div>
-              <p className="text-sm font-semibold text-emerald-100">
-                Step {stepLabel}
-              </p>
-              <p className="mt-1 text-sm text-white/55">
-                Care for {recipient.displayName}
-              </p>
+              <p className="text-sm font-semibold text-emerald-100">Step {stepLabel}</p>
+              <p className="mt-1 text-sm text-white/55">Care for {recipient.displayName}</p>
             </div>
           </div>
         </div>
@@ -189,12 +186,8 @@ export function BookingFunnel({
 
           {step === "service" && (
             <FunnelScreen key="service">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Recommended care options
-              </h2>
-              <p className="mt-2 text-sm text-white/55">
-                {selectedNeed.recommendation}
-              </p>
+              <h2 className="text-3xl font-semibold tracking-tight">Recommended care options</h2>
+              <p className="mt-2 text-sm text-white/55">{selectedNeed.recommendation}</p>
               <div className="mt-6 space-y-3">
                 {selectedNeed.serviceGroups
                   ? selectedNeed.serviceGroups.map((group) => (
@@ -229,9 +222,7 @@ export function BookingFunnel({
 
           {step === "duration" && (
             <FunnelScreen key="duration">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Choose duration
-              </h2>
+              <h2 className="text-3xl font-semibold tracking-tight">Choose duration</h2>
               <p className="mt-2 text-sm text-white/55">
                 Availability and pricing are estimated before confirmation.
               </p>
@@ -242,9 +233,7 @@ export function BookingFunnel({
                     active={selectedDuration.label === duration.label}
                     title={`${duration.label} - ${duration.price}`}
                     subtitle={
-                      duration.recommended
-                        ? `${duration.note} - Recommended`
-                        : duration.note
+                      duration.recommended ? `${duration.note} - Recommended` : duration.note
                     }
                     onClick={() => onDuration(duration)}
                   />
@@ -255,9 +244,7 @@ export function BookingFunnel({
 
           {step === "time" && (
             <FunnelScreen key="time">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                When do you need care?
-              </h2>
+              <h2 className="text-3xl font-semibold tracking-tight">When do you need care?</h2>
               <p className="mt-2 text-sm text-white/55">
                 Choose when the caregiver should be arranged.
               </p>
@@ -277,13 +264,23 @@ export function BookingFunnel({
 
           {step === "location" && (
             <FunnelScreen key="location">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Where is care needed?
-              </h2>
+              <h2 className="text-3xl font-semibold tracking-tight">Where is care needed?</h2>
               <p className="mt-2 text-sm text-white/55">
                 Confirm the place before we match a caregiver.
               </p>
               <div className="mt-6 space-y-3">
+                <GoogleAddressSelector
+                  selectedAddress={selectedLocation}
+                  onSelect={(address) =>
+                    onLocation({
+                      label: address.label,
+                      detail: address.detail,
+                      latitude: address.latitude,
+                      longitude: address.longitude,
+                      placeId: address.placeId
+                    })
+                  }
+                />
                 {locationOptions.map((location) => (
                   <SelectRow
                     key={location.label}
@@ -300,9 +297,7 @@ export function BookingFunnel({
           {step === "review" && (
             <FunnelScreen key="review">
               <Card className="rounded-[2rem] border-0 bg-white p-5 text-[#06130f]">
-                <h2 className="text-3xl font-semibold tracking-tight">
-                  Review booking
-                </h2>
+                <h2 className="text-3xl font-semibold tracking-tight">Review booking</h2>
                 <div className="mt-5 space-y-3">
                   <MiniMetric label="Care for" value={recipient.displayName} />
                   <MiniMetric label="Service" value={selectedService} />
@@ -408,9 +403,7 @@ export function SelectRow({
     >
       <div>
         <p className="font-semibold">{title}</p>
-        <p className={`mt-1 text-sm ${active ? "text-slate-500" : "text-white/50"}`}>
-          {subtitle}
-        </p>
+        <p className={`mt-1 text-sm ${active ? "text-slate-500" : "text-white/50"}`}>{subtitle}</p>
       </div>
       <ChevronRight className="h-5 w-5 opacity-60" />
     </Button>
@@ -428,11 +421,10 @@ export function CareOnWay({ recipient }: { recipient: Recipient }) {
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-300 text-[#06130f]">
           <Check className="h-10 w-10" />
         </div>
-        <h2 className="mt-6 text-4xl font-semibold tracking-tight">
-          Care is on the way
-        </h2>
+        <h2 className="mt-6 text-4xl font-semibold tracking-tight">Care is on the way</h2>
         <p className="mt-3 text-base leading-7 text-white/60">
-          We have sent {recipient.shortName}&apos;s request to nearby verified caregivers. The Care screen will open automatically with assignment, ETA, OTP, and live updates.
+          We have sent {recipient.shortName}&apos;s request to nearby verified caregivers. The Care
+          screen will open automatically with assignment, ETA, OTP, and live updates.
         </p>
         <div className="mt-6 grid grid-cols-3 gap-2 text-xs text-white/65">
           {["Matching", "ETA", "OTP"].map((item) => (

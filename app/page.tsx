@@ -5,25 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import {
-  HeartPulse,
-  Home,
-  MapPinned,
-  Pill,
-  Sparkles,
-  UserRound
-} from "lucide-react";
+import { HeartPulse, Home, MapPinned, Pill, Sparkles, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LiveActivityTimeline, LiveSystemPanel } from "../components/system/LiveSystemPanel";
 import { SystemStatusPill } from "../components/system/SystemStatusPill";
 import { LiveOperationalDock } from "../components/realtime/LiveOperationalDock";
 import { Skeleton } from "../components/ui/skeleton";
 import { AuthService, SessionUser } from "../services/authService";
-import {
-  BookingRequestDetails,
-  BookingService,
-  CareBooking
-} from "../services/bookingService";
+import { BookingRequestDetails, BookingService, CareBooking } from "../services/bookingService";
 import { HealthService, HealthSnapshot } from "../services/healthService";
 import { CareProfile, ProfileService } from "../services/profileService";
 import type { CareRecipientProfile } from "../services/profileService";
@@ -140,6 +129,9 @@ type TimeOption = {
 type LocationOption = {
   label: string;
   detail: string;
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
 };
 
 type AiReassuranceInsight = {
@@ -332,7 +324,8 @@ const careNeeds: CareNeed[] = [
         ]
       }
     ],
-    recommendation: "Choose this for appointments, hospital attender support, lab work, or report follow-up."
+    recommendation:
+      "Choose this for appointments, hospital attender support, lab work, or report follow-up."
   },
   {
     title: "Medicine help",
@@ -430,12 +423,7 @@ const serviceExperienceFor = (serviceType?: string) => {
               "Family update shared by the attender.",
               "Voice note ready from the attender."
             ],
-      summary: [
-        "Attender present",
-        "Doctor round noted",
-        "Meals supported",
-        "Family updated"
-      ],
+      summary: ["Attender present", "Doctor round noted", "Meals supported", "Family updated"],
       note: "Attender note: The hospital stay is being monitored and family updates are active.",
       profilePreference: "Hospital attender updates, discharge support, and family coordination",
       trackLabel: "Track Hospital Support",
@@ -479,12 +467,7 @@ const serviceExperienceFor = (serviceType?: string) => {
               "Report collection window will be tracked.",
               "Family update shared after the lab visit."
             ],
-      summary: [
-        "Appointment checked",
-        "Visit supported",
-        "Report tracked",
-        "Family updated"
-      ],
+      summary: ["Appointment checked", "Visit supported", "Report tracked", "Family updated"],
       note: "Caregiver note: Lab and report steps are being tracked for family visibility.",
       profilePreference: "Lab appointment, visit assistance, and report collection updates",
       trackLabel: "Track Lab Support",
@@ -528,12 +511,7 @@ const serviceExperienceFor = (serviceType?: string) => {
               "Prescription follow-up marked.",
               "Voice summary ready from the caregiver."
             ],
-      summary: [
-        "Appointment confirmed",
-        "Visit supported",
-        "Notes captured",
-        "Follow-up ready"
-      ],
+      summary: ["Appointment confirmed", "Visit supported", "Notes captured", "Follow-up ready"],
       note: "Caregiver note: Doctor visit details and follow-up points are ready for family review.",
       profilePreference: "Doctor visits, appointment support, and report follow-up",
       trackLabel: "Track Doctor Visit",
@@ -577,12 +555,7 @@ const serviceExperienceFor = (serviceType?: string) => {
               "Family update shared.",
               "Voice summary ready from the caregiver."
             ],
-      summary: [
-        "Schedule checked",
-        "Medicine supported",
-        "Timing shared",
-        "Recovery noted"
-      ],
+      summary: ["Schedule checked", "Medicine supported", "Timing shared", "Recovery noted"],
       note: "Caregiver note: Medicine support is aligned with the saved schedule.",
       profilePreference: "Medicine reminders, pickup, and recovery monitoring",
       trackLabel: "Track Medicine Help",
@@ -600,9 +573,7 @@ const serviceExperienceFor = (serviceType?: string) => {
   ) {
     const temple = service.includes("temple");
     const celebration =
-      service.includes("birthday") ||
-      service.includes("festival") ||
-      service.includes("occasion");
+      service.includes("birthday") || service.includes("festival") || service.includes("occasion");
 
     return {
       feedTitle: temple
@@ -636,12 +607,7 @@ const serviceExperienceFor = (serviceType?: string) => {
               "Mood looked positive during the visit.",
               "Voice note ready from the caregiver."
             ],
-      summary: [
-        "Visit completed",
-        "Walk supported",
-        "Mood positive",
-        "Family updated"
-      ],
+      summary: ["Visit completed", "Walk supported", "Mood positive", "Family updated"],
       note: "Caregiver note: The visit felt calm, familiar, and reassuring.",
       profilePreference: "Companionship, walks, temple visits, and family occasions",
       trackLabel: "Track Visit",
@@ -660,12 +626,7 @@ const serviceExperienceFor = (serviceType?: string) => {
         "Family update shared.",
         "Caregiver note added."
       ],
-      summary: [
-        "Support confirmed",
-        "Meal checked",
-        "Errand supported",
-        "Family updated"
-      ],
+      summary: ["Support confirmed", "Meal checked", "Errand supported", "Family updated"],
       note: "Caregiver note: Daily support was completed as requested.",
       profilePreference: "Meal support, errands, and home check-ins",
       trackLabel: "Track Daily Support",
@@ -684,10 +645,7 @@ const serviceExperienceFor = (serviceType?: string) => {
   };
 };
 
-const cleanServiceName = (serviceType?: string) =>
-  (serviceType || "Care")
-    .split(" for ")[0]
-    .trim();
+const cleanServiceName = (serviceType?: string) => (serviceType || "Care").split(" for ")[0].trim();
 
 const loadRazorpayScript = () =>
   new Promise<boolean>((resolve) => {
@@ -720,9 +678,10 @@ const readStoredRecipientDetails = () => {
   }
 
   try {
-    return JSON.parse(
-      window.localStorage.getItem(recipientDetailsKey) || "{}"
-    ) as Record<string, RecipientDetails>;
+    return JSON.parse(window.localStorage.getItem(recipientDetailsKey) || "{}") as Record<
+      string,
+      RecipientDetails
+    >;
   } catch {
     window.localStorage.removeItem(recipientDetailsKey);
     return {} as Record<string, RecipientDetails>;
@@ -775,9 +734,9 @@ export default function CustomerApp() {
   const [profile, setProfile] = useState<CareProfile | null>(null);
   const [reports, setReports] = useState<VisitReport[]>([]);
   const [recipientName, setRecipientName] = useState("");
-  const [recipientDetails, setRecipientDetails] = useState<
-    Record<string, RecipientDetails>
-  >(readStoredRecipientDetails);
+  const [recipientDetails, setRecipientDetails] = useState<Record<string, RecipientDetails>>(
+    readStoredRecipientDetails
+  );
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingStep, setBookingStep] = useState<BookingStep>("need");
   const [selectedNeed, setSelectedNeed] = useState<CareNeed>(careNeeds[0]);
@@ -790,9 +749,7 @@ export default function CustomerApp() {
   });
   const [careOnWay, setCareOnWay] = useState(false);
   const [careSubscriptionStarted, setCareSubscriptionStarted] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(subscriptionKey) === "true"
+    () => typeof window !== "undefined" && window.localStorage.getItem(subscriptionKey) === "true"
   );
   const [paymentMessage, setPaymentMessage] = useState("");
   const [paymentTermsBooking, setPaymentTermsBooking] = useState<CareBooking | null>(null);
@@ -806,8 +763,7 @@ export default function CustomerApp() {
   const lastStepEventRef = useRef("");
   const lastAiInsightRef = useRef("");
 
-  const recipient =
-    recipients.find((item) => item.name === recipientName) ?? recipients[0];
+  const recipient = recipients.find((item) => item.name === recipientName) ?? recipients[0];
   const bookingIsFreshestActiveCare =
     Boolean(booking && booking.status !== "none") &&
     (!journey || journey.status === "idle" || (booking?.updatedAt ?? 0) >= journey.updatedAt);
@@ -981,10 +937,7 @@ export default function CustomerApp() {
       status,
       service: currentService,
       recipient: recipient.shortName,
-      eta:
-        visibleBooking?.tracking?.etaMinutes ??
-        visibleJourney?.eta ??
-        null,
+      eta: visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? null,
       sla: visibleBooking?.sla?.status || "not_started"
     });
   }, [
@@ -1237,10 +1190,7 @@ export default function CustomerApp() {
         severity: "critical"
       })
     }).catch(() => undefined);
-    JourneyService.requestService(
-      { ...session, role: "customer" },
-      reason
-    );
+    JourneyService.requestService({ ...session, role: "customer" }, reason);
     trackProductEvent("immediate_assistance_requested", {
       recipient: recipient.shortName,
       service: reason,
@@ -1288,7 +1238,9 @@ export default function CustomerApp() {
     const checkout = (await checkoutResponse.json()) as RazorpayCheckout;
 
     if (checkout.mode === "mock") {
-      setPaymentMessage("Payment provider is not live. Your request is saved, but care will start after ops confirms payment.");
+      setPaymentMessage(
+        "Payment provider is not live. Your request is saved, but care will start after ops confirms payment."
+      );
       trackProductEvent("payment_mock_checkout_blocked", {
         bookingId: nextBooking.id,
         service: nextBooking.serviceType,
@@ -1471,7 +1423,10 @@ export default function CustomerApp() {
           detail:
             selectedLocation.label === "Saved care address"
               ? activeRecipientDetails?.address || selectedLocation.detail
-              : selectedLocation.detail
+              : selectedLocation.detail,
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          placeId: selectedLocation.placeId
         },
         pricing: {
           careEstimate: selectedDuration.price,
@@ -1527,10 +1482,7 @@ export default function CustomerApp() {
   };
 
   const cancelActiveCare = async () => {
-    if (
-      !visibleBooking ||
-      !["searching", "assigned", "accepted"].includes(visibleBooking.status)
-    ) {
+    if (!visibleBooking || !["searching", "assigned", "accepted"].includes(visibleBooking.status)) {
       return;
     }
 
@@ -1628,10 +1580,7 @@ export default function CustomerApp() {
           };
 
           setRecipientDetails(nextDetails);
-          window.localStorage.setItem(
-            recipientDetailsKey,
-            JSON.stringify(nextDetails)
-          );
+          window.localStorage.setItem(recipientDetailsKey, JSON.stringify(nextDetails));
           ProfileService.saveCareRecipient(
             { ...session, role: "customer" },
             recipient.name,
@@ -1654,9 +1603,7 @@ export default function CustomerApp() {
       <div className="lderly-content mx-auto min-h-dvh max-w-md px-4 pb-28 pt-5 sm:max-w-lg">
         <header className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-emerald-200">
-              LDERLY
-            </p>
+            <p className="text-xs uppercase tracking-[0.28em] text-emerald-200">LDERLY</p>
             <h1 className="premium-title mt-1 text-3xl font-semibold tracking-tight">Home</h1>
           </div>
           {hasCareSubscription && (
@@ -1743,12 +1690,20 @@ export default function CustomerApp() {
                 ? "The visit has moved into live coordination."
                 : visibleBooking && visibleBooking.status !== "none"
                   ? "Ops is coordinating assignment before live tracking starts."
-              : "Book care and live operational updates will stay visible here."
+                  : "Book care and live operational updates will stay visible here."
           }
           status={customerLiveTone}
           signals={[
-            { label: "ETA", value: caregiverHasAccepted ? `${visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? 8} min` : "Pending" },
-            { label: "Check-in", value: caregiverIsActive ? "Live" : caregiverHasAccepted ? "Confirmed" : "Not started" },
+            {
+              label: "ETA",
+              value: caregiverHasAccepted
+                ? `${visibleBooking?.tracking?.etaMinutes ?? visibleJourney?.eta ?? 8} min`
+                : "Pending"
+            },
+            {
+              label: "Check-in",
+              value: caregiverIsActive ? "Live" : caregiverHasAccepted ? "Confirmed" : "Not started"
+            },
             { label: "Trust", value: "Supervised" }
           ]}
           className="mt-4"
@@ -1830,10 +1785,7 @@ export default function CustomerApp() {
                     trustProfile={caregiverTrust}
                     onRebook={rebookPreviousCare}
                   />
-                  <SessionSummaryPreview
-                    recipient={recipient}
-                    reports={reports}
-                  />
+                  <SessionSummaryPreview recipient={recipient} reports={reports} />
                   <VisitProofSystem
                     recipient={recipient}
                     reports={reports}
@@ -1892,10 +1844,7 @@ export default function CustomerApp() {
                   const nextDetails = { ...recipientDetails };
                   delete nextDetails[recipient.name];
                   setRecipientDetails(nextDetails);
-                  window.localStorage.setItem(
-                    recipientDetailsKey,
-                    JSON.stringify(nextDetails)
-                  );
+                  window.localStorage.setItem(recipientDetailsKey, JSON.stringify(nextDetails));
                   ProfileService.removeCareRecipient(
                     { ...session, role: "customer" },
                     recipient.name
@@ -2011,7 +1960,9 @@ export default function CustomerApp() {
             trackProductEvent("booking_location_selected", {
               recipient: recipient.shortName,
               service: selectedService,
-              location: location.label
+              location: location.label,
+              hasCoordinates:
+                typeof location.latitude === "number" && typeof location.longitude === "number"
             });
             setSelectedLocation(location);
             setBookingStep("review");
