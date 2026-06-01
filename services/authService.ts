@@ -7,17 +7,11 @@ import {
   signOut
 } from "firebase/auth";
 import { ref, set } from "firebase/database";
+import type { SessionUser, UserRole } from "@lderly/shared-types";
 import { auth } from "../firebase";
 import { db } from "../firebase";
 
-export type UserRole = "customer" | "caretaker" | "admin" | "superadmin";
-
-export type SessionUser = {
-  uid: string;
-  name: string;
-  role: UserRole;
-  authMode: "firebase" | "demo";
-};
+export type { SessionUser, UserRole };
 
 const roleLabels: Record<UserRole, string> = {
   customer: "Customer",

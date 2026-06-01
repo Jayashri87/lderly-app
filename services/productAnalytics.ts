@@ -1,31 +1,7 @@
+import { shouldSendProductEvent } from "@lderly/analytics";
+import type { ProductEventProperties } from "@lderly/shared-types";
+
 let initialized = false;
-
-type ProductEventProperties = Record<string, unknown>;
-
-const recentEvents = new Map<string, number>();
-
-const compactEventKey = (name: string, properties: ProductEventProperties) =>
-  `${name}:${JSON.stringify(properties).slice(0, 240)}`;
-
-const shouldSendEvent = (name: string, properties: ProductEventProperties) => {
-  const key = compactEventKey(name, properties);
-  const previous = recentEvents.get(key) || 0;
-  const now = Date.now();
-
-  if (now - previous < 800) {
-    return false;
-  }
-
-  recentEvents.set(key, now);
-
-  if (recentEvents.size > 80) {
-    Array.from(recentEvents.entries())
-      .slice(0, 20)
-      .forEach(([eventKey]) => recentEvents.delete(eventKey));
-  }
-
-  return true;
-};
 
 const persistProductEvent = (
   name: string,
@@ -100,15 +76,12 @@ export const initializeAnalytics = () => {
   }
 };
 
-export const trackProductEvent = (
-  name: string,
-  properties: ProductEventProperties = {}
-) => {
+export const trackProductEvent = (name: string, properties: ProductEventProperties = {}) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  if (!shouldSendEvent(name, properties)) {
+  if (!shouldSendProductEvent(name, properties)) {
     return;
   }
 

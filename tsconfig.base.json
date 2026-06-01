@@ -21,7 +21,11 @@
       "@/lib/*": ["lib/*"],
       "@/server/*": ["server/*"],
       "@/services/*": ["services/*"],
-      "@/types/*": ["types/*"]
+      "@/types/*": ["types/*"],
+      "@lderly/analytics": ["packages/analytics/src/index.ts"],
+      "@lderly/shared-types": ["packages/shared-types/src/index.ts"],
+      "@lderly/shared-types/*": ["packages/shared-types/src/*"],
+      "@lderly/validation-schemas": ["packages/validation-schemas/src/index.ts"]
     }
   }
 }

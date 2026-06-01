@@ -1,0 +1,15 @@
+services:
+  web:
+    image: node:22-bookworm
+    working_dir: /workspace
+    command: sh -lc "corepack enable && pnpm install --frozen-lockfile && pnpm dev"
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../.env.local
+    volumes:
+      - ..:/workspace
+      - lderly-node-modules:/workspace/node_modules
+
+volumes:
+  lderly-node-modules:

@@ -1,0 +1,16 @@
+{
+  "name": "@lderly/validation-schemas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lderly/shared-types": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
+}

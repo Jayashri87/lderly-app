@@ -13,6 +13,15 @@ importers:
 
   .:
     dependencies:
+      '@lderly/analytics':
+        specifier: workspace:*
+        version: link:packages/analytics
+      '@lderly/shared-types':
+        specifier: workspace:*
+        version: link:packages/shared-types
+      '@lderly/validation-schemas':
+        specifier: workspace:*
+        version: link:packages/validation-schemas
       '@microsoft/clarity':
         specifier: ^1.0.2
         version: 1.0.2
@@ -82,6 +91,9 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: ^1.57.0
@@ -159,6 +171,37 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+
+  packages/analytics:
+    dependencies:
+      '@lderly/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+
+  packages/shared-types: {}
+
+  packages/validation-schemas:
+    dependencies:
+      '@lderly/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
+  services/analytics-service: {}
+
+  services/booking-service: {}
+
+  services/matching-service: {}
+
+  services/notification-service: {}
+
+  services/ops-service: {}
+
+  services/payment-service: {}
+
+  services/tracking-service: {}
 
 packages:
 

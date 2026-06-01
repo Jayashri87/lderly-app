@@ -4,6 +4,7 @@ packages:
   - "packages/*"
   - "design-system"
   - "mobile/*"
+  - "services/*"
 
 overrides:
   postcss: 8.5.14

@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAppCheck } from "../../../../server/apiSecurity";
-import {
-  attachRoleSession,
-  createSessionId,
-  getRoleSession
-} from "../../../../server/authSession";
+import { attachRoleSession, createSessionId, getRoleSession } from "../../../../server/authSession";
 import {
   getAdminAuth,
   getAdminDatabase,
   hasFirebaseAdminConfig
 } from "../../../../server/firebaseAdmin";
+import { isUserRole } from "@lderly/shared-types";
 import type { UserRole } from "../../../../services/authService";
 import { registerRoleSession } from "../../../../server/sessionRegistry";
-
-const validRoles = ["customer", "caretaker", "admin", "superadmin"] as const;
-
-const isUserRole = (role: unknown): role is UserRole =>
-  typeof role === "string" && validRoles.includes(role as UserRole);
 
 const canAssignRole = (request: NextRequest, role: UserRole) => {
   if (role === "customer") {

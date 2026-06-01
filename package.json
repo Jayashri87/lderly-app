@@ -11,6 +11,7 @@
     "lighthouse": "node scripts/lighthouse-report.mjs",
     "load:test": "node scripts/load-test.mjs",
     "lint": "eslint",
+    "typecheck:packages": "pnpm --filter @lderly/shared-types run typecheck && pnpm --filter @lderly/validation-schemas run typecheck && pnpm --filter @lderly/analytics run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .prettierrc.json .github/**/*.yml .github/**/*.json scripts/apply-branch-protection.mjs",
     "prepare": "husky",
@@ -32,7 +33,7 @@
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
     "branch-protection:apply": "node scripts/apply-branch-protection.mjs",
-    "ci:validate": "pnpm run audit:deps && pnpm run audit:secrets && pnpm run audit:performance && pnpm run format:check && pnpm run lint && pnpm run build && pnpm run ci:smoke"
+    "ci:validate": "pnpm run audit:deps && pnpm run audit:secrets && pnpm run audit:performance && pnpm run format:check && pnpm run lint && pnpm run typecheck:packages && pnpm run build && pnpm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
@@ -40,6 +41,9 @@
     "@react-google-maps/api": "^2.20.7",
     "@sentry/nextjs": "^10.53.1",
     "@tanstack/react-query": "^5.100.14",
+    "@lderly/analytics": "workspace:*",
+    "@lderly/shared-types": "workspace:*",
+    "@lderly/validation-schemas": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.13.0",
@@ -57,7 +61,8 @@
     "react-dom": "^19.2.6",
     "react-scan": "^0.5.6",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
