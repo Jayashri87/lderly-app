@@ -1,0 +1,38 @@
+groups:
+  - name: lderly-production
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LDERLY service is down"
+          description: "{{ $labels.job }} has been unreachable for more than 2 minutes."
+
+      - alert: HighApiErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "High API error rate"
+          description: "{{ $labels.job }} is returning elevated 5xx responses."
+
+      - alert: RealtimeClientsDisconnected
+        expr: realtime_connected_clients < 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime service has no connected clients"
+          description: "Check realtime-service socket health and Redis adapter connectivity."
+
+      - alert: PaymentVerificationFailures
+        expr: increase(payment_verification_failures_total[10m]) > 3
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payment verification failures"
+          description: "Multiple payment verification failures detected. Check Razorpay keys, webhook secret, and signature validation."

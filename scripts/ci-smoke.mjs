@@ -2,7 +2,7 @@ import { execFileSync, spawn } from "node:child_process";
 
 const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3210";
 const port = new URL(baseUrl).port || "3000";
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const packageCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const useShell = process.platform === "win32";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,15 +56,15 @@ const run = (command, args, options = {}) =>
   });
 
 const server = spawn(
-  useShell ? `${npmCommand} start -- -p ${port}` : npmCommand,
-  useShell ? [] : ["start", "--", "-p", port],
+  useShell ? `${packageCommand} exec next start -p ${port}` : packageCommand,
+  useShell ? [] : ["exec", "next", "start", "-p", port],
   {
-  stdio: "inherit",
-  shell: useShell,
-  env: {
-    ...process.env,
-    PORT: port
-  }
+    stdio: "inherit",
+    shell: useShell,
+    env: {
+      ...process.env,
+      PORT: port
+    }
   }
 );
 
@@ -100,7 +100,7 @@ process.on("SIGTERM", () => {
 
 try {
   await waitForServer();
-  await run(npmCommand, ["run", "smoke:production"], {
+  await run(packageCommand, ["run", "smoke:production"], {
     env: {
       ...process.env,
       SMOKE_BASE_URL: baseUrl

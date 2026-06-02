@@ -218,6 +218,44 @@ const buildSmokeBooking = (suffix = "") => {
   };
 };
 
+const buildRecoveryBooking = (suffix = "") => {
+  const booking = buildSmokeBooking("");
+  const now = Date.now();
+  const id = `recovery-booking-${now}${suffix}`;
+
+  return {
+    ...booking,
+    id,
+    customerId: "customer-recovery",
+    customerName: "Recovery Customer",
+    notes: "Operational recovery validation",
+    requestDetails: {
+      ...booking.requestDetails,
+      careFor: {
+        relationship: "Mother",
+        displayName: "Recovery Parent"
+      },
+      duration: {
+        ...booking.requestDetails.duration,
+        note: "Recovery validation"
+      },
+      schedule: {
+        ...booking.requestDetails.schedule,
+        detail: "Recovery validation slot"
+      },
+      location: {
+        ...booking.requestDetails.location,
+        label: "Recovery care address"
+      }
+    },
+    familyUpdates: {
+      ...booking.familyUpdates,
+      recipients: ["customer-recovery"]
+    },
+    timeline: [{ label: "Recovery booking requested", at: now }]
+  };
+};
+
 const seedCaretaker = async () => {
   await database.ref("caretakers/demo-caretaker").update({
     uid: "demo-caretaker",
@@ -289,11 +327,15 @@ const cleanupBooking = async (booking) => {
     "caretakers/demo-caretaker/activeAssignments": 0,
     "caretakers/smoke-backup-caretaker/activeBookingId": null,
     "caretakers/smoke-backup-caretaker/activeAssignments": 0,
+    "caretakers/recovery-caretaker/activeBookingId": null,
+    "caretakers/recovery-caretaker/activeAssignments": 0,
     [`operations/bookingsByCaretaker/demo-caretaker/${booking.id}`]: null,
     [`operations/bookingsByCaretaker/smoke-backup-caretaker/${booking.id}`]: null,
+    [`operations/bookingsByCaretaker/recovery-caretaker/${booking.id}`]: null,
     [`operations/dispatchOffers/${booking.id}`]: null,
     [`caretakers/demo-caretaker/offers/${booking.id}`]: null,
     [`caretakers/smoke-backup-caretaker/offers/${booking.id}`]: null,
+    [`caretakers/recovery-caretaker/offers/${booking.id}`]: null,
     [`payouts/releaseQueue/${booking.id}`]: null,
     [`operations/reassignmentQueue/completed/${booking.id}`]: null,
     [`operations/recoveryQueue/byBooking/${booking.id}`]: null,
@@ -440,10 +482,7 @@ try {
     status.json?.productionReadiness?.monthlyNriReportApi === true,
     "monthly NRI report API is prepared"
   );
-  expect(
-    status.json?.productionReadiness?.invoiceGstApi === true,
-    "GST invoice API is prepared"
-  );
+  expect(status.json?.productionReadiness?.invoiceGstApi === true, "GST invoice API is prepared");
   expect(
     status.json?.productionReadiness?.caregiverPayoutApi === true,
     "caregiver payout API is prepared"
@@ -512,10 +551,7 @@ try {
     status.json?.productionReadiness?.opsCommandCenterActions === true,
     "ops command center actions are prepared"
   );
-  expect(
-    status.json?.productionReadiness?.opsRecoveryApi === true,
-    "ops recovery API is prepared"
-  );
+  expect(status.json?.productionReadiness?.opsRecoveryApi === true, "ops recovery API is prepared");
   expect(
     status.json?.productionReadiness?.opsMaintenanceApi === true,
     "ops maintenance API is prepared"
@@ -528,10 +564,7 @@ try {
     status.json?.productionReadiness?.opsGoLiveReadinessApi === true,
     "ops go-live readiness API is prepared"
   );
-  expect(
-    status.json?.productionReadiness?.opsRunbookApi === true,
-    "ops runbook API is prepared"
-  );
+  expect(status.json?.productionReadiness?.opsRunbookApi === true, "ops runbook API is prepared");
   expect(
     status.json?.productionReadiness?.auditRetentionPolicyApi === true,
     "audit retention policy API is prepared"
@@ -600,10 +633,7 @@ try {
     status.json?.productionReadiness?.shadcnStylePrimitives === true,
     "shadcn-style primitives are prepared"
   );
-  expect(
-    status.json?.productionReadiness?.sentrySdkPrepared === true,
-    "Sentry SDK is prepared"
-  );
+  expect(status.json?.productionReadiness?.sentrySdkPrepared === true, "Sentry SDK is prepared");
   expect(
     status.json?.productionReadiness?.analyticsFunnelKpis === true,
     "analytics funnel KPIs are prepared"
@@ -708,14 +738,8 @@ try {
     status.json?.productionReadiness?.familyPermissionsUi === true,
     "family permissions UI is prepared"
   );
-  expect(
-    status.json?.productionReadiness?.visitProofUi === true,
-    "visit proof UI is prepared"
-  );
-  expect(
-    status.json?.productionReadiness?.visitProofApi === true,
-    "visit proof API is prepared"
-  );
+  expect(status.json?.productionReadiness?.visitProofUi === true, "visit proof UI is prepared");
+  expect(status.json?.productionReadiness?.visitProofApi === true, "visit proof API is prepared");
   expect(
     status.json?.productionReadiness?.familyConfidenceScoreUi === true,
     "family confidence score UI is prepared"
@@ -791,12 +815,12 @@ try {
       otp: "1234"
     })
   });
-  expect(otpLoginResult.response.ok, "OTP login returns 200", otpLoginResult.text);
-  expect(Boolean(otpLoginResult.cookie), "OTP login sets signed customer cookie");
   expect(
-    otpLoginResult.json?.uid === "customer-9876543210",
-    "OTP login returns stable customer uid"
+    otpLoginResult.response.status === 410,
+    "OTP login is disabled for production lead-first customer flow",
+    otpLoginResult.text
   );
+  expect(!otpLoginResult.cookie, "OTP login does not create a signed customer cookie");
   const booking = buildSmokeBooking();
 
   const createResult = await request(
@@ -878,7 +902,11 @@ try {
     customerCookie
   );
   createdPaths.push(uberBooking);
-  expect(uberCreateResult.response.ok, "customer can broadcast booking to nearby caregivers", uberCreateResult.text);
+  expect(
+    uberCreateResult.response.ok,
+    "customer can broadcast booking to nearby caregivers",
+    uberCreateResult.text
+  );
   expect(
     uberCreateResult.json?.booking?.status === "searching",
     "broadcast booking enters searching state"
@@ -896,7 +924,11 @@ try {
     },
     caretakerCookie
   );
-  expect(uberAcceptResult.response.ok, "nearby caretaker can accept dispatch offer", uberAcceptResult.text);
+  expect(
+    uberAcceptResult.response.ok,
+    "nearby caretaker can accept dispatch offer",
+    uberAcceptResult.text
+  );
   expect(
     uberAcceptResult.json?.booking?.status === "accepted" &&
       uberAcceptResult.json?.booking?.caretakerId === "demo-caretaker",
@@ -955,7 +987,11 @@ try {
     },
     caretakerCookie
   );
-  expect(uberStartResult.response.ok, "caretaker can start service with customer OTP", uberStartResult.text);
+  expect(
+    uberStartResult.response.ok,
+    "caretaker can start service with customer OTP",
+    uberStartResult.text
+  );
   expect(
     Boolean(uberStartResult.json?.booking?.serviceStart?.verifiedAt),
     "customer OTP verification is persisted"
@@ -996,7 +1032,11 @@ try {
     },
     customerCookie
   );
-  expect(uberVerifyResult.response.ok, "customer can verify completion and release payment", uberVerifyResult.text);
+  expect(
+    uberVerifyResult.response.ok,
+    "customer can verify completion and release payment",
+    uberVerifyResult.text
+  );
   expect(
     uberVerifyResult.json?.booking?.status === "payment_settled" &&
       uberVerifyResult.json?.booking?.completion?.paymentReleaseStatus === "released",
@@ -1026,7 +1066,11 @@ try {
     customerCookie
   );
   createdPaths.push(expiredOfferBooking);
-  expect(expiredOfferCreateResult.response.ok, "customer can create expired-offer smoke booking", expiredOfferCreateResult.text);
+  expect(
+    expiredOfferCreateResult.response.ok,
+    "customer can create expired-offer smoke booking",
+    expiredOfferCreateResult.text
+  );
   await database.ref().update({
     [`bookings/byId/${expiredOfferBooking.id}/dispatch/offerExpiresAt`]: Date.now() - 60_000,
     [`bookings/byId/${expiredOfferBooking.id}/dispatch/offers/demo-caretaker/status`]: "sent",
@@ -1094,7 +1138,11 @@ try {
     },
     customerCookie
   );
-  expect(cancelBroadcastResult.response.ok, "customer can cancel open broadcast booking", cancelBroadcastResult.text);
+  expect(
+    cancelBroadcastResult.response.ok,
+    "customer can cancel open broadcast booking",
+    cancelBroadcastResult.text
+  );
   expect(
     cancelBroadcastResult.json?.booking?.status === "cancelled",
     "customer cancellation marks broadcast booking cancelled"
@@ -1115,7 +1163,10 @@ try {
   const cancelledOfferStatus = await database
     .ref(`caretakers/demo-caretaker/offers/${cancelBroadcastBooking.id}/status`)
     .get();
-  expect(cancelledOfferStatus.val() === "cancelled", "customer cancellation clears caregiver offer");
+  expect(
+    cancelledOfferStatus.val() === "cancelled",
+    "customer cancellation clears caregiver offer"
+  );
 
   const foreignBooking = {
     ...buildSmokeBooking("-foreign"),
@@ -1201,7 +1252,11 @@ try {
     },
     customerCookie
   );
-  expect(checkoutReplayFirst.response.ok, "idempotent checkout first attempt succeeds", checkoutReplayFirst.text);
+  expect(
+    checkoutReplayFirst.response.ok,
+    "idempotent checkout first attempt succeeds",
+    checkoutReplayFirst.text
+  );
   expect(
     checkoutReplaySecond.response.headers.get("x-idempotent-replay") === "true" ||
       checkoutReplaySecond.json?.replayed === true,
@@ -1292,10 +1347,7 @@ try {
     customerCookie
   );
   expect(pricingResult.response.ok, "customer can get dynamic pricing quote", pricingResult.text);
-  expect(
-    pricingResult.json?.quote?.estimatedTotal > 0,
-    "pricing quote returns payable estimate"
-  );
+  expect(pricingResult.json?.quote?.estimatedTotal > 0, "pricing quote returns payable estimate");
 
   const profileResult = await request(
     "/api/profiles/care",
@@ -1476,7 +1528,9 @@ try {
       id: notificationRetryResult.json.run.id
     });
   }
-  const retryNotificationAfter = await database.ref(`notifications/byId/${retryNotificationId}`).get();
+  const retryNotificationAfter = await database
+    .ref(`notifications/byId/${retryNotificationId}`)
+    .get();
   expect(
     retryNotificationAfter.val()?.deliveryAttempts >= 2,
     "notification retry increments delivery attempts"
@@ -1490,7 +1544,11 @@ try {
     },
     adminCookie
   );
-  expect(partnerSeedResult.response.ok, "admin can seed partner marketplace", partnerSeedResult.text);
+  expect(
+    partnerSeedResult.response.ok,
+    "admin can seed partner marketplace",
+    partnerSeedResult.text
+  );
   for (const partner of partnerSeedResult.json?.partners || []) {
     createdReliability.push({
       kind: "partner",
@@ -1527,6 +1585,23 @@ try {
     });
   }
 
+  await database.ref("caretakers/demo-caretaker").update({
+    available: true,
+    status: "available",
+    activeAssignments: 0,
+    activeBookingId: null,
+    currentLocation: { lat: 12.985, lng: 77.61 }
+  });
+  await database.ref("caretakers/smoke-backup-caretaker").update({
+    available: false,
+    status: "offline",
+    activeAssignments: 0,
+    activeBookingId: null
+  });
+  await database
+    .ref(`bookings/byId/${booking.id}/matching/preferredCaretakerId`)
+    .set("demo-caretaker");
+
   const assignResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/assign`,
     {
@@ -1538,14 +1613,18 @@ try {
   expect(assignResult.response.ok, "admin can assign caretaker", assignResult.text);
   expect(
     assignResult.json?.booking?.caretakerId === "demo-caretaker",
-    "assignment selected smoke caretaker"
+    "assignment selected smoke caretaker",
+    `assigned=${assignResult.json?.booking?.caretakerId || "none"}`
   );
 
-  const caregiverIntelResult = await request(
-    "/api/ops/caregiver-intelligence",
-    {},
-    adminCookie
-  );
+  await database.ref("caretakers/smoke-backup-caretaker").update({
+    available: true,
+    status: "available",
+    activeAssignments: 0,
+    activeBookingId: null
+  });
+
+  const caregiverIntelResult = await request("/api/ops/caregiver-intelligence", {}, adminCookie);
   expect(
     caregiverIntelResult.response.ok,
     "admin can read caregiver reliability intelligence",
@@ -1597,8 +1676,7 @@ try {
     "admin can assign reassignment smoke booking",
     assignReassignmentResult.text
   );
-  const originallyAssignedCaretaker =
-    assignReassignmentResult.json?.booking?.caretakerId || "";
+  const originallyAssignedCaretaker = assignReassignmentResult.json?.booking?.caretakerId || "";
 
   const reassignResult = await request(
     `/api/bookings/${encodeURIComponent(reassignmentBooking.id)}/reassign`,
@@ -1652,11 +1730,7 @@ try {
     }
   }
 
-  const emergencyCommandResult = await request(
-    "/api/ops/emergency-command",
-    {},
-    adminCookie
-  );
+  const emergencyCommandResult = await request("/api/ops/emergency-command", {}, adminCookie);
   expect(
     emergencyCommandResult.response.ok,
     "admin can read emergency command center",
@@ -1680,7 +1754,7 @@ try {
   );
 
   const staleRecoveryBooking = {
-    ...buildSmokeBooking("-recovery"),
+    ...buildRecoveryBooking("-assignment"),
     createdAt: Date.now() - 25 * 60 * 1000,
     updatedAt: Date.now() - 25 * 60 * 1000,
     scheduledFor: Date.now() + 30 * 60 * 1000,
@@ -1688,7 +1762,7 @@ try {
       assignmentDueAt: Date.now() - 12 * 60 * 1000,
       arrivalDueAt: Date.now() + 20 * 60 * 1000,
       status: "breached",
-      breachReason: "Smoke stale assignment recovery"
+      breachReason: "Operational stale assignment recovery"
     }
   };
   await database.ref(`bookings/byId/${staleRecoveryBooking.id}`).set(staleRecoveryBooking);
@@ -1717,7 +1791,7 @@ try {
       method: "POST",
       body: JSON.stringify({
         bookingId: staleRecoveryBooking.id,
-        note: "Smoke stale booking recovery"
+        note: "Operational stale booking recovery"
       })
     },
     adminCookie
@@ -1748,7 +1822,7 @@ try {
   }
 
   const dispatchExpiredBooking = {
-    ...buildSmokeBooking("-dispatch-expired"),
+    ...buildRecoveryBooking("-dispatch-expired"),
     status: "searching",
     caretakerId: "",
     caretakerName: "Nearby caregivers notified",
@@ -1759,10 +1833,10 @@ try {
       offerExpiresAt: Date.now() - 2 * 60 * 1000,
       candidateCount: 1,
       offers: {
-        "smoke-backup-caretaker": {
-          bookingId: `smoke-booking-${Date.now()}-dispatch-expired`,
-          caretakerId: "smoke-backup-caretaker",
-          caretakerName: "Smoke Backup Caretaker",
+        "recovery-caretaker": {
+          bookingId: `recovery-booking-${Date.now()}-dispatch-expired`,
+          caretakerId: "recovery-caretaker",
+          caretakerName: "Recovery Caretaker",
           score: 98,
           distanceKm: 2.3,
           etaMinutes: 9,
@@ -1775,17 +1849,17 @@ try {
       assignmentDueAt: Date.now() + 6 * 60 * 1000,
       arrivalDueAt: Date.now() + 30 * 60 * 1000,
       status: "watch",
-      breachReason: "Smoke dispatch expired recovery"
+      breachReason: "Operational dispatch expired recovery"
     }
   };
-  dispatchExpiredBooking.dispatch.offers["smoke-backup-caretaker"].bookingId =
+  dispatchExpiredBooking.dispatch.offers["recovery-caretaker"].bookingId =
     dispatchExpiredBooking.id;
   await database.ref(`bookings/byId/${dispatchExpiredBooking.id}`).set(dispatchExpiredBooking);
-  await database.ref(`caretakers/smoke-backup-caretaker/offers/${dispatchExpiredBooking.id}`).set({
+  await database.ref(`caretakers/recovery-caretaker/offers/${dispatchExpiredBooking.id}`).set({
     bookingId: dispatchExpiredBooking.id,
     serviceType: dispatchExpiredBooking.serviceType,
     customerName: dispatchExpiredBooking.customerName,
-    destinationLabel: "Smoke care address",
+    destinationLabel: "Recovery care address",
     distanceKm: 2.3,
     etaMinutes: 9,
     status: "sent",
@@ -1798,8 +1872,7 @@ try {
   expect(
     dispatchRecoverySnapshotResult.json?.snapshot?.signals?.some(
       (signal) =>
-        signal.bookingId === dispatchExpiredBooking.id &&
-        signal.kind === "dispatch_offer_expired"
+        signal.bookingId === dispatchExpiredBooking.id && signal.kind === "dispatch_offer_expired"
     ),
     "ops recovery detects expired caregiver broadcast"
   );
@@ -1809,7 +1882,7 @@ try {
       method: "POST",
       body: JSON.stringify({
         bookingId: dispatchExpiredBooking.id,
-        note: "Smoke dispatch rebroadcast recovery"
+        note: "Operational dispatch rebroadcast recovery"
       })
     },
     adminCookie
@@ -1832,10 +1905,10 @@ try {
   }
 
   const verificationDelayedBooking = {
-    ...buildSmokeBooking("-completion-verify"),
+    ...buildRecoveryBooking("-completion-verify"),
     status: "completed",
-    caretakerId: "demo-caretaker",
-    caretakerName: "Smoke Caretaker",
+    caretakerId: "recovery-caretaker",
+    caretakerName: "Recovery Caretaker",
     updatedAt: Date.now() - 45 * 60 * 1000,
     completion: {
       caretakerMarkedDoneAt: Date.now() - 45 * 60 * 1000,
@@ -1848,7 +1921,9 @@ try {
       breachReason: ""
     }
   };
-  await database.ref(`bookings/byId/${verificationDelayedBooking.id}`).set(verificationDelayedBooking);
+  await database
+    .ref(`bookings/byId/${verificationDelayedBooking.id}`)
+    .set(verificationDelayedBooking);
   createdPaths.push(verificationDelayedBooking);
 
   const completionRecoverySnapshotResult = await request("/api/ops/recovery", {}, adminCookie);
@@ -1866,7 +1941,7 @@ try {
       method: "POST",
       body: JSON.stringify({
         bookingId: verificationDelayedBooking.id,
-        note: "Smoke completion verification nudge"
+        note: "Operational completion verification nudge"
       })
     },
     adminCookie
@@ -1940,7 +2015,11 @@ try {
     },
     adminCookie
   );
-  expect(maintenanceResult.response.ok, "admin can run ops maintenance cleanup", maintenanceResult.text);
+  expect(
+    maintenanceResult.response.ok,
+    "admin can run ops maintenance cleanup",
+    maintenanceResult.text
+  );
   expect(
     maintenanceResult.json?.record?.staleLocksRemoved >= 1,
     "ops maintenance removes expired booking locks"
@@ -2146,10 +2225,7 @@ try {
     customerCookie
   );
   expect(invoiceResult.response.ok, "customer can generate GST invoice", invoiceResult.text);
-  expect(
-    invoiceResult.json?.invoice?.gstAmount >= 0,
-    "invoice includes GST amount"
-  );
+  expect(invoiceResult.json?.invoice?.gstAmount >= 0, "invoice includes GST amount");
   if (invoiceResult.json?.invoice?.id) {
     createdReliability.push({
       kind: "invoice",
@@ -2196,7 +2272,11 @@ try {
     },
     adminCookie
   );
-  expect(subscriptionResult.response.ok, "admin can create recurring care subscription", subscriptionResult.text);
+  expect(
+    subscriptionResult.response.ok,
+    "admin can create recurring care subscription",
+    subscriptionResult.text
+  );
   if (subscriptionResult.json?.subscription?.id) {
     createdReliability.push({
       kind: "subscription",
@@ -2303,10 +2383,7 @@ try {
     "admin can generate AI ops summary",
     aiOpsSummaryResult.text
   );
-  expect(
-    Boolean(aiOpsSummaryResult.json?.summary?.headline),
-    "AI ops summary includes headline"
-  );
+  expect(Boolean(aiOpsSummaryResult.json?.summary?.headline), "AI ops summary includes headline");
   expect(
     Array.isArray(aiOpsSummaryResult.json?.summary?.anomalySignals),
     "AI ops summary includes anomaly signals"
@@ -2693,9 +2770,7 @@ try {
   );
   expect(arrivedResult.response.ok, "caretaker can mark arrived", arrivedResult.text);
 
-  const latestBookingForStart = (
-    await database.ref(`bookings/byId/${booking.id}`).get()
-  ).val();
+  const latestBookingForStart = (await database.ref(`bookings/byId/${booking.id}`).get()).val();
   const startWithoutOtpResult = await request(
     `/api/bookings/${encodeURIComponent(booking.id)}/status`,
     {
@@ -2718,7 +2793,11 @@ try {
     },
     caretakerCookie
   );
-  expect(progressResult.response.ok, "caretaker can start session with customer OTP", progressResult.text);
+  expect(
+    progressResult.response.ok,
+    "caretaker can start session with customer OTP",
+    progressResult.text
+  );
 
   const vitalsResult = await request(
     "/api/care-quality/vitals",
@@ -2829,10 +2908,7 @@ try {
     customerCookie
   );
   expect(visitProofResult.response.ok, "customer can read visit proof", visitProofResult.text);
-  expect(
-    visitProofResult.json?.proof?.reportReady === true,
-    "visit proof links completed report"
-  );
+  expect(visitProofResult.json?.proof?.reportReady === true, "visit proof links completed report");
   expect(
     Array.isArray(visitProofResult.json?.proof?.proofSignals),
     "visit proof includes service proof signals"
@@ -2967,7 +3043,11 @@ try {
       },
       adminCookie
     );
-    expect(voiceScanResult.response.ok, "admin can mark voice note scan clean", voiceScanResult.text);
+    expect(
+      voiceScanResult.response.ok,
+      "admin can mark voice note scan clean",
+      voiceScanResult.text
+    );
   }
 
   const kycResult = await request(
@@ -3270,10 +3350,16 @@ try {
         .catch(() => undefined);
     }
     if (item.kind === "aiOpsSummary") {
-      await database.ref(`aiOpsSummaries/byId/${item.id}`).remove().catch(() => undefined);
+      await database
+        .ref(`aiOpsSummaries/byId/${item.id}`)
+        .remove()
+        .catch(() => undefined);
     }
     if (item.kind === "aiCaregiverNote") {
-      await database.ref(`aiCaregiverNotes/byId/${item.id}`).remove().catch(() => undefined);
+      await database
+        .ref(`aiCaregiverNotes/byId/${item.id}`)
+        .remove()
+        .catch(() => undefined);
     }
     if (item.kind === "retentionSummary") {
       await database
@@ -3383,7 +3469,10 @@ try {
         .catch(() => undefined);
     }
     if (item.kind === "careRisk") {
-      await database.ref(`careRisk/byUser/${item.userId}`).remove().catch(() => undefined);
+      await database
+        .ref(`careRisk/byUser/${item.userId}`)
+        .remove()
+        .catch(() => undefined);
     }
     if (item.kind === "incident") {
       await database

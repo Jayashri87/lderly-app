@@ -12,6 +12,7 @@
     "load:test": "node scripts/load-test.mjs",
     "lint": "eslint",
     "typecheck:packages": "pnpm --filter @lderly/shared-types run typecheck && pnpm --filter @lderly/validation-schemas run typecheck && pnpm --filter @lderly/analytics run typecheck && pnpm --filter @lderly/payment run typecheck",
+    "build:workspaces": "pnpm run typecheck:packages && pnpm --filter @lderly/api-gateway run build",
     "format": "prettier --write .",
     "format:check": "prettier --check package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .prettierrc.json .github/**/*.yml .github/**/*.json scripts/apply-branch-protection.mjs",
     "prepare": "husky",
@@ -33,7 +34,7 @@
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
     "branch-protection:apply": "node scripts/apply-branch-protection.mjs",
-    "ci:validate": "pnpm run audit:deps && pnpm run audit:secrets && pnpm run audit:performance && pnpm run format:check && pnpm run lint && pnpm run typecheck:packages && pnpm run build && pnpm run ci:smoke"
+    "ci:validate": "pnpm run audit:deps && pnpm run audit:secrets && pnpm run audit:performance && pnpm run format:check && pnpm run lint && pnpm run build:workspaces && pnpm run build && pnpm run ci:smoke"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
