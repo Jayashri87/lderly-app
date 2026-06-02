@@ -7,8 +7,7 @@ type ProxySession = {
   expiresAt?: number;
 };
 
-const encode = (value: string) =>
-  new TextEncoder().encode(value);
+const encode = (value: string) => new TextEncoder().encode(value);
 
 const decodeBase64Url = (value: string) => {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -96,10 +95,7 @@ const applySecurityHeaders = (response: NextResponse) => {
       "max-age=31536000; includeSubDomains; preload"
     );
   }
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(self)"
-  );
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)");
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   response.headers.set("Pragma", "no-cache");
   response.headers.set("Expires", "0");
@@ -117,23 +113,59 @@ const redirectToSignin = (request: NextRequest, reason: string) => {
   return applySecurityHeaders(NextResponse.redirect(url));
 };
 
+const withRequestTelemetry = (response: NextResponse, requestId: string, startedAt: number) => {
+  response.headers.set("X-Request-ID", requestId);
+  response.headers.set("X-Process-Time", `${Date.now() - startedAt}ms`);
+  return response;
+};
+
 export async function proxy(request: NextRequest) {
+  const startedAt = Date.now();
   const pathname = request.nextUrl.pathname;
+  const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-request-id", requestId);
+
+  if (pathname.includes("../") || pathname.includes("..\\")) {
+    return withRequestTelemetry(
+      applySecurityHeaders(NextResponse.json({ error: "Invalid request" }, { status: 400 })),
+      requestId,
+      startedAt
+    );
+  }
+
   const requiredRole = requiredRoleFor(pathname);
 
   if (requiredRole) {
     const session = await readVerifiedSession(request.cookies.get("lderly_session")?.value);
 
     if (!session) {
-      return redirectToSignin(request, "session_required");
+      return withRequestTelemetry(
+        redirectToSignin(request, "session_required"),
+        requestId,
+        startedAt
+      );
     }
 
-    if (session.role !== requiredRole && !(requiredRole === "admin" && session.role === "superadmin")) {
-      return redirectToSignin(request, "role_required");
+    if (
+      session.role !== requiredRole &&
+      !(requiredRole === "admin" && session.role === "superadmin")
+    ) {
+      return withRequestTelemetry(redirectToSignin(request, "role_required"), requestId, startedAt);
     }
   }
 
-  return applySecurityHeaders(NextResponse.next());
+  return withRequestTelemetry(
+    applySecurityHeaders(
+      NextResponse.next({
+        request: {
+          headers: requestHeaders
+        }
+      })
+    ),
+    requestId,
+    startedAt
+  );
 }
 
 export const config = {
