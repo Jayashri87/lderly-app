@@ -31,13 +31,15 @@ export function LderlyProviders({ children }: { children: React.ReactNode }) {
     installFirebaseAppCheckFetch();
 
     if (process.env.NEXT_PUBLIC_REACT_SCAN === "true") {
-      import("react-scan/auto").catch(() => undefined);
+      import("react-scan").catch(() => undefined);
     }
   }, []);
 
   useEffect(() => {
     const deviceMemory =
-      "deviceMemory" in navigator ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory) : 8;
+      "deviceMemory" in navigator
+        ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory)
+        : 8;
     const lowPowerDevice = navigator.hardwareConcurrency <= 4 || deviceMemory <= 4;
 
     if (
