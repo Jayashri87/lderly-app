@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAppCheckToken } from "./appCheckProvider";
 import { requireRole } from "./authSession";
 import { getAdminDatabase } from "./firebaseAdmin";
-import { isRoleSessionActive } from "./sessionRegistry";
+import { isRoleSessionActive, updateSessionActivity } from "./sessionRegistry";
 import type { UserRole } from "../services/authService";
 
 type ApiSession = NonNullable<ReturnType<typeof requireRole>>;
@@ -77,15 +77,11 @@ export const parseJsonBody = async <T>(request: NextRequest): Promise<T | null> 
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
-const safeFirebaseKey = (value: string) =>
-  value.replace(/[.#$/[\]]/g, "_").slice(0, 420);
+const safeFirebaseKey = (value: string) => value.replace(/[.#$/[\]]/g, "_").slice(0, 420);
 
 const isFailedOperationResult = (value: unknown) =>
   Boolean(
-    value &&
-      typeof value === "object" &&
-      "ok" in value &&
-      (value as { ok?: unknown }).ok === false
+    value && typeof value === "object" && "ok" in value && (value as { ok?: unknown }).ok === false
   );
 
 export const checkRateLimit = (
@@ -159,6 +155,8 @@ export const requireApiSession = async (
     return { ok: false, response: jsonError("Session expired or revoked", 401) };
   }
 
+  await updateSessionActivity(session);
+
   if (options.csrf !== false && !sameOriginCheck(request)) {
     return { ok: false, response: jsonError("Invalid request origin", 403) };
   }
@@ -226,15 +224,17 @@ export const withIdempotency = async <T>(
   const key = safeFirebaseKey(`${operation}:${session.role || "role"}:${owner}:${rawKey}`);
   const ref = database.ref(`operations/idempotency/${key}`);
   const existingSnapshot = await ref.get();
-  const existing = existingSnapshot.val() as
-    | {
-        value?: T;
-        operation?: string;
-        path?: string;
-      }
-    | null;
+  const existing = existingSnapshot.val() as {
+    value?: T;
+    operation?: string;
+    path?: string;
+  } | null;
 
-  if (existing?.value && existing.operation === operation && existing.path === request.nextUrl.pathname) {
+  if (
+    existing?.value &&
+    existing.operation === operation &&
+    existing.path === request.nextUrl.pathname
+  ) {
     return { value: existing.value, replayed: true };
   }
 

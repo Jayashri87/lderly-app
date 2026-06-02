@@ -14,6 +14,7 @@ export type DeviceSessionRecord = {
   createdAt: number;
   expiresAt: number;
   revokedAt?: number;
+  lastActivityAt?: number;
 };
 
 const clientIpFor = (request: NextRequest) =>
@@ -23,10 +24,34 @@ const clientIpFor = (request: NextRequest) =>
 
 const uidFor = (session: SessionPayload) => session.uid || session.username;
 
-export const registerRoleSession = async (
-  request: NextRequest,
-  session: SessionPayload
-) => {
+const sessionCache = new Map<
+  string,
+  {
+    record: DeviceSessionRecord | null;
+    cachedAt: number;
+  }
+>();
+const sessionCacheTtlMs = 15 * 1000;
+const activityWriteIntervalMs = 5 * 60 * 1000;
+
+const cachedSessionFor = (sessionId: string) => {
+  const cached = sessionCache.get(sessionId);
+
+  if (!cached || Date.now() - cached.cachedAt > sessionCacheTtlMs) {
+    return undefined;
+  }
+
+  return cached.record;
+};
+
+const setCachedSession = (sessionId: string, record: DeviceSessionRecord | null) => {
+  sessionCache.set(sessionId, {
+    record,
+    cachedAt: Date.now()
+  });
+};
+
+export const registerRoleSession = async (request: NextRequest, session: SessionPayload) => {
   const database = getAdminDatabase();
 
   if (!database) {
@@ -43,18 +68,21 @@ export const registerRoleSession = async (
     userAgent: request.headers.get("user-agent") || "",
     ip: clientIpFor(request),
     createdAt: session.createdAt,
-    expiresAt: session.expiresAt
+    expiresAt: session.expiresAt,
+    lastActivityAt: Date.now()
   };
 
-  await database.ref(`deviceSessions/byId/${session.sessionId}`).set(record);
-  await database
-    .ref(`deviceSessions/byUser/${uid}/${session.sessionId}`)
-    .set({
+  await Promise.all([
+    database.ref(`deviceSessions/byId/${session.sessionId}`).set(record),
+    database.ref(`deviceSessions/byUser/${uid}/${session.sessionId}`).set({
       status: record.status,
       role: record.role,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt
-    });
+    })
+  ]);
+
+  setCachedSession(session.sessionId, record);
 };
 
 export const isRoleSessionActive = async (session: SessionPayload) => {
@@ -64,12 +92,48 @@ export const isRoleSessionActive = async (session: SessionPayload) => {
     return true;
   }
 
-  const snapshot = await database
-    .ref(`deviceSessions/byId/${session.sessionId}`)
-    .get();
+  const cached = cachedSessionFor(session.sessionId);
+
+  if (cached !== undefined) {
+    return Boolean(cached && cached.status === "active" && cached.expiresAt > Date.now());
+  }
+
+  const snapshot = await database.ref(`deviceSessions/byId/${session.sessionId}`).get();
   const record = snapshot.val() as DeviceSessionRecord | null;
 
+  setCachedSession(session.sessionId, record);
+
   return Boolean(record && record.status === "active" && record.expiresAt > Date.now());
+};
+
+export const updateSessionActivity = async (session: SessionPayload) => {
+  const database = getAdminDatabase();
+
+  if (!database) {
+    return;
+  }
+
+  const cached = cachedSessionFor(session.sessionId);
+  const lastActivityAt = cached?.lastActivityAt || session.createdAt;
+  const now = Date.now();
+
+  if (now - lastActivityAt < activityWriteIntervalMs) {
+    return;
+  }
+
+  await database
+    .ref(`deviceSessions/byId/${session.sessionId}/lastActivityAt`)
+    .set(now)
+    .catch(() => undefined);
+
+  if (cached) {
+    setCachedSession(session.sessionId, {
+      ...cached,
+      lastActivityAt: now
+    });
+  } else {
+    sessionCache.delete(session.sessionId);
+  }
 };
 
 export const revokeRoleSession = async (session: SessionPayload | null) => {
@@ -92,6 +156,8 @@ export const revokeRoleSession = async (session: SessionPayload | null) => {
     [`deviceSessions/byUser/${uid}/${session.sessionId}/status`]: "revoked",
     [`deviceSessions/byUser/${uid}/${session.sessionId}/revokedAt`]: revokedAt
   });
+
+  sessionCache.delete(session.sessionId);
 };
 
 export const revokeAllRoleSessions = async (request: NextRequest) => {
@@ -113,8 +179,36 @@ export const revokeAllRoleSessions = async (request: NextRequest) => {
     updates[`deviceSessions/byId/${sessionId}/revokedAt`] = revokedAt;
     updates[`deviceSessions/byUser/${uid}/${sessionId}/status`] = "revoked";
     updates[`deviceSessions/byUser/${uid}/${sessionId}/revokedAt`] = revokedAt;
+    sessionCache.delete(sessionId);
   }
 
   await database.ref().update(updates);
   return session;
+};
+
+export const cleanupExpiredSessions = async (): Promise<number> => {
+  const database = getAdminDatabase();
+
+  if (!database) {
+    return 0;
+  }
+
+  const snapshot = await database.ref("deviceSessions/byId").get();
+  const sessions = (snapshot.val() || {}) as Record<string, DeviceSessionRecord>;
+  const now = Date.now();
+  const updates: Record<string, null> = {};
+
+  for (const [sessionId, record] of Object.entries(sessions)) {
+    if (record.expiresAt < now) {
+      updates[`deviceSessions/byId/${sessionId}`] = null;
+      updates[`deviceSessions/byUser/${record.uid}/${sessionId}`] = null;
+      sessionCache.delete(sessionId);
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await database.ref().update(updates);
+  }
+
+  return Object.keys(updates).length / 2;
 };

@@ -1,10 +1,12 @@
 import { getAdminDatabase } from "./firebaseAdmin";
+import { cleanupExpiredSessions } from "./sessionRegistry";
 
 type MaintenanceRecord = {
   id: string;
   actor: string;
   staleLocksRemoved: number;
   expiredIdempotencyRemoved: number;
+  expiredSessionsRemoved: number;
   oldRecoverySignalsRemoved: number;
   startedAt: number;
   completedAt: number;
@@ -47,13 +49,18 @@ export const OpsMaintenanceProvider = {
     ).filter((operation) => Number(operation.expiresAt || 0) <= now);
     const oldRecoverySignals = normalizeObject<{ createdAt?: number }>(
       recoverySnapshot.val()
-    ).filter((signal) => Number(signal.createdAt || 0) > 0 && Number(signal.createdAt) < now - 24 * 60 * 60 * 1000);
+    ).filter(
+      (signal) =>
+        Number(signal.createdAt || 0) > 0 && Number(signal.createdAt) < now - 24 * 60 * 60 * 1000
+    );
+    const expiredSessionsRemoved = await cleanupExpiredSessions();
     const recordId = `maintenance-${startedAt}-${Math.random().toString(36).slice(2, 8)}`;
     const record: MaintenanceRecord = {
       id: recordId,
       actor,
       staleLocksRemoved: staleLocks.length,
       expiredIdempotencyRemoved: expiredIdempotency.length,
+      expiredSessionsRemoved,
       oldRecoverySignalsRemoved: oldRecoverySignals.length,
       startedAt,
       completedAt: Date.now()
