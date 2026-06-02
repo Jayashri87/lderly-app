@@ -16,6 +16,27 @@ The caregiver app needs native Android background location so families can see:
 - job completion
 - panic/SOS support
 
+## GPS Reliability Improvements
+
+The app now treats location as a visit-scoped operating workflow, not a passive UI toggle:
+
+- starts foreground-service tracking only after the caregiver starts navigation for an accepted job
+- sends an immediate foreground GPS fix before switching to background updates
+- tracks every 10 seconds or 10 meters while the foreground service is active
+- keeps Android background updates alive through the persistent notification
+- stores live GPS health locally so caregivers can see whether sharing is active
+- queues failed location posts locally and retries them every 15 seconds
+- stops location sharing when the visit is completed, cancelled, settled, or the caregiver signs out/goes offline
+- sends only through the existing protected `POST /api/caretaker/location` endpoint
+
+This is still not a full Uber-native map stack. The remaining native tracking upgrades are:
+
+- Google Maps SDK route polyline in the APK
+- native navigation deep link to Google Maps
+- battery optimization prompt for pilot devices
+- Play Store background-location declaration and review copy
+- field testing on at least 2 Android brands with screen locked
+
 ## Recommended Stack
 
 - Expo React Native

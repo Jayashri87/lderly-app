@@ -13,7 +13,7 @@ import {
   View
 } from "react-native";
 import { CaregiverApi, clearSession, readSession } from "./src/api";
-import { CaregiverLocation } from "./src/backgroundLocation";
+import { CaregiverLocation, LocationHealth } from "./src/backgroundLocation";
 import { ActiveAssignment, AssignmentFeed, CaregiverSession } from "./src/types";
 
 const statusCopy: Record<string, { label: string; detail: string; next: string }> = {
@@ -77,6 +77,7 @@ export default function App() {
   const [online, setOnline] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<number | null>(null);
   const [clock, setClock] = useState(0);
+  const [locationHealth, setLocationHealth] = useState<LocationHealth | null>(null);
 
   const activeBooking = useMemo(() => {
     const active = feed?.bookings?.[0] || null;
@@ -137,6 +138,27 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  const refreshLocationHealth = useCallback(async () => {
+    const health = await CaregiverLocation.getStatus();
+    setLocationHealth(health);
+  }, []);
+
+  useEffect(() => {
+    const initialRefresh = setTimeout(() => {
+      refreshLocationHealth().catch(() => undefined);
+    }, 0);
+    const timer = setInterval(() => {
+      CaregiverLocation.flushQueue()
+        .catch(() => undefined)
+        .finally(() => refreshLocationHealth().catch(() => undefined));
+    }, 15000);
+
+    return () => {
+      clearTimeout(initialRefresh);
+      clearInterval(timer);
+    };
+  }, [refreshLocationHealth]);
+
   useEffect(() => {
     if (!session) {
       return undefined;
@@ -148,6 +170,19 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, [refreshFeed, session]);
+
+  useEffect(() => {
+    if (
+      activeBooking?.status &&
+      ["completed", "payment_settled", "report_generated", "cancelled"].includes(
+        activeBooking.status
+      )
+    ) {
+      CaregiverLocation.stop()
+        .catch(() => undefined)
+        .finally(() => refreshLocationHealth().catch(() => undefined));
+    }
+  }, [activeBooking?.status, refreshLocationHealth]);
 
   const run = async (label: string, action: () => Promise<unknown>, refresh = true) => {
     if (busy) {
@@ -177,6 +212,10 @@ export default function App() {
     }
 
     setOnline(nextOnline);
+    if (!nextOnline) {
+      await CaregiverLocation.stop();
+      await refreshLocationHealth();
+    }
     await run(nextOnline ? "Going online" : "Going offline", () =>
       CaregiverApi.updateAvailability(session, nextOnline, nextOnline ? "available" : "offline")
     );
@@ -209,6 +248,7 @@ export default function App() {
     if (currentState === "accepted") {
       run("Start navigation", async () => {
         await CaregiverLocation.start(currentBookingId);
+        await refreshLocationHealth();
         await CaregiverApi.updateStatus(session, currentBookingId, "en_route");
       });
       return;
@@ -231,6 +271,7 @@ export default function App() {
     if (currentState === "in_progress") {
       run("Complete visit", async () => {
         await CaregiverLocation.stop();
+        await refreshLocationHealth();
         await CaregiverApi.updateStatus(session, currentBookingId, "completed");
       });
       return;
@@ -244,20 +285,28 @@ export default function App() {
       return;
     }
 
-    Alert.alert("Reject care request?", "This request will move to another caregiver or ops review.", [
-      {
-        text: "Keep request",
-        style: "cancel"
-      },
-      {
-        text: "Reject",
-        style: "destructive",
-        onPress: () =>
-          run("Reject request", () =>
-            CaregiverApi.rejectBooking(session, activeOffer.bookingId, "Not available for this request")
-          )
-      }
-    ]);
+    Alert.alert(
+      "Reject care request?",
+      "This request will move to another caregiver or ops review.",
+      [
+        {
+          text: "Keep request",
+          style: "cancel"
+        },
+        {
+          text: "Reject",
+          style: "destructive",
+          onPress: () =>
+            run("Reject request", () =>
+              CaregiverApi.rejectBooking(
+                session,
+                activeOffer.bookingId,
+                "Not available for this request"
+              )
+            )
+        }
+      ]
+    );
   };
 
   const triggerPanicSos = () => {
@@ -266,7 +315,10 @@ export default function App() {
     }
 
     if (!activeBooking && !activeOffer) {
-      Alert.alert("No active request", "Go online or refresh assignments before sending Panic SOS.");
+      Alert.alert(
+        "No active request",
+        "Go online or refresh assignments before sending Panic SOS."
+      );
       return;
     }
 
@@ -299,8 +351,8 @@ export default function App() {
           <Text style={styles.brand}>LDERLY PARTNER</Text>
           <Text style={styles.loginTitle}>Drive the care day</Text>
           <Text style={styles.loginSubtitle}>
-            Sign in to receive nearby requests, navigate to families, start visits with OTP,
-            and complete jobs.
+            Sign in to receive nearby requests, navigate to families, start visits with OTP, and
+            complete jobs.
           </Text>
           <View style={styles.panel}>
             <TextInput
@@ -382,11 +434,9 @@ export default function App() {
           </View>
         </View>
 
-        <AssignmentCard
-          booking={activeBooking}
-          offer={activeOffer}
-          serverTime={clock}
-        />
+        <AssignmentCard booking={activeBooking} offer={activeOffer} serverTime={clock} />
+
+        <LocationStatusCard health={locationHealth} activeBooking={activeBooking} now={clock} />
 
         <FunnelCard state={currentState} offerExpired={offerExpired} hasOtp={Boolean(otp.trim())} />
 
@@ -415,11 +465,7 @@ export default function App() {
         <View style={styles.actionGrid}>
           <SmallAction label="Refresh" onPress={() => refreshFeed(session)} />
           {activeOffer ? <SmallAction label="Reject" onPress={rejectOffer} /> : null}
-          <SmallAction
-            label="Panic SOS"
-            danger
-            onPress={triggerPanicSos}
-          />
+          <SmallAction label="Panic SOS" danger onPress={triggerPanicSos} />
           <SmallAction
             label="Sign out"
             onPress={() =>
@@ -427,6 +473,7 @@ export default function App() {
                 "Signing out",
                 async () => {
                   await CaregiverLocation.stop();
+                  await refreshLocationHealth();
                   await clearSession();
                   setSession(null);
                   setFeed(null);
@@ -452,6 +499,47 @@ export default function App() {
   );
 }
 
+function LocationStatusCard({
+  health,
+  activeBooking,
+  now
+}: {
+  health: LocationHealth | null;
+  activeBooking: ActiveAssignment | null;
+  now: number;
+}) {
+  const lastSent = health?.lastSentAt
+    ? `${Math.max(0, Math.round((now - health.lastSentAt) / 1000))}s ago`
+    : "--";
+  const accuracy = health?.lastAccuracyMeters ? `${Math.round(health.lastAccuracyMeters)} m` : "--";
+  const activeByStatus = ["en_route", "arrived", "in_progress"].includes(
+    activeBooking?.status || ""
+  );
+
+  return (
+    <View style={styles.gpsPanel}>
+      <View style={styles.gpsHeader}>
+        <View>
+          <Text style={styles.sectionLabel}>Live GPS</Text>
+          <Text style={styles.gpsTitle}>
+            {health?.active && activeByStatus ? "Sharing movement" : "GPS standby"}
+          </Text>
+        </View>
+        <View style={[styles.gpsStatusPill, health?.active ? styles.gpsStatusActive : null]}>
+          <View style={[styles.gpsPulse, health?.active ? styles.gpsPulseActive : null]} />
+          <Text style={styles.gpsStatusText}>{health?.active ? "Active" : "Off"}</Text>
+        </View>
+      </View>
+      <View style={styles.metricRow}>
+        <Metric label="Last sent" value={lastSent} />
+        <Metric label="Accuracy" value={accuracy} />
+        <Metric label="Queued" value={`${health?.queued || 0}`} />
+      </View>
+      {health?.error ? <Text style={styles.warningText}>{health.error}</Text> : null}
+    </View>
+  );
+}
+
 function AssignmentCard({
   booking,
   offer,
@@ -474,8 +562,8 @@ function AssignmentCard({
         <Text style={styles.sectionLabel}>No active request</Text>
         <Text style={styles.emptyTitle}>Stay online for nearby jobs</Text>
         <Text style={styles.emptyText}>
-          When a family books care in your area, the request will appear here with ETA,
-          distance, service, and one accept action.
+          When a family books care in your area, the request will appear here with ETA, distance,
+          service, and one accept action.
         </Text>
       </View>
     );
@@ -496,7 +584,10 @@ function AssignmentCard({
       <InfoRow label="Booking" value={compactId(booking?.id || offer?.bookingId || "")} />
       <View style={styles.metricRow}>
         <Metric label="Distance" value={distance ? `${distance} km` : "--"} />
-        <Metric label="ETA" value={`${booking?.tracking?.etaMinutes || offer?.etaMinutes || "--"} min`} />
+        <Metric
+          label="ETA"
+          value={`${booking?.tracking?.etaMinutes || offer?.etaMinutes || "--"} min`}
+        />
         <Metric label="Offer" value={expiry || "Active"} />
       </View>
     </View>
@@ -512,8 +603,12 @@ function Progress({ booking }: { booking: ActiveAssignment | null }) {
       <Text style={styles.sectionLabel}>Visit progress</Text>
       {steps.map((step, index) => (
         <View key={step} style={styles.progressRow}>
-          <View style={[styles.progressDot, index <= activeIndex ? styles.progressDotActive : null]} />
-          <Text style={[styles.progressText, index <= activeIndex ? styles.progressTextActive : null]}>
+          <View
+            style={[styles.progressDot, index <= activeIndex ? styles.progressDotActive : null]}
+          />
+          <Text
+            style={[styles.progressText, index <= activeIndex ? styles.progressTextActive : null]}
+          >
             {statusCopy[step]?.label || step}
           </Text>
         </View>
@@ -567,7 +662,11 @@ function FunnelCard({
   return (
     <View style={styles.panel}>
       <Text style={styles.sectionLabel}>Care funnel</Text>
-      {offerExpired ? <Text style={styles.warningText}>This request is no longer active. Refresh for the latest request.</Text> : null}
+      {offerExpired ? (
+        <Text style={styles.warningText}>
+          This request is no longer active. Refresh for the latest request.
+        </Text>
+      ) : null}
       {state === "arrived" && !hasOtp ? (
         <Text style={styles.warningText}>OTP is required before service can start.</Text>
       ) : null}
@@ -583,10 +682,7 @@ function FunnelCard({
             <Text style={styles.funnelDotText}>{step.done ? "✓" : step.active ? "!" : ""}</Text>
           </View>
           <Text
-            style={[
-              styles.funnelText,
-              step.done || step.active ? styles.funnelTextActive : null
-            ]}
+            style={[styles.funnelText, step.done || step.active ? styles.funnelTextActive : null]}
           >
             {step.label}
           </Text>
@@ -599,7 +695,11 @@ function FunnelCard({
 function TrustStrip({ feed }: { feed: AssignmentFeed | null }) {
   return (
     <View style={styles.trustStrip}>
-      <Metric label="Rating" value={feed?.caretaker.rating ? `${feed.caretaker.rating}` : "--"} dark />
+      <Metric
+        label="Rating"
+        value={feed?.caretaker.rating ? `${feed.caretaker.rating}` : "--"}
+        dark
+      />
       <Metric
         label="Punctual"
         value={feed?.caretaker.punctualityScore ? `${feed.caretaker.punctualityScore}%` : "--"}
@@ -623,15 +723,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Metric({
-  label,
-  value,
-  dark
-}: {
-  label: string;
-  value: string;
-  dark?: boolean;
-}) {
+function Metric({ label, value, dark }: { label: string; value: string; dark?: boolean }) {
   return (
     <View style={[styles.metric, dark ? styles.metricDark : null]}>
       <Text style={[styles.metricLabel, dark ? styles.metricLabelDark : null]}>{label}</Text>
@@ -650,8 +742,13 @@ function SmallAction({
   danger?: boolean;
 }) {
   return (
-    <TouchableOpacity style={[styles.smallAction, danger ? styles.smallActionDanger : null]} onPress={onPress}>
-      <Text style={[styles.smallActionText, danger ? styles.smallActionDangerText : null]}>{label}</Text>
+    <TouchableOpacity
+      style={[styles.smallAction, danger ? styles.smallActionDanger : null]}
+      onPress={onPress}
+    >
+      <Text style={[styles.smallActionText, danger ? styles.smallActionDangerText : null]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -801,6 +898,50 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "#ffffff",
     padding: 18
+  },
+  gpsPanel: {
+    gap: 12,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
+    padding: 18
+  },
+  gpsHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  gpsTitle: {
+    color: "#06130f",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  gpsStatusPill: {
+    alignItems: "center",
+    borderRadius: 999,
+    backgroundColor: "#e2e8f0",
+    flexDirection: "row",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  gpsStatusActive: {
+    backgroundColor: "#dcfce7"
+  },
+  gpsPulse: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#94a3b8"
+  },
+  gpsPulseActive: {
+    backgroundColor: "#16a34a"
+  },
+  gpsStatusText: {
+    color: "#0f172a",
+    fontSize: 12,
+    fontWeight: "900"
   },
   jobHeader: {
     alignItems: "flex-start",
